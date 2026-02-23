@@ -5,7 +5,8 @@ import { join, resolve } from "node:path"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-const CLI = resolve("dist/cli.js")
+const CLI_SRC = resolve("src/cli/index.ts")
+const TSX = resolve("node_modules/.bin/tsx")
 
 let tmpDir: string
 
@@ -22,7 +23,7 @@ const run = (
   opts?: { cwd?: string; env?: Record<string, string> },
 ): { stdout: string; status: number } => {
   try {
-    const stdout = execFileSync("node", [CLI, ...args], {
+    const stdout = execFileSync(TSX, [CLI_SRC, ...args], {
       cwd: opts?.cwd ?? tmpDir,
       env: { ...process.env, ...opts?.env },
       stdio: "pipe",
