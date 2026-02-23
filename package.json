@@ -1,19 +1,24 @@
 {
-  "name": "ts-builds-template",
-  "version": "1.0.0",
-  "description": "A basic template for creating a TypeScript Builds and Publishing it to NPM.",
+  "name": "envpkt",
+  "version": "0.1.0",
+  "description": "Credential lifecycle and fleet management for AI agents",
   "keywords": [
-    "typescript",
-    "template",
-    "tsdown",
-    "npm"
+    "credentials",
+    "secrets",
+    "ai-agents",
+    "mcp",
+    "toml",
+    "fleet-management"
   ],
   "author": "jordan.burke@gmail.com",
-  "license": "MIT",
-  "homepage": "https://github.com/jordanburke/ts-builds-template",
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/jordanburke/envpkt",
   "repository": {
     "type": "git",
-    "url": "https://github.com/jordanburke/ts-builds-template"
+    "url": "https://github.com/jordanburke/envpkt"
+  },
+  "bin": {
+    "envpkt": "dist/cli.js"
   },
   "scripts": {
     "validate": "ts-builds validate",
@@ -26,13 +31,22 @@
     "test:watch": "ts-builds test:watch",
     "test:coverage": "ts-builds test:coverage",
     "build": "ts-builds build",
+    "build:schema": "tsx scripts/build-schema.ts",
     "dev": "ts-builds dev",
     "prepublishOnly": "pnpm validate"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@sinclair/typebox": "^0.34.48",
+    "commander": "^14.0.3",
+    "functype": "^0.47.0",
+    "smol-toml": "^1.6.0"
   },
   "devDependencies": {
     "@types/node": "^24.10.13",
     "ts-builds": "^2.4.0",
-    "tsdown": "^0.20.3"
+    "tsdown": "^0.20.3",
+    "tsx": "^4.19.4"
   },
   "type": "module",
   "main": "./dist/index.js",
@@ -43,11 +57,13 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
-    }
+    },
+    "./schema": "./schemas/envpkt.schema.json"
   },
   "files": [
     "lib",
-    "dist"
+    "dist",
+    "schemas"
   ],
   "prettier": "ts-builds/prettier",
   "packageManager": "pnpm@10.30.0+sha512.2b5753de015d480eeb88f5b5b61e0051f05b4301808a82ec8b840c9d2adf7748eb352c83f5c1593ca703ff1017295bc3fdd3119abb9686efc96b9fcb18200937"

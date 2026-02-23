@@ -1,0 +1,6 @@
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+version = 1
+
+[meta.API_KEY]
+service = "stripe"

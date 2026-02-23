@@ -1,0 +1,57 @@
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# envpkt for a SaaS integration service
+
+version = 1
+
+[agent]
+name = "billing-service"
+role = "payment-processor"
+capabilities = ["charge", "refund", "subscription-management"]
+
+[lifecycle]
+warn_before_days = 14
+stale_after_days = 365
+
+[meta.STRIPE_SECRET_KEY]
+service = "stripe"
+consumer = "api"
+env_var = "STRIPE_SECRET_KEY"
+purpose = "Process customer payments and manage subscriptions"
+capabilities = ["charges:write", "subscriptions:write", "customers:read"]
+created = "2026-01-15"
+expires = "2027-01-15"
+rotation_url = "https://dashboard.stripe.com/apikeys"
+provisioner = "manual"
+tags = ["payments", "production"]
+
+[meta.STRIPE_WEBHOOK_SECRET]
+service = "stripe"
+consumer = "api"
+env_var = "STRIPE_WEBHOOK_SECRET"
+purpose = "Verify incoming Stripe webhook signatures"
+capabilities = ["webhook-verification"]
+created = "2026-01-15"
+provisioner = "manual"
+tags = ["payments", "webhooks"]
+
+[meta.SENDGRID_API_KEY]
+service = "sendgrid"
+consumer = "saas"
+env_var = "SENDGRID_API_KEY"
+purpose = "Send transactional emails (receipts, invoices, password resets)"
+capabilities = ["mail.send"]
+created = "2025-12-01"
+rotation_url = "https://app.sendgrid.com/settings/api_keys"
+provisioner = "manual"
+tags = ["email", "transactional"]
+
+[meta.REDIS_URL]
+service = "redis"
+consumer = "database"
+env_var = "REDIS_URL"
+purpose = "Rate limiting and idempotency key cache"
+capabilities = ["read", "write"]
+created = "2026-02-01"
+provisioner = "ci"
+tags = ["cache", "rate-limiting"]

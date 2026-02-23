@@ -1,0 +1,86 @@
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# Full envpkt configuration for an AI agent with lifecycle policies
+
+version = 1
+
+[agent]
+name = "data-pipeline-agent"
+role = "etl-processor"
+capabilities = ["read-s3", "write-postgres", "send-notifications"]
+expires = "2027-01-01"
+
+# --- Lifecycle Policy ---
+
+[lifecycle]
+warn_before_days = 30
+stale_after_days = 180
+require_rotation_url = true
+require_purpose = true
+
+# --- Callbacks ---
+
+[callbacks]
+on_expiring = "https://hooks.slack.com/services/T00/B00/xxx"
+on_expired = "https://hooks.slack.com/services/T00/B00/yyy"
+on_audit_fail = "https://hooks.slack.com/services/T00/B00/zzz"
+
+# --- Tool Integrations ---
+
+[tools]
+fnox = true
+mcp = true
+
+# --- Secret Metadata ---
+# Each [meta.<KEY>] answers five questions:
+#   What service?  Where stored?  Why needed?  When expires?  How provisioned?
+
+[meta.AWS_ACCESS_KEY_ID]
+service = "aws"
+consumer = "infra"
+env_var = "AWS_ACCESS_KEY_ID"
+vault_path = "secret/data/aws/pipeline"
+purpose = "S3 bucket read access for raw data ingestion"
+capabilities = ["s3:GetObject", "s3:ListBucket"]
+created = "2025-11-01"
+expires = "2026-05-01"
+rotation_url = "https://console.aws.amazon.com/iam/home#/security_credentials"
+provisioner = "vault"
+tags = ["aws", "production", "data-pipeline"]
+
+[meta.AWS_SECRET_ACCESS_KEY]
+service = "aws"
+consumer = "infra"
+env_var = "AWS_SECRET_ACCESS_KEY"
+vault_path = "secret/data/aws/pipeline"
+purpose = "S3 bucket read access (secret counterpart)"
+capabilities = ["s3:GetObject", "s3:ListBucket"]
+created = "2025-11-01"
+expires = "2026-05-01"
+rotation_url = "https://console.aws.amazon.com/iam/home#/security_credentials"
+provisioner = "vault"
+tags = ["aws", "production", "data-pipeline"]
+
+[meta.DATABASE_URL]
+service = "postgres"
+consumer = "database"
+env_var = "DATABASE_URL"
+vault_path = "secret/data/postgres/pipeline"
+purpose = "Write processed data to the analytics database"
+capabilities = ["SELECT", "INSERT", "UPDATE"]
+created = "2025-10-15"
+expires = "2026-10-15"
+rotation_url = "https://wiki.internal/runbooks/rotate-db-creds"
+provisioner = "vault"
+tags = ["postgres", "production", "analytics"]
+
+[meta.SLACK_WEBHOOK_URL]
+service = "slack"
+consumer = "saas"
+env_var = "SLACK_WEBHOOK_URL"
+purpose = "Send pipeline completion and failure notifications"
+capabilities = ["post-message"]
+created = "2025-09-01"
+rotation_url = "https://api.slack.com/apps/A00/incoming-webhooks"
+provisioner = "manual"
+tags = ["slack", "notifications"]

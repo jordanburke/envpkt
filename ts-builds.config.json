@@ -1,4 +1,7 @@
 {
   "srcDir": "./src",
-  "validateChain": ["format", "lint", "typecheck", "test", "build"]
+  "commands": {
+    "build:schema": "tsx scripts/build-schema.ts"
+  },
+  "validateChain": ["format", "lint", "typecheck", "test", "build:schema", "build"]
 }

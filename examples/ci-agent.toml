@@ -1,0 +1,53 @@
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# envpkt for a CI/CD deployment agent
+
+version = 1
+
+[agent]
+name = "deploy-bot"
+role = "ci-deployer"
+capabilities = ["build", "test", "deploy-staging", "deploy-production"]
+expires = "2026-12-31"
+
+[lifecycle]
+warn_before_days = 7
+stale_after_days = 90
+require_rotation_url = true
+
+[meta.GITHUB_TOKEN]
+service = "github"
+consumer = "api"
+env_var = "GITHUB_TOKEN"
+purpose = "Clone repositories and create deployment status checks"
+capabilities = ["repo:read", "deployments:write", "statuses:write"]
+created = "2026-02-01"
+expires = "2026-08-01"
+rotation_url = "https://github.com/settings/tokens"
+provisioner = "ci"
+tags = ["github", "ci"]
+
+[meta.DOCKER_REGISTRY_TOKEN]
+service = "ghcr.io"
+consumer = "infra"
+env_var = "DOCKER_REGISTRY_TOKEN"
+purpose = "Push built container images to GitHub Container Registry"
+capabilities = ["packages:write"]
+created = "2026-02-01"
+expires = "2026-08-01"
+rotation_url = "https://github.com/settings/tokens"
+provisioner = "ci"
+tags = ["docker", "registry", "ci"]
+
+[meta.KUBE_CONFIG]
+service = "kubernetes"
+consumer = "infra"
+env_var = "KUBECONFIG"
+vault_path = "secret/data/k8s/deploy-bot"
+purpose = "Apply manifests to staging and production clusters"
+capabilities = ["apply", "rollout", "get"]
+created = "2026-01-15"
+expires = "2026-07-15"
+rotation_url = "https://wiki.internal/runbooks/rotate-k8s-sa"
+provisioner = "vault"
+tags = ["kubernetes", "deployment"]
