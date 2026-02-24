@@ -5,10 +5,11 @@ import { Either, Left, Right, Try } from "functype"
 import type { FnoxError } from "../core/types.js"
 
 /** Export all secrets from fnox as key=value pairs for a given profile */
-export const fnoxExport = (profile?: string): Either<FnoxError, Record<string, string>> => {
+export const fnoxExport = (profile?: string, agentKey?: string): Either<FnoxError, Record<string, string>> => {
   const args = profile ? ["export", "--profile", profile] : ["export"]
+  const env = agentKey ? { ...process.env, FNOX_AGE_KEY: agentKey } : undefined
 
-  return Try(() => execFileSync("fnox", args, { stdio: "pipe", encoding: "utf-8" })).fold<
+  return Try(() => execFileSync("fnox", args, { stdio: "pipe", encoding: "utf-8", env })).fold<
     Either<FnoxError, Record<string, string>>
   >(
     (err) => Left({ _tag: "FnoxCliError", message: `fnox export failed: ${err}` }),
@@ -28,10 +29,13 @@ export const fnoxExport = (profile?: string): Either<FnoxError, Record<string, s
 }
 
 /** Get a single secret value from fnox */
-export const fnoxGet = (key: string, profile?: string): Either<FnoxError, string> => {
+export const fnoxGet = (key: string, profile?: string, agentKey?: string): Either<FnoxError, string> => {
   const args = profile ? ["get", key, "--profile", profile] : ["get", key]
+  const env = agentKey ? { ...process.env, FNOX_AGE_KEY: agentKey } : undefined
 
-  return Try(() => execFileSync("fnox", args, { stdio: "pipe", encoding: "utf-8" })).fold<Either<FnoxError, string>>(
+  return Try(() => execFileSync("fnox", args, { stdio: "pipe", encoding: "utf-8", env })).fold<
+    Either<FnoxError, string>
+  >(
     (err) => Left({ _tag: "FnoxCliError", message: `fnox get ${key} failed: ${err}` }),
     (output) => Right(output.trim()),
   )

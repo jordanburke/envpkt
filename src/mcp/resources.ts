@@ -104,7 +104,12 @@ const readCapabilities = (): ReadResourceResult => {
         text: JSON.stringify(
           {
             agent: config.agent
-              ? { name: config.agent.name, role: config.agent.role, capabilities: agentCapabilities }
+              ? {
+                  name: config.agent.name,
+                  consumer: config.agent.consumer,
+                  description: config.agent.description,
+                  capabilities: agentCapabilities,
+                }
               : null,
             secrets: secretCapabilities,
           },

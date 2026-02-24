@@ -15,13 +15,13 @@ export type {
 
 export type HealthStatus = "healthy" | "degraded" | "critical"
 
-export type SecretStatus = "healthy" | "expiring_soon" | "expired" | "stale" | "missing"
+export type SecretStatus = "healthy" | "expiring_soon" | "expired" | "stale" | "missing" | "missing_metadata"
 
 // --- Audit types ---
 
 export type SecretHealth = {
   readonly key: string
-  readonly service: string
+  readonly service: Option<string>
   readonly status: SecretStatus
   readonly days_remaining: Option<number>
   readonly rotation_url: Option<string>
@@ -40,14 +40,17 @@ export type AuditResult = {
   readonly expired: number
   readonly stale: number
   readonly missing: number
+  readonly missing_metadata: number
+  readonly orphaned: number
+  readonly agent?: import("./schema.js").AgentIdentity
 }
 
 // --- Fleet types ---
 
 export type FleetAgent = {
   readonly path: string
-  readonly name: Option<string>
-  readonly role: Option<string>
+  readonly agent?: import("./schema.js").AgentIdentity
+  readonly min_expiry_days?: number
   readonly audit: AuditResult
 }
 
@@ -56,8 +59,8 @@ export type FleetHealth = {
   readonly agents: List<FleetAgent>
   readonly total_agents: number
   readonly total_secrets: number
-  readonly critical_count: number
-  readonly degraded_count: number
+  readonly expired: number
+  readonly expiring_soon: number
 }
 
 // --- fnox types ---
@@ -84,3 +87,32 @@ export type FnoxError =
   | { readonly _tag: "FnoxNotFound"; readonly message: string }
   | { readonly _tag: "FnoxCliError"; readonly message: string }
   | { readonly _tag: "FnoxParseError"; readonly message: string }
+
+// --- Boot types ---
+
+export type BootOptions = {
+  readonly configPath?: string
+  readonly profile?: string
+  readonly inject?: boolean
+  readonly failOnExpired?: boolean
+  readonly warnOnly?: boolean
+}
+
+export type BootResult = {
+  readonly audit: AuditResult
+  readonly injected: ReadonlyArray<string>
+  readonly skipped: ReadonlyArray<string>
+  readonly secrets: Readonly<Record<string, string>>
+  readonly warnings: ReadonlyArray<string>
+}
+
+export type BootError =
+  | ConfigError
+  | FnoxError
+  | { readonly _tag: "AuditFailed"; readonly audit: AuditResult; readonly message: string }
+  | IdentityError
+
+export type IdentityError =
+  | { readonly _tag: "AgeNotFound"; readonly message: string }
+  | { readonly _tag: "DecryptFailed"; readonly message: string }
+  | { readonly _tag: "IdentityNotFound"; readonly path: string }

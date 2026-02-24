@@ -4,10 +4,7 @@
   "title": "envpkt configuration",
   "description": "Credential lifecycle and fleet management configuration for AI agents",
   "type": "object",
-  "required": [
-    "version",
-    "meta"
-  ],
+  "required": ["version", "meta"],
   "properties": {
     "version": {
       "description": "Schema version number",
@@ -17,16 +14,35 @@
     "agent": {
       "description": "Identity and capabilities of the AI agent using this envpkt",
       "type": "object",
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "properties": {
         "name": {
           "description": "Agent display name",
           "type": "string"
         },
-        "role": {
-          "description": "Agent role or function",
+        "consumer": {
+          "description": "Classification of the agent's consumer type",
+          "anyOf": [
+            {
+              "const": "agent",
+              "type": "string"
+            },
+            {
+              "const": "service",
+              "type": "string"
+            },
+            {
+              "const": "developer",
+              "type": "string"
+            },
+            {
+              "const": "ci",
+              "type": "string"
+            }
+          ]
+        },
+        "description": {
+          "description": "Agent description or role",
           "type": "string"
         },
         "capabilities": {
@@ -40,6 +56,21 @@
           "format": "date",
           "description": "Agent credential expiration date (YYYY-MM-DD)",
           "type": "string"
+        },
+        "services": {
+          "description": "Service dependencies for this agent",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "identity": {
+          "description": "Path to encrypted agent key file (relative to config directory)",
+          "type": "string"
+        },
+        "recipient": {
+          "description": "Agent's age public key for encryption",
+          "type": "string"
         }
       }
     },
@@ -48,47 +79,21 @@
       "type": "object",
       "patternProperties": {
         "^(.*)$": {
-          "description": "Metadata about a single secret — answers What/Where/Why/When/How",
+          "description": "Metadata about a single secret",
           "type": "object",
-          "required": [
-            "service"
-          ],
           "properties": {
             "service": {
               "description": "Service or system this secret authenticates to",
               "type": "string"
             },
-            "consumer": {
-              "description": "Classification of the secret's consumer service",
-              "anyOf": [
-                {
-                  "const": "api",
-                  "type": "string"
-                },
-                {
-                  "const": "database",
-                  "type": "string"
-                },
-                {
-                  "const": "saas",
-                  "type": "string"
-                },
-                {
-                  "const": "infra",
-                  "type": "string"
-                },
-                {
-                  "const": "other",
-                  "type": "string"
-                }
-              ]
-            },
-            "env_var": {
-              "description": "Environment variable name where the secret is injected",
+            "expires": {
+              "format": "date",
+              "description": "Date the secret expires (YYYY-MM-DD)",
               "type": "string"
             },
-            "vault_path": {
-              "description": "Path in secret manager (e.g. vault, fnox)",
+            "rotation_url": {
+              "format": "uri",
+              "description": "URL or reference for secret rotation procedure",
               "type": "string"
             },
             "purpose": {
@@ -107,42 +112,33 @@
               "description": "Date the secret was provisioned (YYYY-MM-DD)",
               "type": "string"
             },
-            "expires": {
-              "format": "date",
-              "description": "Date the secret expires (YYYY-MM-DD)",
+            "rotates": {
+              "description": "Rotation schedule (e.g. '90d', 'quarterly')",
               "type": "string"
             },
-            "rotation_url": {
-              "format": "uri",
-              "description": "URL or reference for secret rotation procedure",
+            "rate_limit": {
+              "description": "Rate limit or quota info (e.g. '1000/min')",
               "type": "string"
             },
-            "provisioner": {
-              "description": "How this secret is provisioned",
-              "anyOf": [
-                {
-                  "const": "manual",
-                  "type": "string"
-                },
-                {
-                  "const": "fnox",
-                  "type": "string"
-                },
-                {
-                  "const": "vault",
-                  "type": "string"
-                },
-                {
-                  "const": "ci",
-                  "type": "string"
-                }
-              ]
+            "model_hint": {
+              "description": "Suggested model or tier for this credential",
+              "type": "string"
+            },
+            "source": {
+              "description": "Where the secret value originates (e.g. 'vault', 'ci')",
+              "type": "string"
+            },
+            "required": {
+              "description": "Whether this secret is required for operation",
+              "type": "boolean"
             },
             "tags": {
-              "description": "Freeform tags for grouping and filtering",
-              "type": "array",
-              "items": {
-                "type": "string"
+              "description": "Key-value tags for grouping and filtering",
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {
+                  "type": "string"
+                }
               }
             }
           }
@@ -153,24 +149,19 @@
       "description": "Policy configuration for credential lifecycle management",
       "type": "object",
       "properties": {
-        "warn_before_days": {
-          "default": 30,
-          "description": "Days before expiration to trigger warnings",
-          "type": "number"
-        },
-        "stale_after_days": {
-          "default": 365,
+        "stale_warning_days": {
+          "default": 90,
           "description": "Days since creation to consider a secret stale",
           "type": "number"
         },
-        "require_rotation_url": {
+        "require_expiration": {
           "default": false,
-          "description": "Require rotation_url on all secrets",
+          "description": "Require expires on all secrets",
           "type": "boolean"
         },
-        "require_purpose": {
+        "require_service": {
           "default": false,
-          "description": "Require purpose on all secrets",
+          "description": "Require service on all secrets",
           "type": "boolean"
         }
       }
@@ -194,19 +185,10 @@
       }
     },
     "tools": {
-      "description": "Tool integration toggles",
+      "description": "Tool integration configuration — open namespace for third-party extensions",
       "type": "object",
-      "properties": {
-        "fnox": {
-          "default": true,
-          "description": "Enable fnox integration",
-          "type": "boolean"
-        },
-        "mcp": {
-          "default": true,
-          "description": "Enable MCP server capabilities",
-          "type": "boolean"
-        }
+      "patternProperties": {
+        "^(.*)$": {}
       }
     }
   }

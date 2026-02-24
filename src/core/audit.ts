@@ -4,6 +4,7 @@ import type { EnvpktConfig } from "./schema.js"
 import type { AuditResult, HealthStatus, SecretHealth, SecretStatus } from "./types.js"
 
 const MS_PER_DAY = 86_400_000
+const WARN_BEFORE_DAYS = 30
 
 const daysBetween = (from: Date, to: Date): number => Math.floor((to.getTime() - from.getTime()) / MS_PER_DAY)
 
@@ -16,10 +17,9 @@ const classifySecret = (
   key: string,
   meta: EnvpktConfig["meta"][string],
   fnoxKeys: ReadonlySet<string>,
-  warnBeforeDays: number,
-  staleAfterDays: number,
-  requireRotationUrl: boolean,
-  requirePurpose: boolean,
+  staleWarningDays: number,
+  requireExpiration: boolean,
+  requireService: boolean,
   today: Date,
 ): SecretHealth => {
   const issues: string[] = []
@@ -28,6 +28,7 @@ const classifySecret = (
   const expires = Option(meta?.expires).flatMap(parseDate)
   const rotationUrl = Option(meta?.rotation_url)
   const purpose = Option(meta?.purpose)
+  const service = Option(meta?.service)
 
   const daysRemaining = expires.map((exp) => daysBetween(today, exp))
 
@@ -39,13 +40,15 @@ const classifySecret = (
   )
   const isExpiringSoon = daysRemaining.fold(
     () => false,
-    (d) => d >= 0 && d <= warnBeforeDays,
+    (d) => d >= 0 && d <= WARN_BEFORE_DAYS,
   )
   const isStale = daysSinceCreated.fold(
     () => false,
-    (d) => d > staleAfterDays,
+    (d) => d > staleWarningDays,
   )
   const isMissing = fnoxKeys.size > 0 && !fnoxKeys.has(key)
+
+  const isMissingMetadata = (requireExpiration && expires.isNone()) || (requireService && service.isNone())
 
   if (isExpired) issues.push("Secret has expired")
   if (isExpiringSoon) {
@@ -58,19 +61,22 @@ const classifySecret = (
   }
   if (isStale) issues.push("Secret is stale (no rotation detected)")
   if (isMissing) issues.push("Key not found in fnox")
-  if (requireRotationUrl && rotationUrl.isNone()) issues.push("Missing required rotation_url")
-  if (requirePurpose && purpose.isNone()) issues.push("Missing required purpose")
+  if (isMissingMetadata) {
+    if (requireExpiration && expires.isNone()) issues.push("Missing required expiration date")
+    if (requireService && service.isNone()) issues.push("Missing required service")
+  }
 
   const status: SecretStatus = Cond.of<SecretStatus>()
     .when(isExpired, "expired")
     .elseWhen(isMissing, "missing")
+    .elseWhen(isMissingMetadata, "missing_metadata")
     .elseWhen(isExpiringSoon, "expiring_soon")
     .elseWhen(isStale, "stale")
     .else("healthy")
 
   return {
     key,
-    service: meta?.service ?? key,
+    service,
     status,
     days_remaining: daysRemaining,
     rotation_url: rotationUrl,
@@ -84,29 +90,34 @@ const classifySecret = (
 export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string>, today?: Date): AuditResult => {
   const now = today ?? new Date()
   const lifecycle = config.lifecycle ?? {}
-  const warnBeforeDays = lifecycle.warn_before_days ?? 30
-  const staleAfterDays = lifecycle.stale_after_days ?? 365
-  const requireRotationUrl = lifecycle.require_rotation_url ?? false
-  const requirePurpose = lifecycle.require_purpose ?? false
+  const staleWarningDays = lifecycle.stale_warning_days ?? 90
+  const requireExpiration = lifecycle.require_expiration ?? false
+  const requireService = lifecycle.require_service ?? false
 
   const keys = fnoxKeys ?? new Set<string>()
+  const metaKeys = new Set(Object.keys(config.meta))
 
   const secrets = List(
     Object.entries(config.meta).map(([key, meta]) =>
-      classifySecret(key, meta, keys, warnBeforeDays, staleAfterDays, requireRotationUrl, requirePurpose, now),
+      classifySecret(key, meta, keys, staleWarningDays, requireExpiration, requireService, now),
     ),
   )
+
+  // Count orphaned: meta entries that don't have a corresponding fnox key
+  // Only count when fnox keys are available
+  const orphaned = keys.size > 0 ? [...metaKeys].filter((k) => !keys.has(k)).length : 0
 
   const total = secrets.size
   const expired = secrets.count((s) => s.status === "expired")
   const missing = secrets.count((s) => s.status === "missing")
+  const missing_metadata = secrets.count((s) => s.status === "missing_metadata")
   const expiring_soon = secrets.count((s) => s.status === "expiring_soon")
   const stale = secrets.count((s) => s.status === "stale")
   const healthy = secrets.count((s) => s.status === "healthy")
 
   const status: HealthStatus = Cond.of<HealthStatus>()
     .when(expired > 0 || missing > 0, "critical")
-    .elseWhen(expiring_soon > 0 || stale > 0, "degraded")
+    .elseWhen(expiring_soon > 0 || stale > 0 || missing_metadata > 0, "degraded")
     .else("healthy")
 
   return {
@@ -118,5 +129,8 @@ export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string
     expired,
     stale,
     missing,
+    missing_metadata,
+    orphaned,
+    agent: config.agent,
   }
 }

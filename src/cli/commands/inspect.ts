@@ -34,7 +34,8 @@ export const runInspect = (options: InspectOptions): void => {
 
           if (config.agent) {
             console.log(`${BOLD}Agent:${RESET} ${config.agent.name}`)
-            if (config.agent.role) console.log(`  role: ${config.agent.role}`)
+            if (config.agent.consumer) console.log(`  consumer: ${config.agent.consumer}`)
+            if (config.agent.description) console.log(`  description: ${config.agent.description}`)
             if (config.agent.capabilities) console.log(`  capabilities: ${config.agent.capabilities.join(", ")}`)
             if (config.agent.expires) console.log(`  expires: ${config.agent.expires}`)
             console.log("")
@@ -42,20 +43,22 @@ export const runInspect = (options: InspectOptions): void => {
 
           console.log(`${BOLD}Secrets:${RESET} ${Object.keys(config.meta).length}`)
           for (const [key, meta] of Object.entries(config.meta)) {
-            console.log(`  ${BOLD}${key}${RESET} → ${meta.service}`)
+            console.log(`  ${BOLD}${key}${RESET} → ${meta.service ?? key}`)
             if (meta.purpose) console.log(`    purpose: ${meta.purpose}`)
             if (meta.created) console.log(`    created: ${meta.created}`)
             if (meta.expires) console.log(`    expires: ${meta.expires}`)
-            if (meta.provisioner) console.log(`    provisioner: ${meta.provisioner}`)
+            if (meta.source) console.log(`    source: ${meta.source}`)
           }
 
           if (config.lifecycle) {
             console.log("")
             console.log(`${BOLD}Lifecycle:${RESET}`)
-            if (config.lifecycle.warn_before_days !== undefined)
-              console.log(`  warn_before_days: ${config.lifecycle.warn_before_days}`)
-            if (config.lifecycle.stale_after_days !== undefined)
-              console.log(`  stale_after_days: ${config.lifecycle.stale_after_days}`)
+            if (config.lifecycle.stale_warning_days !== undefined)
+              console.log(`  stale_warning_days: ${config.lifecycle.stale_warning_days}`)
+            if (config.lifecycle.require_expiration !== undefined)
+              console.log(`  require_expiration: ${config.lifecycle.require_expiration}`)
+            if (config.lifecycle.require_service !== undefined)
+              console.log(`  require_service: ${config.lifecycle.require_service}`)
           }
         },
       )

@@ -39,16 +39,13 @@ export const runFleet = (options: FleetOptions): void => {
     `${statusIcon(fleet.status)} ${BOLD}Fleet: ${fleet.status.toUpperCase()}${RESET} — ${fleet.total_agents} agents, ${fleet.total_secrets} secrets`,
   )
 
-  if (fleet.critical_count > 0) console.log(`  ${RED}${fleet.critical_count}${RESET} critical`)
-  if (fleet.degraded_count > 0) console.log(`  ${YELLOW}${fleet.degraded_count}${RESET} degraded`)
+  if (fleet.expired > 0) console.log(`  ${RED}${fleet.expired}${RESET} expired`)
+  if (fleet.expiring_soon > 0) console.log(`  ${YELLOW}${fleet.expiring_soon}${RESET} expiring soon`)
 
   console.log("")
 
   for (const agent of agents) {
-    const name = agent.name.fold(
-      () => DIM + agent.path + RESET,
-      (n) => BOLD + n + RESET,
-    )
+    const name = agent.agent?.name ? BOLD + agent.agent.name + RESET : DIM + agent.path + RESET
     const icon = statusIcon(agent.audit.status)
     console.log(`  ${icon} ${name} ${DIM}(${agent.audit.total} secrets)${RESET}`)
   }

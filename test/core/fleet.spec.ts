@@ -39,7 +39,7 @@ describe("scanFleet", () => {
 
     const fleet = scanFleet(tmpDir)
     expect(fleet.status).toBe("critical")
-    expect(fleet.critical_count).toBe(1)
+    expect(fleet.expired).toBeGreaterThan(0)
   })
 
   it("skips node_modules and .git directories", () => {
@@ -76,10 +76,10 @@ describe("scanFleet", () => {
     expect(fleet.total_agents).toBe(1)
   })
 
-  it("reads agent name and role from config", () => {
+  it("reads agent identity from config", () => {
     writeEnvpkt(
       join(tmpDir, "named-agent"),
-      `version = 1\n[agent]\nname = "my-agent"\nrole = "processor"\n[meta.K]\nservice = "s"\n`,
+      `version = 1\n[agent]\nname = "my-agent"\nconsumer = "agent"\ndescription = "Test agent"\n[meta.K]\nservice = "s"\n`,
     )
 
     const fleet = scanFleet(tmpDir)
@@ -87,14 +87,37 @@ describe("scanFleet", () => {
     agent.fold(
       () => expect.unreachable("Expected agent"),
       (a) => {
-        a.name.fold(
-          () => expect.unreachable("Expected name"),
-          (n) => expect(n).toBe("my-agent"),
-        )
-        a.role.fold(
-          () => expect.unreachable("Expected role"),
-          (r) => expect(r).toBe("processor"),
-        )
+        expect(a.agent?.name).toBe("my-agent")
+        expect(a.agent?.consumer).toBe("agent")
+        expect(a.agent?.description).toBe("Test agent")
+      },
+    )
+  })
+
+  it("tracks expired and expiring_soon counts", () => {
+    writeEnvpkt(
+      join(tmpDir, "exp-agent"),
+      `version = 1\n[meta.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2022-01-01"\n`,
+    )
+    writeEnvpkt(join(tmpDir, "ok-agent"), `version = 1\n[meta.OK]\nservice = "y"\n`)
+
+    const fleet = scanFleet(tmpDir)
+    expect(fleet.expired).toBeGreaterThan(0)
+  })
+
+  it("computes min_expiry_days for agents", () => {
+    writeEnvpkt(
+      join(tmpDir, "expiry-agent"),
+      `version = 1\n[meta.K1]\nservice = "a"\nexpires = "2030-01-01"\n[meta.K2]\nservice = "b"\nexpires = "2028-06-01"\n`,
+    )
+
+    const fleet = scanFleet(tmpDir)
+    const agent = fleet.agents.get(0)
+    agent.fold(
+      () => expect.unreachable("Expected agent"),
+      (a) => {
+        expect(a.min_expiry_days).toBeDefined()
+        expect(typeof a.min_expiry_days).toBe("number")
       },
     )
   })

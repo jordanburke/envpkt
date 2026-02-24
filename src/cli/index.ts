@@ -62,7 +62,9 @@ program
   .argument("<command...>", "Command to execute")
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--profile <profile>", "fnox profile to use")
-  .option("--skip-audit", "Skip the pre-flight audit")
+  .option("--skip-audit", "Skip the pre-flight audit (alias: --no-check)")
+  .option("--no-check", "Skip the pre-flight audit")
+  .option("--warn-only", "Warn on critical audit but do not abort")
   .option("--strict", "Abort on any non-healthy secret")
   .action((args: string[], options) => {
     runExec(args, options)

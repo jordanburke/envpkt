@@ -28,7 +28,8 @@ version = 1
 
 [agent]
 name = "test-agent"
-role = "processor"
+consumer = "agent"
+description = "Test processor agent"
 capabilities = ["read", "write"]
 
 [meta.API_KEY]
@@ -37,7 +38,7 @@ purpose = "Payment processing"
 created = "2026-01-01"
 expires = "2027-12-31"
 capabilities = ["charge", "refund"]
-provisioner = "vault"
+source = "vault"
 rotation_url = "https://dashboard.stripe.com/apikeys"
 
 [meta.DB_PASS]
@@ -45,7 +46,7 @@ service = "postgres"
 purpose = "Main database access"
 created = "2026-01-01"
 capabilities = ["read", "write"]
-provisioner = "manual"
+source = "manual"
 `
 
 const expiredConfig = `
@@ -114,6 +115,8 @@ describe("callTool", () => {
       const data = JSON.parse((result.content[0] as { text: string }).text)
 
       expect(data.agent.name).toBe("test-agent")
+      expect(data.agent.consumer).toBe("agent")
+      expect(data.agent.description).toBe("Test processor agent")
       expect(data.agent.capabilities).toEqual(["read", "write"])
       expect(data.secrets.API_KEY).toEqual(["charge", "refund"])
       expect(data.secrets.DB_PASS).toEqual(["read", "write"])
@@ -136,7 +139,7 @@ describe("callTool", () => {
       expect(data.key).toBe("API_KEY")
       expect(data.service).toBe("stripe")
       expect(data.purpose).toBe("Payment processing")
-      expect(data.provisioner).toBe("vault")
+      expect(data.source).toBe("vault")
     })
 
     it("returns error for missing key", () => {

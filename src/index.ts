@@ -13,6 +13,9 @@ export {
 export type {
   AgentIdentity,
   AuditResult,
+  BootError,
+  BootOptions,
+  BootResult,
   CallbackConfig,
   ConfigError,
   EnvpktConfig,
@@ -22,6 +25,7 @@ export type {
   FnoxError,
   FnoxSecret,
   HealthStatus,
+  IdentityError,
   LifecycleConfig,
   SecretHealth,
   SecretMeta,
@@ -43,12 +47,16 @@ export {
 // Audit engine
 export { computeAudit } from "./core/audit.js"
 
+// Boot API
+export { boot, bootSafe, EnvpktBootError } from "./core/boot.js"
+
 // Fleet scanner
 export { scanFleet } from "./core/fleet.js"
 
 // fnox integration
 export { fnoxExport, fnoxGet } from "./fnox/cli.js"
 export { detectFnox, fnoxAvailable } from "./fnox/detect.js"
+export { ageAvailable, unwrapAgentKey } from "./fnox/identity.js"
 export { extractFnoxKeys, readFnoxConfig } from "./fnox/parse.js"
 export { compareFnoxAndEnvpkt } from "./fnox/sync.js"
 

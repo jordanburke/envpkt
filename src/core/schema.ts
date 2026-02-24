@@ -14,8 +14,8 @@ if (!FormatRegistry.Has("uri")) {
 // --- Reusable enums ---
 
 export const ConsumerType = Type.Union(
-  [Type.Literal("api"), Type.Literal("database"), Type.Literal("saas"), Type.Literal("infra"), Type.Literal("other")],
-  { description: "Classification of the secret's consumer service" },
+  [Type.Literal("agent"), Type.Literal("service"), Type.Literal("developer"), Type.Literal("ci")],
+  { description: "Classification of the agent's consumer type" },
 )
 export type ConsumerType = Static<typeof ConsumerType>
 
@@ -24,11 +24,17 @@ export type ConsumerType = Static<typeof ConsumerType>
 export const AgentIdentitySchema = Type.Object(
   {
     name: Type.String({ description: "Agent display name" }),
-    role: Type.Optional(Type.String({ description: "Agent role or function" })),
+    consumer: Type.Optional(ConsumerType),
+    description: Type.Optional(Type.String({ description: "Agent description or role" })),
     capabilities: Type.Optional(Type.Array(Type.String(), { description: "List of capabilities this agent provides" })),
     expires: Type.Optional(
       Type.String({ format: "date", description: "Agent credential expiration date (YYYY-MM-DD)" }),
     ),
+    services: Type.Optional(Type.Array(Type.String(), { description: "Service dependencies for this agent" })),
+    identity: Type.Optional(
+      Type.String({ description: "Path to encrypted agent key file (relative to config directory)" }),
+    ),
+    recipient: Type.Optional(Type.String({ description: "Agent's age public key for encryption" })),
   },
   { description: "Identity and capabilities of the AI agent using this envpkt" },
 )
@@ -38,35 +44,32 @@ export type AgentIdentity = Static<typeof AgentIdentitySchema>
 
 export const SecretMetaSchema = Type.Object(
   {
-    // What
-    service: Type.String({ description: "Service or system this secret authenticates to" }),
-    consumer: Type.Optional(ConsumerType),
-    // Where
-    env_var: Type.Optional(Type.String({ description: "Environment variable name where the secret is injected" })),
-    vault_path: Type.Optional(Type.String({ description: "Path in secret manager (e.g. vault, fnox)" })),
-    // Why
-    purpose: Type.Optional(Type.String({ description: "Why this secret exists and what it enables" })),
-    capabilities: Type.Optional(
-      Type.Array(Type.String(), { description: "What operations this secret grants (e.g. read, write, admin)" }),
-    ),
-    // When
-    created: Type.Optional(
-      Type.String({ format: "date", description: "Date the secret was provisioned (YYYY-MM-DD)" }),
-    ),
+    // Tier 1: scan-first
+    service: Type.Optional(Type.String({ description: "Service or system this secret authenticates to" })),
     expires: Type.Optional(Type.String({ format: "date", description: "Date the secret expires (YYYY-MM-DD)" })),
     rotation_url: Type.Optional(
       Type.String({ format: "uri", description: "URL or reference for secret rotation procedure" }),
     ),
-    // How
-    provisioner: Type.Optional(
-      Type.Union([Type.Literal("manual"), Type.Literal("fnox"), Type.Literal("vault"), Type.Literal("ci")], {
-        description: "How this secret is provisioned",
-      }),
+    // Tier 2: context
+    purpose: Type.Optional(Type.String({ description: "Why this secret exists and what it enables" })),
+    capabilities: Type.Optional(
+      Type.Array(Type.String(), { description: "What operations this secret grants (e.g. read, write, admin)" }),
     ),
-    // Additional
-    tags: Type.Optional(Type.Array(Type.String(), { description: "Freeform tags for grouping and filtering" })),
+    created: Type.Optional(
+      Type.String({ format: "date", description: "Date the secret was provisioned (YYYY-MM-DD)" }),
+    ),
+    // Tier 3: operational
+    rotates: Type.Optional(Type.String({ description: "Rotation schedule (e.g. '90d', 'quarterly')" })),
+    rate_limit: Type.Optional(Type.String({ description: "Rate limit or quota info (e.g. '1000/min')" })),
+    model_hint: Type.Optional(Type.String({ description: "Suggested model or tier for this credential" })),
+    source: Type.Optional(Type.String({ description: "Where the secret value originates (e.g. 'vault', 'ci')" })),
+    // Tier 4: enforcement/extensibility
+    required: Type.Optional(Type.Boolean({ description: "Whether this secret is required for operation" })),
+    tags: Type.Optional(
+      Type.Record(Type.String(), Type.String(), { description: "Key-value tags for grouping and filtering" }),
+    ),
   },
-  { description: "Metadata about a single secret — answers What/Where/Why/When/How" },
+  { description: "Metadata about a single secret" },
 )
 export type SecretMeta = Static<typeof SecretMetaSchema>
 
@@ -74,16 +77,11 @@ export type SecretMeta = Static<typeof SecretMetaSchema>
 
 export const LifecycleConfigSchema = Type.Object(
   {
-    warn_before_days: Type.Optional(
-      Type.Number({ default: 30, description: "Days before expiration to trigger warnings" }),
+    stale_warning_days: Type.Optional(
+      Type.Number({ default: 90, description: "Days since creation to consider a secret stale" }),
     ),
-    stale_after_days: Type.Optional(
-      Type.Number({ default: 365, description: "Days since creation to consider a secret stale" }),
-    ),
-    require_rotation_url: Type.Optional(
-      Type.Boolean({ default: false, description: "Require rotation_url on all secrets" }),
-    ),
-    require_purpose: Type.Optional(Type.Boolean({ default: false, description: "Require purpose on all secrets" })),
+    require_expiration: Type.Optional(Type.Boolean({ default: false, description: "Require expires on all secrets" })),
+    require_service: Type.Optional(Type.Boolean({ default: false, description: "Require service on all secrets" })),
   },
   { description: "Policy configuration for credential lifecycle management" },
 )
@@ -103,13 +101,9 @@ export type CallbackConfig = Static<typeof CallbackConfigSchema>
 
 // --- Tools Config ---
 
-export const ToolsConfigSchema = Type.Object(
-  {
-    fnox: Type.Optional(Type.Boolean({ default: true, description: "Enable fnox integration" })),
-    mcp: Type.Optional(Type.Boolean({ default: true, description: "Enable MCP server capabilities" })),
-  },
-  { description: "Tool integration toggles" },
-)
+export const ToolsConfigSchema = Type.Record(Type.String(), Type.Unknown(), {
+  description: "Tool integration configuration — open namespace for third-party extensions",
+})
 export type ToolsConfig = Static<typeof ToolsConfigSchema>
 
 // --- Top-level EnvpktConfig ---

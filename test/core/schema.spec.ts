@@ -17,35 +17,47 @@ describe("EnvpktConfigSchema", () => {
     expect(configChecker.Check(config)).toBe(true)
   })
 
+  it("validates a config with empty meta entry (service is now optional)", () => {
+    const config = {
+      version: 1,
+      meta: { API_KEY: {} },
+    }
+    expect(configChecker.Check(config)).toBe(true)
+  })
+
   it("validates a full config", () => {
     const config = {
       version: 1,
       agent: {
         name: "my-agent",
-        role: "data-processor",
+        consumer: "agent",
+        description: "Data processing agent",
         capabilities: ["read", "write"],
         expires: "2025-12-31",
+        services: ["postgres", "redis"],
+        identity: "keys/agent.age",
+        recipient: "age1abc123",
       },
       meta: {
         DB_PASSWORD: {
           service: "postgres",
-          consumer: "database",
-          env_var: "DB_PASSWORD",
-          vault_path: "/secrets/db",
           purpose: "Database authentication",
           capabilities: ["read", "write"],
           created: "2025-01-01",
           expires: "2025-12-31",
           rotation_url: "https://admin.example.com/rotate",
-          provisioner: "vault",
-          tags: ["production", "critical"],
+          rotates: "90d",
+          rate_limit: "1000/min",
+          model_hint: "gpt-4",
+          source: "vault",
+          required: true,
+          tags: { env: "production", priority: "critical" },
         },
       },
       lifecycle: {
-        warn_before_days: 30,
-        stale_after_days: 365,
-        require_rotation_url: true,
-        require_purpose: true,
+        stale_warning_days: 90,
+        require_expiration: true,
+        require_service: true,
       },
       callbacks: {
         on_expiring: "notify-slack",
@@ -55,6 +67,7 @@ describe("EnvpktConfigSchema", () => {
       tools: {
         fnox: true,
         mcp: true,
+        custom_tool: { enabled: true },
       },
     }
     expect(configChecker.Check(config)).toBe(true)
@@ -69,46 +82,38 @@ describe("EnvpktConfigSchema", () => {
     const config = { version: 1 }
     expect(configChecker.Check(config)).toBe(false)
   })
-
-  it("rejects meta entry without service", () => {
-    const config = {
-      version: 1,
-      meta: { API_KEY: {} },
-    }
-    expect(configChecker.Check(config)).toBe(false)
-  })
-
-  it("rejects invalid consumer type", () => {
-    const meta = { service: "example", consumer: "invalid" }
-    expect(secretMetaChecker.Check(meta)).toBe(false)
-  })
-
-  it("rejects invalid provisioner", () => {
-    const meta = { service: "example", provisioner: "unknown" }
-    expect(secretMetaChecker.Check(meta)).toBe(false)
-  })
 })
 
 describe("SecretMetaSchema", () => {
-  it("validates minimal secret meta", () => {
+  it("validates empty secret meta (all fields optional)", () => {
+    expect(secretMetaChecker.Check({})).toBe(true)
+  })
+
+  it("validates secret meta with service", () => {
     expect(secretMetaChecker.Check({ service: "postgres" })).toBe(true)
   })
 
-  it("validates full secret meta", () => {
+  it("validates full secret meta with v5 fields", () => {
     const meta = {
       service: "stripe",
-      consumer: "api",
-      env_var: "STRIPE_KEY",
-      vault_path: "/secrets/stripe",
       purpose: "Payment processing",
       capabilities: ["charge", "refund"],
       created: "2025-01-01",
       expires: "2025-12-31",
       rotation_url: "https://dashboard.stripe.com/apikeys",
-      provisioner: "manual",
-      tags: ["billing"],
+      rotates: "quarterly",
+      rate_limit: "100/sec",
+      model_hint: "claude-3",
+      source: "manual",
+      required: true,
+      tags: { category: "billing" },
     }
     expect(secretMetaChecker.Check(meta)).toBe(true)
+  })
+
+  it("rejects tags as array (now must be Record<string,string>)", () => {
+    const meta = { tags: ["billing"] }
+    expect(secretMetaChecker.Check(meta)).toBe(false)
   })
 })
 
@@ -117,17 +122,31 @@ describe("AgentIdentitySchema", () => {
     expect(agentChecker.Check({ name: "test-agent" })).toBe(true)
   })
 
-  it("validates full agent", () => {
+  it("validates full agent with v5 fields", () => {
     const agent = {
       name: "data-processor",
-      role: "ETL pipeline",
+      consumer: "agent",
+      description: "ETL pipeline processor",
       capabilities: ["read-db", "write-s3"],
       expires: "2026-01-01",
+      services: ["postgres", "s3"],
+      identity: "keys/agent.age",
+      recipient: "age1xyz",
     }
     expect(agentChecker.Check(agent)).toBe(true)
   })
 
   it("rejects agent without name", () => {
     expect(agentChecker.Check({})).toBe(false)
+  })
+
+  it("rejects invalid consumer type", () => {
+    expect(agentChecker.Check({ name: "test", consumer: "invalid" })).toBe(false)
+  })
+
+  it("validates all consumer types", () => {
+    for (const consumer of ["agent", "service", "developer", "ci"]) {
+      expect(agentChecker.Check({ name: "test", consumer })).toBe(true)
+    }
   })
 })

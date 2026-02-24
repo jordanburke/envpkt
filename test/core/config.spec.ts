@@ -96,6 +96,18 @@ describe("validateConfig", () => {
     )
   })
 
+  it("returns Right for config with empty meta entry (service optional)", () => {
+    const data = { version: 1, meta: { API_KEY: {} } }
+    const result = validateConfig(data)
+    result.fold(
+      () => expect.unreachable("Expected Right"),
+      (config) => {
+        expect(config.version).toBe(1)
+        expect(config.meta["API_KEY"]).toBeDefined()
+      },
+    )
+  })
+
   it("returns Left ValidationError for missing required fields", () => {
     const data = { version: 1 }
     const result = validateConfig(data)
@@ -124,6 +136,21 @@ describe("loadConfig", () => {
         expect(config.version).toBe(1)
         expect(config.meta["DB_PASS"]?.service).toBe("postgres")
         expect(config.meta["DB_PASS"]?.created).toBe("2025-01-01")
+      },
+    )
+  })
+
+  it("loads config with optional service", () => {
+    const toml = `version = 1\n\n[meta.KEY]\npurpose = "testing"\n`
+    const path = join(tmpDir, "envpkt.toml")
+    writeFileSync(path, toml)
+
+    const result = loadConfig(path)
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      (config) => {
+        expect(config.meta["KEY"]?.purpose).toBe("testing")
+        expect(config.meta["KEY"]?.service).toBeUndefined()
       },
     )
   })

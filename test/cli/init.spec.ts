@@ -24,7 +24,7 @@ describe("envpkt init", () => {
     expect(content).toContain("#:schema")
     expect(content).toContain("[meta.EXAMPLE_API_KEY]")
     expect(content).toContain("[lifecycle]")
-    expect(content).toContain("warn_before_days = 30")
+    expect(content).toContain("stale_warning_days = 90")
   })
 
   it("sets created date to today on generated secrets", () => {
@@ -46,6 +46,13 @@ describe("envpkt init", () => {
     expect(content).toContain('expires = "2026-06-01"')
   })
 
+  it("includes consumer comment in agent section", () => {
+    runInit(tmpDir, { agent: true, name: "test" })
+
+    const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
+    expect(content).toContain("consumer")
+  })
+
   it("scaffolds from fnox.toml when --from-fnox is used", () => {
     const fnoxToml = `[OPENAI_KEY]\nvalue = "sk-xxx"\n\n[DB_PASSWORD]\nvalue = "secret"\n`
     writeFileSync(join(tmpDir, "fnox.toml"), fnoxToml)
@@ -56,6 +63,14 @@ describe("envpkt init", () => {
     expect(content).toContain("[meta.OPENAI_KEY]")
     expect(content).toContain("[meta.DB_PASSWORD]")
     expect(content).not.toContain("[meta.EXAMPLE_API_KEY]")
+  })
+
+  it("includes v5 comment fields in generated secrets", () => {
+    runInit(tmpDir, {})
+
+    const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
+    expect(content).toContain("rotation_url")
+    expect(content).toContain("source")
   })
 
   it("produces a parseable envpkt.toml", () => {

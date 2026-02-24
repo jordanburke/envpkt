@@ -108,7 +108,10 @@ const handleGetPacketHealth = (args: Record<string, unknown>): CallToolResult =>
 
   const secretDetails = audit.secrets.toArray().map((s) => ({
     key: s.key,
-    service: s.service,
+    service: s.service.fold(
+      () => null,
+      (sv) => sv,
+    ),
     status: s.status,
     days_remaining: s.days_remaining.fold(
       () => null,
@@ -159,7 +162,12 @@ const handleListCapabilities = (args: Record<string, unknown>): CallToolResult =
     JSON.stringify(
       {
         agent: config.agent
-          ? { name: config.agent.name, role: config.agent.role, capabilities: agentCapabilities }
+          ? {
+              name: config.agent.name,
+              consumer: config.agent.consumer,
+              description: config.agent.description,
+              capabilities: agentCapabilities,
+            }
           : null,
         secrets: secretCapabilities,
       },

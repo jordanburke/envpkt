@@ -42,6 +42,8 @@ const secretStatusIcon = (status: string): string => {
       return `${YELLOW}○${RESET}`
     case "missing":
       return `${RED}?${RESET}`
+    case "missing_metadata":
+      return `${YELLOW}!${RESET}`
     default:
       return " "
   }
@@ -57,7 +59,11 @@ export const formatSecretRow = (secret: SecretHealth): string => {
     () => "",
     (url) => `${DIM}${url}${RESET}`,
   )
-  return `  ${icon} ${BOLD}${secret.key}${RESET} ${DIM}(${secret.service})${RESET} ${secret.status} ${days} ${rotation}`.trimEnd()
+  const svc = secret.service.fold(
+    () => secret.key,
+    (s) => s,
+  )
+  return `  ${icon} ${BOLD}${secret.key}${RESET} ${DIM}(${svc})${RESET} ${secret.status} ${days} ${rotation}`.trimEnd()
 }
 
 export const formatAudit = (audit: AuditResult): string => {
@@ -70,6 +76,8 @@ export const formatAudit = (audit: AuditResult): string => {
     audit.expired > 0 ? `  ${RED}${audit.expired}${RESET} expired` : null,
     audit.stale > 0 ? `  ${YELLOW}${audit.stale}${RESET} stale` : null,
     audit.missing > 0 ? `  ${RED}${audit.missing}${RESET} missing` : null,
+    audit.missing_metadata > 0 ? `  ${YELLOW}${audit.missing_metadata}${RESET} missing metadata` : null,
+    audit.orphaned > 0 ? `  ${YELLOW}${audit.orphaned}${RESET} orphaned` : null,
   ]
     .filter(Boolean)
     .join("\n")
@@ -93,10 +101,15 @@ export const formatAuditJson = (audit: AuditResult): string =>
       expired: audit.expired,
       stale: audit.stale,
       missing: audit.missing,
+      missing_metadata: audit.missing_metadata,
+      orphaned: audit.orphaned,
       secrets: audit.secrets
         .map((s) => ({
           key: s.key,
-          service: s.service,
+          service: s.service.fold(
+            () => null,
+            (sv) => sv,
+          ),
           status: s.status,
           days_remaining: s.days_remaining.fold(
             () => null,
@@ -124,19 +137,14 @@ export const formatFleetJson = (fleet: FleetHealth): string =>
       status: fleet.status,
       total_agents: fleet.total_agents,
       total_secrets: fleet.total_secrets,
-      critical_count: fleet.critical_count,
-      degraded_count: fleet.degraded_count,
+      expired: fleet.expired,
+      expiring_soon: fleet.expiring_soon,
       agents: fleet.agents
         .map((a) => ({
           path: a.path,
-          name: a.name.fold(
-            () => null,
-            (n) => n,
-          ),
-          role: a.role.fold(
-            () => null,
-            (r) => r,
-          ),
+          name: a.agent?.name ?? null,
+          consumer: a.agent?.consumer ?? null,
+          description: a.agent?.description ?? null,
           status: a.audit.status,
           secrets: a.audit.total,
         }))
@@ -157,6 +165,14 @@ export const formatError = (error: { _tag: string; message?: string; path?: stri
       return `${RED}Error:${RESET} Config validation failed:\n${String(error.errors)}`
     case "ReadError":
       return `${RED}Error:${RESET} Could not read file: ${error.message}`
+    case "AgeNotFound":
+      return `${RED}Error:${RESET} age CLI not found: ${error.message}`
+    case "DecryptFailed":
+      return `${RED}Error:${RESET} Decrypt failed: ${error.message}`
+    case "IdentityNotFound":
+      return `${RED}Error:${RESET} Identity file not found: ${error.path}`
+    case "AuditFailed":
+      return `${RED}Error:${RESET} Audit failed: ${error.message}`
     default:
       return `${RED}Error:${RESET} ${error.message ?? tag}`
   }

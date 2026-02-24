@@ -1,12 +1,15 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-const CLI_SRC = resolve("src/cli/index.ts")
-const TSX = resolve("node_modules/.bin/tsx")
+const __testDir = dirname(fileURLToPath(import.meta.url))
+const PROJECT_ROOT = resolve(__testDir, "../..")
+const CLI_SRC = resolve(PROJECT_ROOT, "src/cli/index.ts")
+const TSX = resolve(PROJECT_ROOT, "node_modules/.bin/tsx")
 
 let tmpDir: string
 
@@ -165,6 +168,13 @@ describe("envpkt CLI e2e", () => {
       expect(stdout).toContain("world")
     })
 
+    it("runs with --no-check (alias for --skip-audit)", () => {
+      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[meta.K]\nservice = "s"\n`)
+      const { stdout, status } = run(["exec", "-c", join(tmpDir, "envpkt.toml"), "--no-check", "echo", "aliased"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("aliased")
+    })
+
     it("exits non-zero with --strict on critical audit", () => {
       writeFileSync(
         join(tmpDir, "envpkt.toml"),
@@ -172,6 +182,16 @@ describe("envpkt CLI e2e", () => {
       )
       const { status } = run(["exec", "-c", join(tmpDir, "envpkt.toml"), "--strict", "echo", "nope"])
       expect(status).toBeGreaterThan(0)
+    })
+
+    it("runs with --warn-only on critical audit", () => {
+      writeFileSync(
+        join(tmpDir, "envpkt.toml"),
+        `version = 1\n[meta.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
+      )
+      const { stdout, status } = run(["exec", "-c", join(tmpDir, "envpkt.toml"), "--warn-only", "echo", "warn-passed"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("warn-passed")
     })
   })
 })

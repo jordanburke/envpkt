@@ -25,16 +25,13 @@ const generateSecretBlock = (key: string, service?: string): string => {
   const svc = service ?? key
   return `[meta.${key}]
 service = "${svc}"
-# consumer = "api"           # What type: api | database | saas | infra | other
-# env_var = "${key.toUpperCase()}"
-# vault_path = ""            # Where: path in secret manager
 # purpose = ""               # Why: what this secret enables
 # capabilities = []          # What operations this grants
 created = "${todayIso()}"
 # expires = ""               # When: YYYY-MM-DD expiration date
-# rotation_url = ""          # How: URL for rotation procedure
-# provisioner = "manual"     # How: manual | fnox | vault | ci
-# tags = []
+# rotation_url = ""          # URL for rotation procedure
+# source = ""                # Where the value originates (e.g. vault, ci)
+# tags = {}
 `
 }
 
@@ -47,7 +44,8 @@ const generateAgentSection = (name: string, capabilities?: string, expires?: str
     : ""
   const exp = expires ? `\nexpires = "${expires}"` : ""
   return `[agent]
-name = "${name}"${caps}${exp}
+name = "${name}"
+# consumer = "agent"         # agent | service | developer | ci${caps}${exp}
 `
 }
 
@@ -66,10 +64,9 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
 
   lines.push(`# Lifecycle policy`)
   lines.push(`[lifecycle]`)
-  lines.push(`warn_before_days = 30`)
-  lines.push(`stale_after_days = 365`)
-  lines.push(`# require_rotation_url = false`)
-  lines.push(`# require_purpose = false`)
+  lines.push(`stale_warning_days = 90`)
+  lines.push(`# require_expiration = false`)
+  lines.push(`# require_service = false`)
   lines.push(``)
 
   if (fnoxKeys && fnoxKeys.length > 0) {
@@ -78,8 +75,8 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
       lines.push(generateSecretBlock(key))
     }
   } else {
-    lines.push(`# Add your secret metadata below. Each [meta.<key>] answers:`)
-    lines.push(`#   What service? Where stored? Why needed? When expires? How provisioned?`)
+    lines.push(`# Add your secret metadata below.`)
+    lines.push(`# Each [meta.<key>] describes a secret your agent needs.`)
     lines.push(``)
     lines.push(generateSecretBlock("EXAMPLE_API_KEY", "example-service"))
   }
@@ -153,7 +150,7 @@ export const runInit = (dir: string, options: InitOptions): void => {
       if (fnoxKeys) {
         console.log(`  Scaffolded ${fnoxKeys.length} secret(s) from fnox.toml`)
       }
-      console.log(`  ${BOLD}Next:${RESET} Fill in the five-W fields for each secret (What/Where/Why/When/How)`)
+      console.log(`  ${BOLD}Next:${RESET} Fill in metadata for each secret`)
     },
   )
 }
