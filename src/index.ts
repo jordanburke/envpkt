@@ -17,6 +17,7 @@ export type {
   BootOptions,
   BootResult,
   CallbackConfig,
+  CatalogError,
   ConfigError,
   EnvpktConfig,
   FleetAgent,
@@ -27,6 +28,8 @@ export type {
   HealthStatus,
   IdentityError,
   LifecycleConfig,
+  ResolveOptions,
+  ResolveResult,
   SecretHealth,
   SecretMeta,
   SecretStatus,
@@ -43,6 +46,9 @@ export {
   resolveConfigPath,
   validateConfig,
 } from "./core/config.js"
+
+// Catalog resolution
+export { loadCatalog, resolveConfig, resolveSecrets } from "./core/catalog.js"
 
 // Audit engine
 export { computeAudit } from "./core/audit.js"

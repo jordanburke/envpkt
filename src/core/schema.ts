@@ -35,6 +35,7 @@ export const AgentIdentitySchema = Type.Object(
       Type.String({ description: "Path to encrypted agent key file (relative to config directory)" }),
     ),
     recipient: Type.Optional(Type.String({ description: "Agent's age public key for encryption" })),
+    secrets: Type.Optional(Type.Array(Type.String(), { description: "Secret keys this agent needs from the catalog" })),
   },
   { description: "Identity and capabilities of the AI agent using this envpkt" },
 )
@@ -111,6 +112,9 @@ export type ToolsConfig = Static<typeof ToolsConfigSchema>
 export const EnvpktConfigSchema = Type.Object(
   {
     version: Type.Number({ description: "Schema version number", default: 1 }),
+    catalog: Type.Optional(
+      Type.String({ description: "Path to shared secret catalog (relative to this config file)" }),
+    ),
     agent: Type.Optional(AgentIdentitySchema),
     meta: Type.Record(Type.String(), SecretMetaSchema, {
       description: "Per-secret metadata keyed by secret name",

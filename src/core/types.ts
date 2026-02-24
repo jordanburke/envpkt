@@ -88,6 +88,27 @@ export type FnoxError =
   | { readonly _tag: "FnoxCliError"; readonly message: string }
   | { readonly _tag: "FnoxParseError"; readonly message: string }
 
+// --- Catalog / Resolve types ---
+
+export type ResolveOptions = {
+  readonly configPath?: string
+  readonly output?: string
+}
+
+export type ResolveResult = {
+  readonly config: import("./schema.js").EnvpktConfig
+  readonly catalogPath?: string
+  readonly merged: ReadonlyArray<string>
+  readonly overridden: ReadonlyArray<string>
+  readonly warnings: ReadonlyArray<string>
+}
+
+export type CatalogError =
+  | { readonly _tag: "CatalogNotFound"; readonly path: string }
+  | { readonly _tag: "CatalogLoadError"; readonly message: string }
+  | { readonly _tag: "SecretNotInCatalog"; readonly key: string; readonly catalogPath: string }
+  | { readonly _tag: "MissingSecretsList"; readonly message: string }
+
 // --- Boot types ---
 
 export type BootOptions = {
@@ -109,6 +130,7 @@ export type BootResult = {
 export type BootError =
   | ConfigError
   | FnoxError
+  | CatalogError
   | { readonly _tag: "AuditFailed"; readonly audit: AuditResult; readonly message: string }
   | IdentityError
 

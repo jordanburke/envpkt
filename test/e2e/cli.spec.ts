@@ -49,6 +49,7 @@ describe("envpkt CLI e2e", () => {
     expect(stdout).toContain("fleet")
     expect(stdout).toContain("inspect")
     expect(stdout).toContain("exec")
+    expect(stdout).toContain("resolve")
     expect(stdout).toContain("mcp")
   })
 
