@@ -173,6 +173,14 @@ export const formatError = (error: { _tag: string; message?: string; path?: stri
       return `${RED}Error:${RESET} Identity file not found: ${error.path}`
     case "AuditFailed":
       return `${RED}Error:${RESET} Audit failed: ${error.message}`
+    case "CatalogNotFound":
+      return `${RED}Error:${RESET} Catalog not found: ${error.path}`
+    case "CatalogLoadError":
+      return `${RED}Error:${RESET} Catalog load error: ${error.message}`
+    case "SecretNotInCatalog":
+      return `${RED}Error:${RESET} Secret "${(error as unknown as { key: string }).key}" not found in catalog: ${error.path}`
+    case "MissingSecretsList":
+      return `${RED}Error:${RESET} ${error.message}`
     default:
       return `${RED}Error:${RESET} ${error.message ?? tag}`
   }

@@ -44,11 +44,22 @@ export const readConfigFile = (path: string): Either<ConfigError, string> => {
   )
 }
 
+/** Ensure required fields have defaults for valid configs (e.g. agent configs with catalog may omit meta) */
+const applyDefaults = (data: unknown): unknown => {
+  if (data !== null && typeof data === "object" && !Array.isArray(data)) {
+    const obj = data as Record<string, unknown>
+    if (!("meta" in obj)) {
+      return { ...obj, meta: {} }
+    }
+  }
+  return data
+}
+
 /** Parse a TOML string, returning Either<ConfigError, unknown> */
 export const parseToml = (raw: string): Either<ConfigError, unknown> =>
   Try(() => parse(raw)).fold(
     (err) => Left({ _tag: "ParseError", message: String(err) } as const),
-    (data) => Right(normalizeDates(data)),
+    (data) => Right(applyDefaults(normalizeDates(data))),
   )
 
 /** Validate parsed data against the TypeBox schema */

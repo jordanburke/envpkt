@@ -1,0 +1,44 @@
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# Shared secret catalog — team-owned, defines metadata once for all agents.
+# Individual agents reference this via `catalog = "path/to/catalog.toml"`
+
+version = 1
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+require_service = true
+
+[meta.DATABASE_URL]
+service = "postgres"
+purpose = "Primary application database"
+capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
+rotation_url = "https://wiki.internal/runbooks/rotate-db"
+source = "vault"
+created = "2025-11-01"
+expires = "2026-11-01"
+
+[meta.REDIS_URL]
+service = "redis"
+purpose = "Caching and session storage"
+created = "2025-11-01"
+expires = "2026-11-01"
+
+[meta.AWS_ACCESS_KEY_ID]
+service = "aws"
+purpose = "S3 bucket access for data storage"
+capabilities = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
+rotation_url = "https://console.aws.amazon.com/iam/home#/security_credentials"
+source = "vault"
+created = "2025-11-01"
+expires = "2026-05-01"
+
+[meta.AWS_SECRET_ACCESS_KEY]
+service = "aws"
+purpose = "S3 bucket access (secret counterpart)"
+capabilities = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
+rotation_url = "https://console.aws.amazon.com/iam/home#/security_credentials"
+source = "vault"
+created = "2025-11-01"
+expires = "2026-05-01"

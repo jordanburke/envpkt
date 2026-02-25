@@ -1,7 +1,10 @@
+import { dirname } from "node:path"
+
 import { computeAudit } from "../../core/audit.js"
+import { resolveConfig } from "../../core/catalog.js"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import type { SecretStatus } from "../../core/types.js"
-import { exitCodeForAudit, formatAudit, formatAuditJson, formatError } from "../output.js"
+import { CYAN, DIM, exitCodeForAudit, formatAudit, formatAuditJson, formatError, RESET } from "../output.js"
 
 type AuditOptions = {
   readonly config?: string
@@ -27,36 +30,54 @@ export const runAudit = (options: AuditOptions): void => {
           console.error(formatError(err))
           process.exit(2)
         },
-        (config) => {
-          const audit = computeAudit(config)
+        (rawConfig) => {
+          const configDir = dirname(path)
+          const resolved = resolveConfig(rawConfig, configDir)
 
-          let filtered = audit
-          if (options.status) {
-            const statusFilter = options.status as SecretStatus
-            const filteredSecrets = audit.secrets.filter((s) => s.status === statusFilter)
-            filtered = { ...audit, secrets: filteredSecrets }
-          }
-          if (options.expiring !== undefined) {
-            const days = options.expiring
-            const filteredSecrets = filtered.secrets.filter((s) =>
-              s.days_remaining.fold(
-                () => false,
-                (d) => d >= 0 && d <= days,
-              ),
-            )
-            filtered = { ...filtered, secrets: filteredSecrets }
-          }
-
-          if (options.format === "json") {
-            console.log(formatAuditJson(filtered))
-          } else {
-            console.log(formatAudit(filtered))
-          }
-
-          const code = options.strict ? exitCodeForAudit(audit) : audit.status === "critical" ? 2 : 0
-          process.exit(code)
+          resolved.fold(
+            (err) => {
+              console.error(formatError(err))
+              process.exit(2)
+            },
+            (resolveResult) => {
+              if (resolveResult.catalogPath) {
+                console.log(`${DIM}Catalog: ${CYAN}${resolveResult.catalogPath}${RESET}`)
+              }
+              runAuditOnConfig(resolveResult.config, options)
+            },
+          )
         },
       )
     },
   )
+}
+
+const runAuditOnConfig = (config: import("../../core/types.js").EnvpktConfig, options: AuditOptions): void => {
+  const audit = computeAudit(config)
+
+  let filtered = audit
+  if (options.status) {
+    const statusFilter = options.status as SecretStatus
+    const filteredSecrets = audit.secrets.filter((s) => s.status === statusFilter)
+    filtered = { ...audit, secrets: filteredSecrets }
+  }
+  if (options.expiring !== undefined) {
+    const days = options.expiring
+    const filteredSecrets = filtered.secrets.filter((s) =>
+      s.days_remaining.fold(
+        () => false,
+        (d) => d >= 0 && d <= days,
+      ),
+    )
+    filtered = { ...filtered, secrets: filteredSecrets }
+  }
+
+  if (options.format === "json") {
+    console.log(formatAuditJson(filtered))
+  } else {
+    console.log(formatAudit(filtered))
+  }
+
+  const code = options.strict ? exitCodeForAudit(audit) : audit.status === "critical" ? 2 : 0
+  process.exit(code)
 }

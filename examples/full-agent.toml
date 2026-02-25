@@ -1,6 +1,7 @@
 #:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
 
 # Full envpkt configuration for an AI agent with lifecycle policies
+# For shared secret metadata across agents, see catalog.toml + agent-with-catalog.toml
 
 version = 1
 

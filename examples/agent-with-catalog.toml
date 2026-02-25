@@ -1,0 +1,16 @@
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# Agent config referencing a shared catalog.
+# Run: envpkt resolve -c examples/agent-with-catalog.toml
+
+version = 1
+catalog = "catalog.toml"
+
+[agent]
+name = "data-pipeline"
+consumer = "agent"
+secrets = ["DATABASE_URL", "REDIS_URL"]
+
+# Override: narrow catalog's full CRUD to read-only for this agent
+[meta.DATABASE_URL]
+capabilities = ["SELECT"]

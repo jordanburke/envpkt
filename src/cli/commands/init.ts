@@ -12,6 +12,7 @@ const CONFIG_FILENAME = "envpkt.toml"
 
 type InitOptions = {
   readonly fromFnox?: string
+  readonly catalog?: string
   readonly agent?: boolean
   readonly name?: string
   readonly capabilities?: string
@@ -57,28 +58,42 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
   lines.push(`version = 1`)
   lines.push(``)
 
-  if (options.agent && options.name) {
-    lines.push(generateAgentSection(options.name, options.capabilities, options.expires))
+  if (options.catalog) {
+    lines.push(`catalog = "${options.catalog}"`)
     lines.push(``)
   }
 
-  lines.push(`# Lifecycle policy`)
-  lines.push(`[lifecycle]`)
-  lines.push(`stale_warning_days = 90`)
-  lines.push(`# require_expiration = false`)
-  lines.push(`# require_service = false`)
-  lines.push(``)
+  if (options.agent && options.name) {
+    lines.push(generateAgentSection(options.name, options.capabilities, options.expires))
+    if (options.catalog) {
+      lines.push(`secrets = []  # Add catalog secret keys this agent needs`)
+    }
+    lines.push(``)
+  }
 
-  if (fnoxKeys && fnoxKeys.length > 0) {
-    lines.push(`# Secrets detected from fnox.toml`)
-    for (const key of fnoxKeys) {
-      lines.push(generateSecretBlock(key))
+  if (!options.catalog) {
+    lines.push(`# Lifecycle policy`)
+    lines.push(`[lifecycle]`)
+    lines.push(`stale_warning_days = 90`)
+    lines.push(`# require_expiration = false`)
+    lines.push(`# require_service = false`)
+    lines.push(``)
+
+    if (fnoxKeys && fnoxKeys.length > 0) {
+      lines.push(`# Secrets detected from fnox.toml`)
+      for (const key of fnoxKeys) {
+        lines.push(generateSecretBlock(key))
+      }
+    } else {
+      lines.push(`# Add your secret metadata below.`)
+      lines.push(`# Each [meta.<key>] describes a secret your agent needs.`)
+      lines.push(``)
+      lines.push(generateSecretBlock("EXAMPLE_API_KEY", "example-service"))
     }
   } else {
-    lines.push(`# Add your secret metadata below.`)
-    lines.push(`# Each [meta.<key>] describes a secret your agent needs.`)
-    lines.push(``)
-    lines.push(generateSecretBlock("EXAMPLE_API_KEY", "example-service"))
+    lines.push(`# Optional: override catalog metadata for specific secrets`)
+    lines.push(`# [meta.KEY_NAME]`)
+    lines.push(`# capabilities = ["read"]  # narrows catalog's broader definition`)
   }
 
   return lines.join("\n")

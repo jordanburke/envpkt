@@ -175,6 +175,33 @@ describe("boot", () => {
   })
 })
 
+describe("boot with catalog", () => {
+  it("resolves catalog before audit", () => {
+    writeFileSync(join(tmpDir, "catalog.toml"), `version = 1\n[meta.DB]\nservice = "postgres"\n`)
+    const configPath = writeConfig(`version = 1\ncatalog = "catalog.toml"\n[agent]\nname = "test"\nsecrets = ["DB"]\n`)
+    const result = bootSafe({ configPath, inject: false })
+
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      (boot) => {
+        expect(boot.audit.total).toBe(1)
+      },
+    )
+  })
+
+  it("returns error for invalid catalog path", () => {
+    const configPath = writeConfig(
+      `version = 1\ncatalog = "nonexistent.toml"\n[agent]\nname = "test"\nsecrets = ["DB"]\n`,
+    )
+    const result = bootSafe({ configPath, inject: false })
+
+    result.fold(
+      (err) => expect(err._tag).toBe("CatalogNotFound"),
+      () => expect.unreachable("Expected Left"),
+    )
+  })
+})
+
 describe("EnvpktBootError", () => {
   it("has descriptive message for FileNotFound", () => {
     const err = new EnvpktBootError({ _tag: "FileNotFound", path: "/missing" })

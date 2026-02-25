@@ -7,6 +7,7 @@ import { detectFnox, fnoxAvailable } from "../fnox/detect.js"
 import { unwrapAgentKey } from "../fnox/identity.js"
 import { extractFnoxKeys, readFnoxConfig } from "../fnox/parse.js"
 import { computeAudit } from "./audit.js"
+import { resolveConfig } from "./catalog.js"
 import { loadConfig, resolveConfigPath } from "./config.js"
 import type { AuditResult, BootError, BootOptions, BootResult, EnvpktConfig } from "./types.js"
 
@@ -22,7 +23,13 @@ const resolveAndLoad = (opts: BootOptions): Either<BootError, ResolvedConfig> =>
     (configPath) =>
       loadConfig(configPath).fold<Either<BootError, ResolvedConfig>>(
         (err) => Left(err),
-        (config) => Right({ config, configPath, configDir: dirname(configPath) }),
+        (config) => {
+          const configDir = dirname(configPath)
+          return resolveConfig(config, configDir).fold<Either<BootError, ResolvedConfig>>(
+            (err) => Left(err),
+            (result) => Right({ config: result.config, configPath, configDir }),
+          )
+        },
       ),
   )
 
@@ -169,6 +176,14 @@ const formatBootError = (error: BootError): string => {
       return `fnox parse error: ${error.message}`
     case "AuditFailed":
       return `Audit failed: ${error.message}`
+    case "CatalogNotFound":
+      return `Catalog not found: ${error.path}`
+    case "CatalogLoadError":
+      return `Catalog load error: ${error.message}`
+    case "SecretNotInCatalog":
+      return `Secret "${error.key}" not found in catalog: ${error.catalogPath}`
+    case "MissingSecretsList":
+      return `Missing secrets list: ${error.message}`
     case "AgeNotFound":
       return `age not found: ${error.message}`
     case "DecryptFailed":

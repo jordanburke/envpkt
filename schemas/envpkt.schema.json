@@ -14,6 +14,10 @@
       "default": 1,
       "type": "number"
     },
+    "catalog": {
+      "description": "Path to shared secret catalog (relative to this config file)",
+      "type": "string"
+    },
     "agent": {
       "description": "Identity and capabilities of the AI agent using this envpkt",
       "type": "object",
@@ -76,6 +80,13 @@
         "recipient": {
           "description": "Agent's age public key for encryption",
           "type": "string"
+        },
+        "secrets": {
+          "description": "Secret keys this agent needs from the catalog",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       }
     },

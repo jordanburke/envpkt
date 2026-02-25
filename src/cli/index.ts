@@ -6,6 +6,7 @@ import { runFleet } from "./commands/fleet.js"
 import { runInit } from "./commands/init.js"
 import { runInspect } from "./commands/inspect.js"
 import { runMcp } from "./commands/mcp.js"
+import { runResolve } from "./commands/resolve.js"
 
 const program = new Command()
 
@@ -15,6 +16,7 @@ program
   .command("init")
   .description("Initialize a new envpkt.toml in the current directory")
   .option("--from-fnox [path]", "Scaffold from fnox.toml (optionally specify path)")
+  .option("--catalog <path>", "Path to shared secret catalog")
   .option("--agent", "Include [agent] section")
   .option("--name <name>", "Agent name (requires --agent)")
   .option("--capabilities <caps>", "Comma-separated capabilities (requires --agent)")
@@ -52,6 +54,7 @@ program
   .description("Display structured view of envpkt.toml")
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--format <format>", "Output format: table | json", "table")
+  .option("--resolved", "Show resolved view (catalog merged)")
   .action((options) => {
     runInspect(options)
   })
@@ -68,6 +71,17 @@ program
   .option("--strict", "Abort on any non-healthy secret")
   .action((args: string[], options) => {
     runExec(args, options)
+  })
+
+program
+  .command("resolve")
+  .description("Resolve catalog references and output a flat, self-contained config")
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .option("-o, --output <path>", "Write resolved config to file (default: stdout)")
+  .option("--format <format>", "Output format: toml | json", "toml")
+  .option("--dry-run", "Show what would be resolved without writing")
+  .action((options) => {
+    runResolve(options)
   })
 
 program
