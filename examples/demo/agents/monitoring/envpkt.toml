@@ -1,0 +1,27 @@
+version = 1
+
+[agent]
+name = "monitoring"
+consumer = "agent"
+description = "Infrastructure health checks and alerting"
+capabilities = ["monitor", "alert"]
+
+[lifecycle]
+stale_warning_days = 60
+
+[meta.DATADOG_API_KEY]
+service = "datadog"
+purpose = "Infrastructure monitoring metrics"
+capabilities = ["metrics:write", "events:write"]
+created = "2025-06-01"
+expires = "2026-01-01"
+rotation_url = "https://app.datadoghq.com/organization-settings/api-keys"
+source = "ci"
+
+[meta.SLACK_WEBHOOK_URL]
+service = "slack"
+purpose = "Alert notifications to #ops-alerts channel"
+capabilities = ["post:messages"]
+created = "2026-01-15"
+expires = "2027-01-15"
+source = "ci"

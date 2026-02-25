@@ -4,10 +4,7 @@
   "title": "envpkt configuration",
   "description": "Credential lifecycle and fleet management configuration for AI agents",
   "type": "object",
-  "required": [
-    "version",
-    "meta"
-  ],
+  "required": ["version", "meta"],
   "properties": {
     "version": {
       "description": "Schema version number",
@@ -21,9 +18,7 @@
     "agent": {
       "description": "Identity and capabilities of the AI agent using this envpkt",
       "type": "object",
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "properties": {
         "name": {
           "description": "Agent display name",

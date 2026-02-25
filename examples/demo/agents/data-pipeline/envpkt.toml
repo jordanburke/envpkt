@@ -1,0 +1,13 @@
+version = 1
+catalog = "../../infra/envpkt.toml"
+
+[agent]
+name = "data-pipeline"
+consumer = "agent"
+description = "ETL pipeline — reads from Postgres, caches in Redis"
+capabilities = ["extract", "transform", "load"]
+secrets = ["DATABASE_URL", "REDIS_URL"]
+
+# Override: narrow DB to read-only for this agent
+[meta.DATABASE_URL]
+capabilities = ["SELECT"]

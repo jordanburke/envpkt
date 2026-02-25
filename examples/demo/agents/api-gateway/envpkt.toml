@@ -1,0 +1,9 @@
+version = 1
+catalog = "../../infra/envpkt.toml"
+
+[agent]
+name = "api-gateway"
+consumer = "service"
+description = "REST API — handles payments and database writes"
+capabilities = ["http:serve", "payments:process"]
+secrets = ["DATABASE_URL", "STRIPE_SECRET_KEY"]
