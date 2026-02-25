@@ -36,7 +36,7 @@
     "prepublishOnly": "pnpm validate"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@modelcontextprotocol/sdk": "^1.27.1",
     "@sinclair/typebox": "^0.34.48",
     "commander": "^14.0.3",
     "functype": "^0.47.0",
@@ -44,7 +44,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.10.13",
-    "ts-builds": "^2.4.0",
+    "ts-builds": "^2.4.1",
     "tsdown": "^0.20.3",
     "tsx": "^4.21.0"
   },
@@ -66,5 +66,5 @@
     "schemas"
   ],
   "prettier": "ts-builds/prettier",
-  "packageManager": "pnpm@10.30.1+sha512.3590e550d5384caa39bd5c7c739f72270234b2f6059e13018f975c313b1eb9fefcc09714048765d4d9efe961382c312e624572c0420762bdc5d5940cdf9be73a"
+  "packageManager": "pnpm@10.30.2+sha512.36cdc707e7b7940a988c9c1ecf88d084f8514b5c3f085f53a2e244c2921d3b2545bc20dd4ebe1fc245feec463bb298aecea7a63ed1f7680b877dc6379d8d0cb4"
 }
