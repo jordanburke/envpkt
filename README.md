@@ -16,6 +16,7 @@ Secrets managers store values. envpkt stores _metadata about_ those values — w
 - Detect stale or orphaned credentials
 - Understand what capabilities each secret grants
 - Automate rotation workflows
+- Share secret metadata across agents via a central catalog
 
 envpkt never touches secret values. It works alongside your existing secrets manager (Vault, fnox, CI variables, etc.).
 
@@ -57,39 +58,95 @@ version = 1
 
 [agent]
 name = "billing-service"
-role = "payment-processor"
+consumer = "agent"
+description = "Payment processing agent"
 capabilities = ["charge", "refund"]
+expires = "2027-01-01"
 
 [lifecycle]
-warn_before_days = 14
-stale_after_days = 365
+stale_warning_days = 90
+require_expiration = true
+require_service = true
 
 [meta.STRIPE_SECRET_KEY]
 service = "stripe"
-consumer = "api"
-env_var = "STRIPE_SECRET_KEY"
 purpose = "Process customer payments and manage subscriptions"
 capabilities = ["charges:write", "subscriptions:write"]
 created = "2026-01-15"
 expires = "2027-01-15"
 rotation_url = "https://dashboard.stripe.com/apikeys"
-provisioner = "manual"
-tags = ["payments", "production"]
+source = "vault"
 
 [meta.DATABASE_URL]
 service = "postgres"
-consumer = "database"
-env_var = "DATABASE_URL"
 purpose = "Read/write access to the billing database"
 capabilities = ["SELECT", "INSERT", "UPDATE"]
 created = "2026-02-01"
 expires = "2026-08-01"
 rotation_url = "https://wiki.internal/runbooks/rotate-db-creds"
-provisioner = "vault"
-tags = ["postgres", "production"]
+source = "vault"
 ```
 
 See [`examples/`](./examples/) for more configurations.
+
+## Shared Secret Catalog
+
+When multiple agents consume the same secrets, a **shared catalog** prevents metadata duplication. Define secret metadata once in a central file, then have each agent reference it.
+
+### Catalog file (`infra/envpkt.toml`)
+
+```toml
+version = 1
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+
+[meta.DATABASE_URL]
+service = "postgres"
+purpose = "Primary application database"
+capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
+rotation_url = "https://wiki.internal/runbooks/rotate-db"
+source = "vault"
+created = "2025-11-01"
+expires = "2026-11-01"
+
+[meta.REDIS_URL]
+service = "redis"
+purpose = "Caching and session storage"
+created = "2025-11-01"
+expires = "2026-11-01"
+```
+
+### Agent file (`agents/pipeline/envpkt.toml`)
+
+```toml
+version = 1
+catalog = "../../infra/envpkt.toml"
+
+[agent]
+name = "data-pipeline"
+consumer = "agent"
+secrets = ["DATABASE_URL", "REDIS_URL"]
+
+# Optional: narrow the catalog definition for this agent
+[meta.DATABASE_URL]
+capabilities = ["SELECT"]
+```
+
+### Resolve to a flat config
+
+```bash
+envpkt resolve -c agents/pipeline/envpkt.toml
+```
+
+This produces a self-contained config with catalog metadata merged in and agent overrides applied. The resolved output has no `catalog` reference — it's ready for deployment.
+
+### Merge rules
+
+- Each field in the agent's `[meta.KEY]` override **replaces** the catalog field (shallow merge)
+- Omitted fields keep the catalog value
+- `agent.secrets` is the source of truth for which keys the agent needs
 
 ## CLI Commands
 
@@ -101,12 +158,13 @@ Generate an `envpkt.toml` template in the current directory.
 envpkt init                                    # Basic template
 envpkt init --from-fnox                        # Scaffold from fnox.toml
 envpkt init --agent --name "my-agent"          # Include agent identity
+envpkt init --catalog "../infra/envpkt.toml"   # Reference a shared catalog
 envpkt init --agent --name "bot" --capabilities "read,write" --expires "2027-01-01"
 ```
 
 ### `envpkt audit`
 
-Check credential health against lifecycle policies.
+Check credential health against lifecycle policies. Automatically resolves catalog references.
 
 ```bash
 envpkt audit                        # Table output
@@ -118,6 +176,19 @@ envpkt audit -c path/to/envpkt.toml # Specify config path
 ```
 
 Exit codes: `0` = healthy, `1` = degraded, `2` = critical.
+
+### `envpkt resolve`
+
+Resolve catalog references and output a flat, self-contained config.
+
+```bash
+envpkt resolve -c agent.toml                # Output resolved TOML to stdout
+envpkt resolve -c agent.toml --format json  # Output as JSON
+envpkt resolve -c agent.toml -o resolved.toml  # Write to file
+envpkt resolve -c agent.toml --dry-run      # Preview without writing
+```
+
+Configs without a `catalog` field pass through unchanged.
 
 ### `envpkt fleet`
 
@@ -133,12 +204,13 @@ envpkt fleet --status critical  # Filter agents by health status
 
 ### `envpkt inspect`
 
-Display a structured view of an `envpkt.toml` file.
+Display a structured view of an `envpkt.toml` file. Automatically resolves catalog references.
 
 ```bash
 envpkt inspect                        # Current directory
 envpkt inspect -c path/to/envpkt.toml # Specific file
 envpkt inspect --format json          # Raw JSON dump
+envpkt inspect --resolved             # Show resolved view (catalog merged)
 ```
 
 ### `envpkt exec`
@@ -204,15 +276,14 @@ The schema is published at:
 
 ### Secret Metadata Fields
 
-Each `[meta.<KEY>]` section answers five questions:
+Each `[meta.<KEY>]` section describes a secret:
 
-| Question  | Fields                        | Description                                 |
-| --------- | ----------------------------- | ------------------------------------------- |
-| **What**  | `service`, `consumer`         | What service and what type of integration   |
-| **Where** | `env_var`, `vault_path`       | Where the secret is injected and stored     |
-| **Why**   | `purpose`, `capabilities`     | Why the secret exists and what it grants    |
-| **When**  | `created`, `expires`          | When it was provisioned and when it expires |
-| **How**   | `provisioner`, `rotation_url` | How it's provisioned and how to rotate it   |
+| Tier            | Fields                                          | Description                               |
+| --------------- | ----------------------------------------------- | ----------------------------------------- |
+| **Scan-first**  | `service`, `expires`, `rotation_url`            | Key health indicators for audit           |
+| **Context**     | `purpose`, `capabilities`, `created`            | Why this secret exists and what it grants |
+| **Operational** | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime and provisioning info             |
+| **Enforcement** | `required`, `tags`                              | Filtering, grouping, and policy           |
 
 ### Agent Identity
 
@@ -221,9 +292,12 @@ The optional `[agent]` section identifies the AI agent:
 ```toml
 [agent]
 name = "data-pipeline-agent"
-role = "etl-processor"
+consumer = "agent"                     # agent | service | developer | ci
+description = "ETL pipeline processor"
 capabilities = ["read-s3", "write-postgres"]
 expires = "2027-01-01"
+services = ["aws", "postgres"]
+secrets = ["DATABASE_URL", "AWS_KEY"]  # When using a catalog
 ```
 
 ### Lifecycle Policy
@@ -232,10 +306,9 @@ The optional `[lifecycle]` section configures audit behavior:
 
 ```toml
 [lifecycle]
-warn_before_days = 30        # Warn N days before expiration
-stale_after_days = 365       # Flag secrets older than N days
-require_rotation_url = true  # Require rotation_url on all secrets
-require_purpose = true       # Require purpose on all secrets
+stale_warning_days = 90       # Flag secrets older than N days without updates
+require_expiration = true     # Require expires on all secrets
+require_service = true        # Require service on all secrets
 ```
 
 ## Library API
@@ -243,18 +316,25 @@ require_purpose = true       # Require purpose on all secrets
 envpkt is also available as a TypeScript library with a functional programming API built on [functype](https://github.com/jordanburke/functype). All functions return `Either<Error, Result>` or `Option<T>` — no thrown exceptions.
 
 ```typescript
-import { loadConfig, computeAudit, scanFleet } from "envpkt"
+import { boot, bootSafe, loadConfig, computeAudit, scanFleet, resolveConfig } from "envpkt"
 
-// Load and validate config
-const result = loadConfig("envpkt.toml")
-result.fold(
+// Boot API — load config, resolve catalog, audit, inject secrets
+const result = boot({ configPath: "envpkt.toml", inject: true })
+console.log(result.audit.status) // "healthy" | "degraded" | "critical"
+
+// Safe variant returns Either instead of throwing
+const safe = bootSafe({ configPath: "envpkt.toml" })
+safe.fold(
+  (err) => console.error("Boot failed:", err._tag),
+  (result) => console.log(`${result.injected.length} secrets injected`),
+)
+
+// Load and audit directly
+const config = loadConfig("envpkt.toml")
+config.fold(
   (err) => console.error("Failed:", err._tag),
   (config) => {
-    // Run audit
     const audit = computeAudit(config)
-    console.log(audit.status) // "healthy" | "degraded" | "critical"
-
-    // Check individual secrets
     audit.secrets.forEach((s) => {
       s.days_remaining.fold(
         () => console.log(`${s.key}: no expiration set`),
@@ -267,6 +347,28 @@ result.fold(
 // Fleet scan
 const fleet = scanFleet("/opt/agents", { maxDepth: 3 })
 console.log(`${fleet.total_agents} agents, ${fleet.total_secrets} secrets`)
+```
+
+### Catalog Resolution API
+
+```typescript
+import { loadConfig, resolveConfig } from "envpkt"
+import { dirname } from "node:path"
+
+const configPath = "agents/pipeline/envpkt.toml"
+loadConfig(configPath).fold(
+  (err) => console.error(err),
+  (config) => {
+    resolveConfig(config, dirname(configPath)).fold(
+      (err) => console.error("Catalog error:", err._tag),
+      (result) => {
+        console.log("Resolved keys:", result.merged)
+        console.log("Overridden:", result.overridden)
+        // result.config is the flat, self-contained config
+      },
+    )
+  },
+)
 ```
 
 ## fnox Integration
