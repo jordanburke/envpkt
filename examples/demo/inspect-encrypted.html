@@ -1,0 +1,156 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>envpkt inspect — encrypted</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background: #1e1e2e;
+        display: flex;
+        justify-content: center;
+        padding-top: 32px;
+        padding-bottom: 32px;
+      }
+      .term {
+        background: #282a36;
+        border-radius: 10px;
+        max-width: 820px;
+        width: 100%;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        overflow: hidden;
+      }
+      .bar {
+        background: #343746;
+        padding: 8px 16px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        display: inline-block;
+      }
+      .r {
+        background: #ff5f57;
+      }
+      .y {
+        background: #febc2e;
+      }
+      .g {
+        background: #28c840;
+      }
+      .cmd {
+        color: #8b8fa3;
+        font-size: 13px;
+        margin-left: 12px;
+        font-family: monospace;
+      }
+      pre {
+        font-family: "JetBrains Mono", Menlo, Monaco, monospace;
+        font-size: 13.5px;
+        line-height: 1.7;
+        color: #abb2bf;
+        padding: 20px 24px;
+        margin: 0;
+        white-space: pre-wrap;
+      }
+      b {
+        color: #e8e8e8;
+        font-weight: 600;
+      }
+      .dim {
+        opacity: 0.55;
+      }
+      .cyan {
+        color: #56b6c2;
+      }
+      .yellow {
+        color: #e5c07b;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="term">
+      <div class="bar">
+        <span class="dot r"></span><span class="dot y"></span><span class="dot g"></span>
+        <span class="cmd">envpkt inspect --secrets</span>
+      </div>
+      <pre><b>envpkt packet: api-gateway (service)</b>
+
+  REST API — handles payments and database writes
+  capabilities: <span class="dim">http:serve, payments:process</span>
+
+<b>secrets: 2</b>
+  <b>DATABASE_URL</b> → postgres = <span class="yellow">pos•••••yapp</span>
+    purpose: Primary application database
+    capabilities: <span class="dim">SELECT, INSERT, UPDATE, DELETE</span>
+    created: 2026-01-15  expires: 2027-01-15
+    rotates: 90d
+    source: vault
+    rotation_url: <span class="dim">https://wiki.internal/runbooks/rotate-db</span>
+  <b>STRIPE_SECRET_KEY</b> → stripe = <span class="yellow">sk_•••••qrst</span>
+    purpose: Payment processing
+    capabilities: <span class="dim">charges:write, subscriptions:read</span>
+    created: 2026-02-01  expires: 2027-02-01
+    rate_limit: 100/sec
+    source: vault
+    rotation_url: <span class="dim">https://dashboard.stripe.com/apikeys</span>
+
+<b>catalog:</b> <span class="cyan">examples/demo/infra/envpkt.toml</span>
+  merged: 2 keys
+  overridden: (none)
+
+────────────────────────────────────────────────────────────────────────
+
+<b>envpkt packet: data-pipeline (agent)</b>
+
+  ETL pipeline — reads from Postgres, caches in Redis
+  capabilities: <span class="dim">extract, transform, load</span>
+
+<b>secrets: 2</b>
+  <b>DATABASE_URL</b> → postgres = <span class="yellow">pos•••••yapp</span>
+    purpose: Primary application database
+    capabilities: <span class="dim">SELECT</span>
+    created: 2026-01-15  expires: 2027-01-15
+    rotates: 90d
+    source: vault
+    rotation_url: <span class="dim">https://wiki.internal/runbooks/rotate-db</span>
+  <b>REDIS_URL</b> → redis = <span class="yellow">red•••••79/0</span>
+    purpose: Caching and session storage
+    capabilities: <span class="dim">GET, SET, DEL</span>
+    created: 2026-01-15  expires: 2027-01-15
+    source: vault
+
+<b>catalog:</b> <span class="cyan">examples/demo/infra/envpkt.toml</span>
+  merged: 2 keys
+  overridden: DATABASE_URL
+
+────────────────────────────────────────────────────────────────────────
+
+<b>envpkt packet: monitoring (agent)</b>
+
+  Infrastructure health checks and alerting
+  capabilities: <span class="dim">monitor, alert</span>
+
+<b>secrets: 2</b>
+  <b>DATADOG_API_KEY</b> → datadog = <span class="yellow">dd-•••••1b2c</span>
+    purpose: Infrastructure monitoring metrics
+    capabilities: <span class="dim">metrics:write, events:write</span>
+    created: 2025-06-01  expires: 2026-01-01
+    source: ci
+    rotation_url: <span class="dim">https://app.datadoghq.com/organization-settings/api-keys</span>
+  <b>SLACK_WEBHOOK_URL</b> → slack = <span class="yellow">htt•••••xxxx</span>
+    purpose: Alert notifications to #ops-alerts channel
+    capabilities: <span class="dim">post:messages</span>
+    created: 2026-01-15  expires: 2027-01-15
+    source: ci
+
+<b>lifecycle:</b>
+  stale_warning_days: 60</pre>
+    </div>
+  </body>
+</html>

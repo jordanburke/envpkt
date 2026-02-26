@@ -32,6 +32,7 @@
     "test:coverage": "ts-builds test:coverage",
     "build": "ts-builds build",
     "build:schema": "tsx scripts/build-schema.ts",
+    "demo": "tsx scripts/generate-demo-html.ts",
     "dev": "ts-builds dev",
     "prepublishOnly": "pnpm validate"
   },

@@ -50,6 +50,10 @@ export {
 // Catalog resolution
 export { loadCatalog, resolveConfig, resolveSecrets } from "./core/catalog.js"
 
+// Packet formatting
+export type { FormatPacketOptions, SecretDisplay } from "./core/format.js"
+export { formatPacket, maskValue } from "./core/format.js"
+
 // Audit engine
 export { computeAudit } from "./core/audit.js"
 

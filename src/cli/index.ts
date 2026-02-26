@@ -55,6 +55,8 @@ program
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--format <format>", "Output format: table | json", "table")
   .option("--resolved", "Show resolved view (catalog merged)")
+  .option("--secrets", "Show secret values from environment (masked by default)")
+  .option("--plaintext", "Show secret values in plaintext (requires --secrets)")
   .action((options) => {
     runInspect(options)
   })

@@ -67,6 +67,37 @@ npx envpkt fleet -d examples/demo/agents/
 
 Scans all agents and produces an aggregate health report.
 
+### 6. Secret Display Modes
+
+```bash
+# Metadata only — no secret values shown
+npx envpkt inspect -c examples/demo/agents/api-gateway/envpkt.toml
+
+# Masked values — first 3 + ••••• + last 4 characters
+npx envpkt inspect -c examples/demo/agents/api-gateway/envpkt.toml --secrets
+
+# Full plaintext values
+npx envpkt inspect -c examples/demo/agents/api-gateway/envpkt.toml --secrets --plaintext
+```
+
+The `--secrets` flag reads values from environment variables. The demo HTML renders below use fake values for illustration.
+
+## HTML Renders
+
+Pre-rendered terminal screenshots showing all 3 agents across the 3 display modes:
+
+- `inspect-no-secrets.html` — metadata only (no secret values)
+- `inspect-encrypted.html` — masked values (default `--secrets` behavior)
+- `inspect-plaintext.html` — full values (`--secrets --plaintext`)
+
+Regenerate after changing fixtures or formatting:
+
+```bash
+pnpm demo
+```
+
+> Secret values in the HTML renders are fake demo data — not real credentials.
+
 ## Key Concepts Demonstrated
 
 | Concept                               | Where                                                                        |
