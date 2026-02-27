@@ -4,7 +4,16 @@ import { computeAudit } from "../../core/audit.js"
 import { resolveConfig } from "../../core/catalog.js"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import type { SecretStatus } from "../../core/types.js"
-import { CYAN, DIM, exitCodeForAudit, formatAudit, formatAuditJson, formatError, RESET } from "../output.js"
+import {
+  CYAN,
+  DIM,
+  exitCodeForAudit,
+  formatAudit,
+  formatAuditJson,
+  formatAuditMinimal,
+  formatError,
+  RESET,
+} from "../output.js"
 
 type AuditOptions = {
   readonly config?: string
@@ -74,6 +83,8 @@ const runAuditOnConfig = (config: import("../../core/types.js").EnvpktConfig, op
 
   if (options.format === "json") {
     console.log(formatAuditJson(filtered))
+  } else if (options.format === "minimal") {
+    console.log(formatAuditMinimal(filtered))
   } else {
     console.log(formatAudit(filtered))
   }

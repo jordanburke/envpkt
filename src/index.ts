@@ -57,6 +57,14 @@ export { formatPacket, maskValue } from "./core/format.js"
 // Audit engine
 export { computeAudit } from "./core/audit.js"
 
+// Pattern registry
+export type { ConfidenceLevel, CredentialPattern, MatchResult } from "./core/patterns.js"
+export { deriveServiceFromName, matchEnvVar, matchValueShape, scanEnv } from "./core/patterns.js"
+
+// Env scan/check
+export type { CheckResult, DriftEntry, DriftStatus, ScanOptions, ScanResult } from "./core/env.js"
+export { envCheck, envScan, generateTomlFromScan } from "./core/env.js"
+
 // Boot API
 export { boot, bootSafe, EnvpktBootError } from "./core/boot.js"
 

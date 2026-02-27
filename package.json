@@ -40,7 +40,7 @@
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@sinclair/typebox": "^0.34.48",
     "commander": "^14.0.3",
-    "functype": "^0.47.1",
+    "functype": "^0.48.0",
     "smol-toml": "^1.6.0"
   },
   "devDependencies": {

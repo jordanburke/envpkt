@@ -1,3 +1,5 @@
+import type { CheckResult, ScanResult } from "../core/env.js"
+import type { ConfidenceLevel } from "../core/patterns.js"
 import type { AuditResult, FleetHealth, HealthStatus, SecretHealth } from "../core/types.js"
 
 const RESET = "\x1b[0m"
@@ -195,6 +197,159 @@ export const exitCodeForAudit = (audit: AuditResult): number => {
     case "critical":
       return 2
   }
+}
+
+// --- Scan formatters ---
+
+const confidenceIcon = (confidence: ConfidenceLevel): string => {
+  switch (confidence) {
+    case "high":
+      return `${GREEN}●${RESET}`
+    case "medium":
+      return `${YELLOW}◐${RESET}`
+    case "low":
+      return `${DIM}○${RESET}`
+  }
+}
+
+export const formatScanTable = (scan: ScanResult): string => {
+  const total = scan.discovered.size
+  const header = `${BOLD}Scan Results${RESET} — ${total} credential(s) found in ${scan.total_scanned} env vars`
+  const counts = [
+    scan.high_confidence > 0 ? `  ${GREEN}${scan.high_confidence}${RESET} high confidence` : null,
+    scan.medium_confidence > 0 ? `  ${YELLOW}${scan.medium_confidence}${RESET} medium confidence` : null,
+    scan.low_confidence > 0 ? `  ${DIM}${scan.low_confidence}${RESET} low confidence` : null,
+  ]
+    .filter(Boolean)
+    .join("\n")
+
+  const rows = scan.discovered
+    .map((m) => {
+      const icon = confidenceIcon(m.confidence)
+      const svc = m.service.fold(
+        () => `${DIM}unknown${RESET}`,
+        (s) => s,
+      )
+      return `  ${icon} ${BOLD}${m.envVar}${RESET} → ${CYAN}${svc}${RESET} ${DIM}(${m.matchedBy})${RESET}`
+    })
+    .toArray()
+    .join("\n")
+
+  return [header, counts, rows].filter((s) => s.length > 0).join("\n\n")
+}
+
+export const formatScanJson = (scan: ScanResult): string =>
+  JSON.stringify(
+    {
+      total_scanned: scan.total_scanned,
+      discovered: scan.discovered.size,
+      high_confidence: scan.high_confidence,
+      medium_confidence: scan.medium_confidence,
+      low_confidence: scan.low_confidence,
+      matches: scan.discovered
+        .map((m) => ({
+          envVar: m.envVar,
+          service: m.service.fold(
+            () => null,
+            (s) => s,
+          ),
+          confidence: m.confidence,
+          matchedBy: m.matchedBy,
+        }))
+        .toArray(),
+    },
+    null,
+    2,
+  )
+
+// --- Check formatters ---
+
+const driftIcon = (status: string): string => {
+  switch (status) {
+    case "tracked":
+      return `${GREEN}✓${RESET}`
+    case "missing_from_env":
+      return `${RED}✗${RESET}`
+    case "untracked":
+      return `${YELLOW}?${RESET}`
+    default:
+      return " "
+  }
+}
+
+export const formatCheckTable = (check: CheckResult): string => {
+  const clean = check.is_clean
+  const icon = clean ? `${GREEN}✓${RESET}` : `${YELLOW}⚠${RESET}`
+  const label = clean ? `${GREEN}CLEAN${RESET}` : `${YELLOW}DRIFT DETECTED${RESET}`
+  const header = `${icon} ${BOLD}${label}${RESET}`
+
+  const counts = [
+    `  ${GREEN}${check.tracked_and_present}${RESET} tracked and present`,
+    check.missing_from_env > 0 ? `  ${RED}${check.missing_from_env}${RESET} missing from env` : null,
+    check.untracked_credentials > 0 ? `  ${YELLOW}${check.untracked_credentials}${RESET} untracked credentials` : null,
+  ]
+    .filter(Boolean)
+    .join("\n")
+
+  const rows = check.entries
+    .filter((e) => e.status !== "tracked")
+    .map((e) => {
+      const di = driftIcon(e.status)
+      const svc = e.service.fold(
+        () => "",
+        (s) => ` ${DIM}(${s})${RESET}`,
+      )
+      const conf = e.confidence.fold(
+        () => "",
+        (c) => ` ${confidenceIcon(c)}`,
+      )
+      return `  ${di} ${BOLD}${e.envVar}${RESET}${svc} ${e.status}${conf}`
+    })
+    .toArray()
+    .join("\n")
+
+  return [header, counts, rows].filter((s) => s.length > 0).join("\n\n")
+}
+
+export const formatCheckJson = (check: CheckResult): string =>
+  JSON.stringify(
+    {
+      is_clean: check.is_clean,
+      tracked_and_present: check.tracked_and_present,
+      missing_from_env: check.missing_from_env,
+      untracked_credentials: check.untracked_credentials,
+      entries: check.entries
+        .map((e) => ({
+          envVar: e.envVar,
+          service: e.service.fold(
+            () => null,
+            (s) => s,
+          ),
+          status: e.status,
+          confidence: e.confidence.fold(
+            () => null,
+            (c) => c,
+          ),
+        }))
+        .toArray(),
+    },
+    null,
+    2,
+  )
+
+// --- Audit minimal formatter (for shell hook) ---
+
+export const formatAuditMinimal = (audit: AuditResult): string => {
+  if (audit.status === "healthy") return `${GREEN}✓${RESET} ${audit.total} secrets healthy`
+
+  const parts: string[] = []
+  if (audit.expired > 0) parts.push(`${audit.expired} expired`)
+  if (audit.expiring_soon > 0) parts.push(`${audit.expiring_soon} expiring`)
+  if (audit.stale > 0) parts.push(`${audit.stale} stale`)
+  if (audit.missing > 0) parts.push(`${audit.missing} missing`)
+
+  const icon = audit.status === "critical" ? `${RED}✗${RESET}` : `${YELLOW}⚠${RESET}`
+  return `${icon} ${parts.join(", ")}`
 }
 
 export { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW }

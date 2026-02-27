@@ -26,11 +26,17 @@ envpkt never touches secret values. It works alongside your existing secrets man
 # Install
 npm install -g envpkt
 
-# Initialize in your project
-envpkt init
+# Auto-discover credentials from your shell environment
+envpkt env scan
+
+# Scaffold envpkt.toml from discovered credentials
+envpkt env scan --write
 
 # Audit credential health
 envpkt audit
+
+# Check for drift between envpkt.toml and live environment
+envpkt env check
 
 # Scan a directory tree of agents
 envpkt fleet
@@ -228,6 +234,46 @@ envpkt exec --strict -- ./deploy.sh   # Abort if audit is not healthy
 envpkt exec --profile staging -- ...  # Use a specific fnox profile
 ```
 
+### `envpkt env scan`
+
+Auto-discover credentials from your shell environment. Matches env vars against ~45 known services (exact name), ~13 generic suffix patterns (`*_API_KEY`, `*_SECRET`, `*_TOKEN`, etc.), and ~29 value shape patterns (`sk-*`, `ghp_*`, `AKIA*`, `postgres://`, etc.).
+
+```bash
+envpkt env scan                     # Table output with confidence icons
+envpkt env scan --format json       # JSON output
+envpkt env scan --write             # Write/append to envpkt.toml
+envpkt env scan --dry-run           # Preview TOML that would be written
+envpkt env scan --include-unknown   # Include vars with no inferred service
+```
+
+Confidence levels:
+
+- **High** (●) — exact name match or recognized value prefix
+- **Medium** (◐) — generic suffix pattern with derived service name
+
+### `envpkt env check`
+
+Bidirectional drift detection between `envpkt.toml` and the live shell environment. Checks both directions: TOML keys missing from env, and credential-shaped env vars not tracked in TOML.
+
+```bash
+envpkt env check                        # Table output
+envpkt env check --format json          # JSON output
+envpkt env check --strict               # Exit non-zero on any drift
+envpkt env check -c path/to/envpkt.toml # Specify config path
+```
+
+### `envpkt shell-hook`
+
+Output a shell function that runs `envpkt audit --format minimal` whenever you `cd` into a directory containing `envpkt.toml`.
+
+```bash
+# Add to your .zshrc
+eval "$(envpkt shell-hook zsh)"
+
+# Add to your .bashrc
+eval "$(envpkt shell-hook bash)"
+```
+
 ### `envpkt mcp`
 
 Start the envpkt MCP server (stdio transport) for AI agent integration.
@@ -372,6 +418,46 @@ const plain = formatPacket(resolveResult, {
   secrets: { DATABASE_URL: "postgres://user:pass@host/db" },
   secretDisplay: "plaintext",
 })
+```
+
+### Environment Scan/Check API
+
+```typescript
+import { envScan, envCheck, generateTomlFromScan, matchEnvVar } from "envpkt"
+
+// Scan process.env for credentials
+const scan = envScan(process.env)
+console.log(`Found ${scan.discovered.size} credentials (${scan.high_confidence} high confidence)`)
+
+scan.discovered.forEach((m) => {
+  const svc = m.service.fold(
+    () => "unknown",
+    (s) => s,
+  )
+  console.log(`  ${m.envVar} → ${svc} (${m.confidence})`)
+})
+
+// Generate TOML blocks from scan results
+const toml = generateTomlFromScan(scan.discovered.toArray())
+
+// Check drift between config and live env
+import { loadConfig } from "envpkt"
+
+loadConfig("envpkt.toml").fold(
+  (err) => console.error(err),
+  (config) => {
+    const check = envCheck(config, process.env)
+    if (!check.is_clean) {
+      console.log(`${check.missing_from_env} missing, ${check.untracked_credentials} untracked`)
+    }
+  },
+)
+
+// Match a single env var
+matchEnvVar("OPENAI_API_KEY", "sk-test123").fold(
+  () => console.log("Not a credential"),
+  (m) => console.log(`Matched: ${m.confidence} confidence`),
+)
 ```
 
 ### Catalog Resolution API

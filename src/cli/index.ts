@@ -1,12 +1,14 @@
 import { Command } from "commander"
 
 import { runAudit } from "./commands/audit.js"
+import { runEnvCheck, runEnvScan } from "./commands/env.js"
 import { runExec } from "./commands/exec.js"
 import { runFleet } from "./commands/fleet.js"
 import { runInit } from "./commands/init.js"
 import { runInspect } from "./commands/inspect.js"
 import { runMcp } from "./commands/mcp.js"
 import { runResolve } from "./commands/resolve.js"
+import { runShellHook } from "./commands/shell-hook.js"
 
 const program = new Command()
 
@@ -92,6 +94,37 @@ program
   .option("-c, --config <path>", "Path to envpkt.toml")
   .action((options) => {
     runMcp(options)
+  })
+
+const env = program.command("env").description("Discover and check credentials in your shell environment")
+
+env
+  .command("scan")
+  .description("Auto-discover credentials from process.env and scaffold TOML entries")
+  .option("--format <format>", "Output format: table | json", "table")
+  .option("--write", "Write discovered credentials to envpkt.toml")
+  .option("--dry-run", "Preview TOML that would be written (implies --write)")
+  .option("--include-unknown", "Include vars where service could not be inferred")
+  .action((options) => {
+    runEnvScan(options)
+  })
+
+env
+  .command("check")
+  .description("Bidirectional drift detection between envpkt.toml and live environment")
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .option("--format <format>", "Output format: table | json", "table")
+  .option("--strict", "Exit non-zero on any drift")
+  .action((options) => {
+    runEnvCheck(options)
+  })
+
+program
+  .command("shell-hook")
+  .description("Output shell function for ambient credential warnings on cd")
+  .argument("<shell>", "Shell type: zsh | bash")
+  .action((shell: string) => {
+    runShellHook(shell)
   })
 
 program.parse()
