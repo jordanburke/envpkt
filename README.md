@@ -211,7 +211,11 @@ envpkt inspect                        # Current directory
 envpkt inspect -c path/to/envpkt.toml # Specific file
 envpkt inspect --format json          # Raw JSON dump
 envpkt inspect --resolved             # Show resolved view (catalog merged)
+envpkt inspect --secrets              # Show secret values from env (masked)
+envpkt inspect --secrets --plaintext  # Show secret values in plaintext
 ```
+
+The `--secrets` flag reads values from environment variables matching each secret key. By default values are masked (`pos•••••yapp`). Add `--plaintext` to display full values.
 
 ### `envpkt exec`
 
@@ -349,6 +353,27 @@ const fleet = scanFleet("/opt/agents", { maxDepth: 3 })
 console.log(`${fleet.total_agents} agents, ${fleet.total_secrets} secrets`)
 ```
 
+### Packet Formatting API
+
+```typescript
+import { formatPacket, maskValue } from "envpkt"
+
+// formatPacket produces a human-readable text summary of a resolved config
+const text = formatPacket(resolveResult)
+
+// With secret values (masked by default)
+const masked = formatPacket(resolveResult, {
+  secrets: { DATABASE_URL: "postgres://user:pass@host/db" },
+})
+// DATABASE_URL → postgres = pos•••••t/db
+
+// With plaintext secret values
+const plain = formatPacket(resolveResult, {
+  secrets: { DATABASE_URL: "postgres://user:pass@host/db" },
+  secretDisplay: "plaintext",
+})
+```
+
 ### Catalog Resolution API
 
 ```typescript
@@ -386,7 +411,10 @@ pnpm install
 pnpm validate    # format + lint + typecheck + test + build:schema + build
 pnpm test        # Run tests only
 pnpm dev         # Watch mode
+pnpm demo        # Regenerate demo HTML renders in examples/demo/
 ```
+
+See [`examples/demo/`](./examples/demo/) for a walkthrough of the catalog system with 3 agents, including styled HTML renders of the inspect output in all 3 display modes (no secrets, masked, plaintext).
 
 ## License
 
