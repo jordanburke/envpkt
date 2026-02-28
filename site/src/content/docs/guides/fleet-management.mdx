@@ -1,0 +1,83 @@
+---
+title: Fleet Management
+description: Scan and monitor credential health across all your agents
+---
+
+The `envpkt fleet` command scans a directory tree for `envpkt.toml` files and aggregates credential health across your entire fleet.
+
+## Directory Scanning
+
+```bash
+# Scan current directory (default depth: 3)
+envpkt fleet
+
+# Scan specific directory with deeper traversal
+envpkt fleet -d /opt/agents --depth 5
+
+# JSON output for monitoring systems
+envpkt fleet --format json
+```
+
+## Health Aggregation
+
+Fleet health is the worst status across all agents:
+
+| Overall Status | Meaning                                           |
+| -------------- | ------------------------------------------------- |
+| `healthy`      | All agents pass audit                             |
+| `degraded`     | Some agents have expiring_soon or stale secrets   |
+| `critical`     | At least one agent has expired or missing secrets |
+
+## Filtering
+
+Show only agents with a specific health status:
+
+```bash
+# Show critical agents only
+envpkt fleet --status critical
+
+# Show degraded agents
+envpkt fleet --status degraded
+```
+
+## Fleet Report
+
+The table output shows per-agent:
+
+- **Path** — relative path to the `envpkt.toml`
+- **Agent** — agent name (from `[agent]` section)
+- **Status** — health status
+- **Secrets** — total secret count
+- **Min Expiry** — days until the nearest expiration
+
+Followed by aggregate totals.
+
+## Library API
+
+Use `scanFleet()` programmatically:
+
+```typescript
+import { scanFleet } from "envpkt"
+
+const fleet = scanFleet("/opt/agents", { maxDepth: 3 })
+
+console.log(`${fleet.total_agents} agents, ${fleet.total_secrets} secrets`)
+console.log(`Status: ${fleet.status}`)
+
+fleet.agents.forEach((agent) => {
+  console.log(`  ${agent.path}: ${agent.audit.status}`)
+})
+```
+
+The `FleetHealth` type provides:
+
+```typescript
+type FleetHealth = {
+  readonly status: HealthStatus
+  readonly agents: List<FleetAgent>
+  readonly total_agents: number
+  readonly total_secrets: number
+  readonly expired: number
+  readonly expiring_soon: number
+}
+```

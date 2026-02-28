@@ -1,0 +1,252 @@
+---
+title: Library API
+description: TypeScript API reference for programmatic envpkt usage
+---
+
+envpkt is available as a TypeScript library with a functional programming API built on [functype](https://github.com/jordanburke/functype). All functions return `Either<Error, Result>` or `Option<T>` — no thrown exceptions.
+
+```typescript
+import { boot, loadConfig, computeAudit, scanFleet } from "envpkt"
+```
+
+## Boot API
+
+High-level API that loads config, resolves catalog, audits, and optionally injects secrets.
+
+### `boot(options)`
+
+```typescript
+const result = boot({ configPath: "envpkt.toml", inject: true })
+console.log(result.audit.status) // "healthy" | "degraded" | "critical"
+```
+
+Throws `EnvpktBootError` on failure.
+
+### `bootSafe(options)`
+
+```typescript
+const safe = bootSafe({ configPath: "envpkt.toml" })
+safe.fold(
+  (err) => console.error("Boot failed:", err._tag),
+  (result) => console.log(`${result.injected.length} secrets injected`),
+)
+```
+
+Returns `Either<BootError, BootResult>`.
+
+### `BootOptions`
+
+```typescript
+type BootOptions = {
+  readonly configPath?: string
+  readonly profile?: string
+  readonly inject?: boolean
+  readonly failOnExpired?: boolean
+  readonly warnOnly?: boolean
+}
+```
+
+### `BootResult`
+
+```typescript
+type BootResult = {
+  readonly audit: AuditResult
+  readonly injected: ReadonlyArray<string>
+  readonly skipped: ReadonlyArray<string>
+  readonly secrets: Readonly<Record<string, string>>
+  readonly warnings: ReadonlyArray<string>
+}
+```
+
+## Config Operations
+
+### `loadConfig(path)`
+
+Load and validate an `envpkt.toml` file. Returns `Either<ConfigError, EnvpktConfig>`.
+
+```typescript
+const config = loadConfig("envpkt.toml")
+config.fold(
+  (err) => console.error("Failed:", err._tag),
+  (config) => console.log(config),
+)
+```
+
+### `loadConfigFromCwd()`
+
+Load config from the current working directory.
+
+### `findConfigPath(startDir?)`
+
+Search for `envpkt.toml` starting from a directory, walking upward.
+
+### `parseToml(content)`
+
+Parse raw TOML string. Returns `Either<ConfigError, unknown>`.
+
+### `validateConfig(data)`
+
+Validate parsed data against the schema. Returns `Either<ConfigError, EnvpktConfig>`.
+
+## Catalog Resolution
+
+### `resolveConfig(config, baseDir)`
+
+Resolve catalog references. Returns `Either<CatalogError, ResolveResult>`.
+
+```typescript
+import { loadConfig, resolveConfig } from "envpkt"
+import { dirname } from "node:path"
+
+const configPath = "agents/pipeline/envpkt.toml"
+loadConfig(configPath).fold(
+  (err) => console.error(err),
+  (config) => {
+    resolveConfig(config, dirname(configPath)).fold(
+      (err) => console.error("Catalog error:", err._tag),
+      (result) => {
+        console.log("Resolved keys:", result.merged)
+        console.log("Overridden:", result.overridden)
+      },
+    )
+  },
+)
+```
+
+### `ResolveResult`
+
+```typescript
+type ResolveResult = {
+  readonly config: EnvpktConfig
+  readonly catalogPath?: string
+  readonly merged: ReadonlyArray<string>
+  readonly overridden: ReadonlyArray<string>
+  readonly warnings: ReadonlyArray<string>
+}
+```
+
+## Audit Engine
+
+### `computeAudit(config)`
+
+Compute audit results for a config. Returns `AuditResult`.
+
+```typescript
+const audit = computeAudit(config)
+console.log(audit.status) // "healthy" | "degraded" | "critical"
+audit.secrets.forEach((s) => {
+  console.log(`${s.key}: ${s.status}`)
+})
+```
+
+## Fleet Scanner
+
+### `scanFleet(dir, options?)`
+
+Scan a directory tree for `envpkt.toml` files. Returns `FleetHealth`.
+
+```typescript
+const fleet = scanFleet("/opt/agents", { maxDepth: 3 })
+console.log(`${fleet.total_agents} agents, ${fleet.total_secrets} secrets`)
+```
+
+## Environment Scanning
+
+### `envScan(env)`
+
+Scan an environment object for credentials. Returns `ScanResult`.
+
+```typescript
+const scan = envScan(process.env)
+console.log(`Found ${scan.discovered.size} credentials`)
+```
+
+### `envCheck(config, env)`
+
+Bidirectional drift detection. Returns `CheckResult`.
+
+```typescript
+const check = envCheck(config, process.env)
+if (!check.is_clean) {
+  console.log(`${check.missing_from_env} missing, ${check.untracked_credentials} untracked`)
+}
+```
+
+### `generateTomlFromScan(matches)`
+
+Generate TOML `[meta.*]` blocks from scan results.
+
+### `matchEnvVar(name, value)`
+
+Match a single env var against all patterns. Returns `Option<MatchResult>`.
+
+```typescript
+matchEnvVar("OPENAI_API_KEY", "sk-test123").fold(
+  () => console.log("Not a credential"),
+  (m) => console.log(`Matched: ${m.confidence} confidence`),
+)
+```
+
+## Packet Formatting
+
+### `formatPacket(resolveResult, options?)`
+
+Produce a human-readable text summary of a resolved config.
+
+```typescript
+import { formatPacket } from "envpkt"
+
+// Without secrets
+const text = formatPacket(resolveResult)
+
+// With masked secrets
+const masked = formatPacket(resolveResult, {
+  secrets: { DATABASE_URL: "postgres://user:pass@host/db" },
+})
+
+// With plaintext secrets
+const plain = formatPacket(resolveResult, {
+  secrets: { DATABASE_URL: "postgres://user:pass@host/db" },
+  secretDisplay: "plaintext",
+})
+```
+
+### `maskValue(value)`
+
+Mask a secret value for display (e.g., `postgres://user:pass@host/db` → `pos•••••t/db`).
+
+## fnox Integration
+
+### `detectFnox()` / `fnoxAvailable()`
+
+Check for fnox availability.
+
+### `readFnoxConfig(path)` / `extractFnoxKeys(config)`
+
+Read and parse fnox configuration.
+
+### `compareFnoxAndEnvpkt(fnoxConfig, envpktConfig)`
+
+Compare keys between fnox and envpkt for orphan detection.
+
+### `fnoxGet(key, profile?)` / `fnoxExport(keys, profile?)`
+
+Retrieve secret values from fnox.
+
+### `ageAvailable()` / `unwrapAgentKey(identityPath)`
+
+Check for age encryption support and decrypt agent keys.
+
+## MCP Server
+
+### `createServer()` / `startServer()`
+
+Create and start the MCP server programmatically.
+
+### `toolDefinitions` / `callTool(name, args, config, audit)`
+
+MCP tool definitions and invocation.
+
+### `resourceDefinitions` / `readResource(uri, config, audit)`
+
+MCP resource definitions and reading.

@@ -1,0 +1,52 @@
+---
+title: Installation
+description: Install envpkt globally, locally, or run with npx
+---
+
+## Global Install
+
+```bash
+npm install -g envpkt
+# or
+pnpm add -g envpkt
+```
+
+Once installed globally, the `envpkt` command is available everywhere:
+
+```bash
+envpkt --version
+envpkt --help
+```
+
+## Local Install
+
+Add envpkt as a dev dependency to your project:
+
+```bash
+npm install -D envpkt
+# or
+pnpm add -D envpkt
+```
+
+Then run via npx or package scripts:
+
+```bash
+npx envpkt audit
+```
+
+## Run Without Installing
+
+```bash
+npx envpkt env scan
+npx envpkt audit
+```
+
+## Library Usage
+
+envpkt is also a TypeScript library. Import functions directly:
+
+```typescript
+import { boot, loadConfig, computeAudit, scanFleet } from "envpkt"
+```
+
+See the [Library API reference](/reference/library-api/) for full documentation.

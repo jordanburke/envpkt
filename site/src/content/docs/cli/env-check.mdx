@@ -1,0 +1,45 @@
+---
+title: envpkt env check
+description: Bidirectional drift detection between envpkt.toml and live environment
+---
+
+Check for drift between your `envpkt.toml` and the live shell environment. Detects both directions: TOML keys missing from env, and credential-shaped env vars not tracked in TOML.
+
+## Usage
+
+```bash
+envpkt env check [options]
+```
+
+## Options
+
+| Option                | Description                    | Default       |
+| --------------------- | ------------------------------ | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`          | Auto-detected |
+| `--format <format>`   | Output format: `table`, `json` | `table`       |
+| `--strict`            | Exit non-zero on any drift     | `false`       |
+
+## Examples
+
+```bash
+# Standard drift check
+envpkt env check
+
+# JSON output
+envpkt env check --format json
+
+# Strict mode for CI
+envpkt env check --strict
+
+# Specify config path
+envpkt env check -c path/to/envpkt.toml
+```
+
+## Drift Types
+
+| Direction             | Meaning                                                             |
+| --------------------- | ------------------------------------------------------------------- |
+| **Missing from env**  | Key defined in `envpkt.toml` but not set in the current shell       |
+| **Untracked in TOML** | Credential-shaped env var detected but not tracked in `envpkt.toml` |
+
+Use `envpkt env scan --write` to add untracked credentials to your config.

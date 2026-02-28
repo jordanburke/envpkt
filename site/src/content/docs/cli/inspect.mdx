@@ -1,0 +1,52 @@
+---
+title: envpkt inspect
+description: Display a structured view of envpkt.toml
+---
+
+Display a human-readable view of your `envpkt.toml` configuration. Automatically resolves catalog references.
+
+## Usage
+
+```bash
+envpkt inspect [options]
+```
+
+## Options
+
+| Option                | Description                                             | Default       |
+| --------------------- | ------------------------------------------------------- | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`                                   | Auto-detected |
+| `--format <format>`   | Output format: `table`, `json`                          | `table`       |
+| `--resolved`          | Show resolved view (catalog merged)                     | `false`       |
+| `--secrets`           | Show secret values from environment (masked by default) | `false`       |
+| `--plaintext`         | Show secret values in plaintext (requires `--secrets`)  | `false`       |
+
+## Examples
+
+```bash
+# Inspect current directory
+envpkt inspect
+
+# Inspect specific file
+envpkt inspect -c path/to/envpkt.toml
+
+# Raw JSON dump
+envpkt inspect --format json
+
+# Show resolved view with catalog merged
+envpkt inspect --resolved
+
+# Show secret values (masked)
+envpkt inspect --secrets
+
+# Show secret values in plaintext
+envpkt inspect --secrets --plaintext
+```
+
+## Secret Display Modes
+
+The `--secrets` flag reads values from environment variables matching each secret key:
+
+- **Without `--secrets`**: Only metadata is shown, no values
+- **With `--secrets`**: Values are masked (e.g., `pos•••••t/db`)
+- **With `--secrets --plaintext`**: Full values are displayed

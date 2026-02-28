@@ -1,0 +1,55 @@
+---
+title: Shell Hooks
+description: Ambient credential warnings when you cd into a project
+---
+
+envpkt provides shell hooks that display credential health automatically when you navigate into a directory containing `envpkt.toml`.
+
+## Setup
+
+### zsh
+
+Add to `~/.zshrc`:
+
+```bash
+eval "$(envpkt shell-hook zsh)"
+```
+
+### bash
+
+Add to `~/.bashrc`:
+
+```bash
+eval "$(envpkt shell-hook bash)"
+```
+
+## What the Hook Does
+
+The hook wraps the `cd` command. When you `cd` into a directory containing `envpkt.toml`, it runs:
+
+```bash
+envpkt audit --format minimal
+```
+
+This provides a one-line health summary without interrupting your workflow.
+
+## Generated Shell Code
+
+The `envpkt shell-hook` command outputs a shell function. For zsh, it looks approximately like:
+
+```bash
+envpkt_chpwd() {
+  if [[ -f envpkt.toml ]]; then
+    envpkt audit --format minimal 2>/dev/null
+  fi
+}
+chpwd_functions=(${chpwd_functions[@]} envpkt_chpwd)
+```
+
+For bash, it uses `PROMPT_COMMAND` or wraps `cd`.
+
+## Use Cases
+
+- **Daily development** — see credential health at a glance
+- **Multi-project work** — catch issues as you switch between projects
+- **Team onboarding** — new team members see credential status immediately

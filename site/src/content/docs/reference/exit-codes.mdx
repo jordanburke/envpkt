@@ -1,0 +1,48 @@
+---
+title: Exit Codes
+description: CLI exit code reference
+---
+
+envpkt CLI commands use exit codes to communicate credential health status.
+
+## Exit Code Table
+
+| Code | Status   | Description                                                         |
+| ---- | -------- | ------------------------------------------------------------------- |
+| `0`  | Healthy  | All secrets pass audit — no issues detected                         |
+| `1`  | Degraded | Some secrets have warnings (expiring soon, stale, missing metadata) |
+| `2`  | Critical | Expired or missing secrets detected                                 |
+
+## Commands Using Exit Codes
+
+### `envpkt audit`
+
+Returns health-based exit codes by default. With `--strict`, any non-healthy secret causes exit code `1` or `2`.
+
+### `envpkt exec`
+
+Inherits audit exit codes. With `--strict`, aborts execution on any non-healthy secret.
+
+### `envpkt env check`
+
+With `--strict`, returns non-zero on any drift between TOML and environment.
+
+### `envpkt fleet`
+
+Returns the worst health status across all agents in the fleet.
+
+## CI Usage
+
+Exit codes integrate directly with CI pipeline failure detection:
+
+```bash
+# Fail pipeline on degraded or critical
+envpkt audit --strict
+
+# Fail only on critical
+envpkt audit
+if [ $? -eq 2 ]; then
+  echo "Critical credential issues — aborting deployment"
+  exit 1
+fi
+```

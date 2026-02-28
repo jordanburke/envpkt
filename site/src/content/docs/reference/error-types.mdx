@@ -1,0 +1,123 @@
+---
+title: Error Types
+description: Discriminated union error types used throughout envpkt
+---
+
+envpkt uses discriminated union types for errors. Each error has a `_tag` field for pattern matching.
+
+## `ConfigError`
+
+Errors from loading and parsing `envpkt.toml`.
+
+```typescript
+type ConfigError =
+  | { readonly _tag: "FileNotFound"; readonly path: string }
+  | { readonly _tag: "ParseError"; readonly message: string }
+  | { readonly _tag: "ValidationError"; readonly errors: List<string> }
+  | { readonly _tag: "ReadError"; readonly message: string }
+```
+
+| Tag               | When                                           |
+| ----------------- | ---------------------------------------------- |
+| `FileNotFound`    | The specified config file does not exist       |
+| `ParseError`      | TOML syntax error                              |
+| `ValidationError` | Schema validation failed (with list of errors) |
+| `ReadError`       | File system read error                         |
+
+## `CatalogError`
+
+Errors from catalog resolution.
+
+```typescript
+type CatalogError =
+  | { readonly _tag: "CatalogNotFound"; readonly path: string }
+  | { readonly _tag: "CatalogLoadError"; readonly message: string }
+  | { readonly _tag: "SecretNotInCatalog"; readonly key: string; readonly catalogPath: string }
+  | { readonly _tag: "MissingSecretsList"; readonly message: string }
+```
+
+| Tag                  | When                                          |
+| -------------------- | --------------------------------------------- |
+| `CatalogNotFound`    | The catalog file path does not exist          |
+| `CatalogLoadError`   | Catalog file failed to load or parse          |
+| `SecretNotInCatalog` | Agent references a key not defined in catalog |
+| `MissingSecretsList` | Agent uses catalog but has no `secrets` array |
+
+## `FnoxError`
+
+Errors from fnox integration.
+
+```typescript
+type FnoxError =
+  | { readonly _tag: "FnoxNotFound"; readonly message: string }
+  | { readonly _tag: "FnoxCliError"; readonly message: string }
+  | { readonly _tag: "FnoxParseError"; readonly message: string }
+```
+
+| Tag              | When                            |
+| ---------------- | ------------------------------- |
+| `FnoxNotFound`   | fnox CLI or config not found    |
+| `FnoxCliError`   | fnox command execution failed   |
+| `FnoxParseError` | fnox output could not be parsed |
+
+## `IdentityError`
+
+Errors from agent identity operations.
+
+```typescript
+type IdentityError =
+  | { readonly _tag: "AgeNotFound"; readonly message: string }
+  | { readonly _tag: "DecryptFailed"; readonly message: string }
+  | { readonly _tag: "IdentityNotFound"; readonly path: string }
+```
+
+| Tag                | When                                          |
+| ------------------ | --------------------------------------------- |
+| `AgeNotFound`      | age encryption tool not installed             |
+| `DecryptFailed`    | Agent key decryption failed                   |
+| `IdentityNotFound` | Identity key file not found at specified path |
+
+## `BootError`
+
+Union of all error types that can occur during boot:
+
+```typescript
+type BootError =
+  | ConfigError
+  | FnoxError
+  | CatalogError
+  | { readonly _tag: "AuditFailed"; readonly audit: AuditResult; readonly message: string }
+  | IdentityError
+```
+
+The `AuditFailed` variant includes the full `AuditResult` for inspection.
+
+## Pattern Matching
+
+Use `_tag` for exhaustive pattern matching:
+
+```typescript
+import type { ConfigError } from "envpkt"
+
+function handleError(err: ConfigError): string {
+  switch (err._tag) {
+    case "FileNotFound":
+      return `Config not found: ${err.path}`
+    case "ParseError":
+      return `TOML syntax error: ${err.message}`
+    case "ValidationError":
+      return `Validation failed: ${err.errors.toArray().join(", ")}`
+    case "ReadError":
+      return `Read error: ${err.message}`
+  }
+}
+```
+
+Or use functype's `Either.fold`:
+
+```typescript
+loadConfig("envpkt.toml").fold(
+  (err) => console.error(`[${err._tag}]`, err),
+  (config) => console.log("Loaded:", config),
+)
+```

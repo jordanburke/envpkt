@@ -1,0 +1,122 @@
+---
+title: The TOML File
+description: Anatomy of envpkt.toml — every section and field explained
+---
+
+Every project gets one `envpkt.toml` that describes its credentials. The file answers five questions per secret: **What / Where / Why / When / How**.
+
+## Minimal Example
+
+```toml
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+version = 1
+
+[meta.API_KEY]
+service = "stripe"
+```
+
+The `#:schema` directive enables autocompletion and validation in editors with TOML + JSON Schema support.
+
+## Full Example
+
+```toml
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+version = 1
+
+[agent]
+name = "billing-service"
+consumer = "agent"
+description = "Payment processing agent"
+capabilities = ["charge", "refund"]
+expires = "2027-01-01"
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+require_service = true
+
+[meta.STRIPE_SECRET_KEY]
+service = "stripe"
+purpose = "Process customer payments and manage subscriptions"
+capabilities = ["charges:write", "subscriptions:write"]
+created = "2026-01-15"
+expires = "2027-01-15"
+rotation_url = "https://dashboard.stripe.com/apikeys"
+source = "vault"
+
+[meta.DATABASE_URL]
+service = "postgres"
+purpose = "Read/write access to the billing database"
+capabilities = ["SELECT", "INSERT", "UPDATE"]
+created = "2026-02-01"
+expires = "2026-08-01"
+rotation_url = "https://wiki.internal/runbooks/rotate-db-creds"
+source = "vault"
+```
+
+## Secret Metadata Field Tiers
+
+Each `[meta.<KEY>]` section describes a single secret. Fields are organized by importance:
+
+| Tier            | Fields                                          | Description                               |
+| --------------- | ----------------------------------------------- | ----------------------------------------- |
+| **Scan-first**  | `service`, `expires`, `rotation_url`            | Key health indicators for audit           |
+| **Context**     | `purpose`, `capabilities`, `created`            | Why this secret exists and what it grants |
+| **Operational** | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime and provisioning info             |
+| **Enforcement** | `required`, `tags`                              | Filtering, grouping, and policy           |
+
+## Agent Identity
+
+The optional `[agent]` section identifies the consumer of these credentials:
+
+```toml
+[agent]
+name = "data-pipeline-agent"
+consumer = "agent"                     # agent | service | developer | ci
+description = "ETL pipeline processor"
+capabilities = ["read-s3", "write-postgres"]
+expires = "2027-01-01"
+services = ["aws", "postgres"]
+secrets = ["DATABASE_URL", "AWS_KEY"]  # When using a catalog
+```
+
+The `consumer` field classifies the type: `agent` (AI agent), `service` (backend service), `developer` (local dev), or `ci` (CI/CD pipeline).
+
+## Lifecycle Policy
+
+The optional `[lifecycle]` section configures audit behavior:
+
+```toml
+[lifecycle]
+stale_warning_days = 90       # Flag secrets older than N days without updates
+require_expiration = true     # Require expires on all secrets
+require_service = true        # Require service on all secrets
+```
+
+## Callbacks
+
+The optional `[callbacks]` section enables automation on lifecycle events:
+
+```toml
+[callbacks]
+on_expiring = "https://hooks.slack.com/services/T00/B00/xxx"
+on_expired = "https://hooks.slack.com/services/T00/B00/yyy"
+on_audit_fail = "https://hooks.slack.com/services/T00/B00/zzz"
+```
+
+## Catalog Reference
+
+To share secret metadata across agents, point to a shared catalog:
+
+```toml
+version = 1
+catalog = "../../infra/envpkt.toml"
+
+[agent]
+name = "data-pipeline"
+secrets = ["DATABASE_URL", "REDIS_URL"]
+```
+
+See the [Catalog System guide](/guides/catalog-system/) for details.

@@ -1,0 +1,41 @@
+---
+title: envpkt mcp
+description: Start the envpkt MCP server (stdio transport)
+---
+
+Start the envpkt MCP server for AI agent integration. Uses stdio transport.
+
+## Usage
+
+```bash
+envpkt mcp [options]
+```
+
+## Options
+
+| Option                | Description           | Default       |
+| --------------------- | --------------------- | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml` | Auto-detected |
+
+## Example
+
+```bash
+envpkt mcp
+```
+
+## MCP Client Configuration
+
+Add envpkt to your MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "envpkt": {
+      "command": "envpkt",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+See the [MCP Server integration](/integrations/mcp-server/) for available tools and resources.

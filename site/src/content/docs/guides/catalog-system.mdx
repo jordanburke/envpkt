@@ -1,0 +1,151 @@
+---
+title: Catalog System
+description: Share secret metadata across agents with a central catalog
+---
+
+When multiple agents consume the same secrets, a **shared catalog** prevents metadata duplication. Define secret metadata once in a central file, then have each agent reference it.
+
+## The Problem
+
+Without a catalog, every agent duplicates the same metadata:
+
+```
+agents/
+├── api-gateway/envpkt.toml      # DATABASE_URL metadata duplicated
+├── data-pipeline/envpkt.toml    # DATABASE_URL metadata duplicated
+└── monitoring/envpkt.toml       # SLACK_WEBHOOK_URL metadata duplicated
+```
+
+If the database rotation URL changes, you update it in every file.
+
+## Architecture
+
+With a catalog, metadata lives in one place:
+
+```
+infra/
+└── envpkt.toml                  # Catalog: single source of truth
+agents/
+├── api-gateway/envpkt.toml      # References catalog
+├── data-pipeline/envpkt.toml    # References catalog + overrides
+└── monitoring/envpkt.toml       # Standalone (no catalog)
+```
+
+## Catalog File
+
+The catalog is a standard `envpkt.toml` with lifecycle policies and `[meta.*]` sections:
+
+```toml
+version = 1
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+require_service = true
+
+[meta.DATABASE_URL]
+service = "postgres"
+purpose = "Primary application database"
+capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
+rotation_url = "https://wiki.internal/runbooks/rotate-db"
+source = "vault"
+created = "2026-01-15"
+expires = "2027-01-15"
+
+[meta.REDIS_URL]
+service = "redis"
+purpose = "Caching and session storage"
+created = "2026-01-15"
+expires = "2027-01-15"
+
+[meta.STRIPE_SECRET_KEY]
+service = "stripe"
+purpose = "Payment processing"
+capabilities = ["charges:write", "subscriptions:read"]
+rotation_url = "https://dashboard.stripe.com/apikeys"
+created = "2026-02-01"
+expires = "2027-02-01"
+rate_limit = "100/sec"
+source = "vault"
+
+[meta.SLACK_WEBHOOK_URL]
+service = "slack"
+purpose = "Alert notifications"
+capabilities = ["post:messages"]
+created = "2026-01-15"
+expires = "2027-01-15"
+source = "ci"
+```
+
+## Agent File
+
+Each agent references the catalog and declares which secrets it needs:
+
+```toml
+version = 1
+catalog = "../../infra/envpkt.toml"
+
+[agent]
+name = "api-gateway"
+consumer = "service"
+description = "REST API — handles payments and database writes"
+capabilities = ["http:serve", "payments:process"]
+secrets = ["DATABASE_URL", "STRIPE_SECRET_KEY"]
+```
+
+The `secrets` array is the source of truth for which keys this agent consumes.
+
+## Capability Narrowing
+
+An agent can override catalog fields to narrow permissions:
+
+```toml
+version = 1
+catalog = "../../infra/envpkt.toml"
+
+[agent]
+name = "data-pipeline"
+consumer = "agent"
+secrets = ["DATABASE_URL", "REDIS_URL"]
+
+# Override: narrow DB to read-only for this agent
+[meta.DATABASE_URL]
+capabilities = ["SELECT"]
+```
+
+The catalog defines full CRUD capabilities, but this agent only needs `SELECT`.
+
+## Merge Rules
+
+When resolving a catalog:
+
+- Each field in the agent's `[meta.KEY]` override **replaces** the catalog field (shallow merge)
+- Omitted fields keep the catalog value
+- `agent.secrets` is the source of truth for which keys the agent needs
+
+## Resolving
+
+```bash
+# Output resolved TOML to stdout
+envpkt resolve -c agents/api-gateway/envpkt.toml
+
+# Write to file
+envpkt resolve -c agents/data-pipeline/envpkt.toml -o resolved.toml
+
+# Preview as JSON
+envpkt resolve -c agents/data-pipeline/envpkt.toml --format json
+```
+
+The resolved output has no `catalog` reference — it's a flat, self-contained config ready for deployment.
+
+## Three-Agent Demo
+
+The `examples/demo/` directory contains a complete walkthrough with three agents sharing a catalog:
+
+| Agent           | Secrets                                | Notes                              |
+| --------------- | -------------------------------------- | ---------------------------------- |
+| `api-gateway`   | `DATABASE_URL`, `STRIPE_SECRET_KEY`    | Uses catalog as-is                 |
+| `data-pipeline` | `DATABASE_URL`, `REDIS_URL`            | Narrows `DATABASE_URL` to `SELECT` |
+| `monitoring`    | `DATADOG_API_KEY`, `SLACK_WEBHOOK_URL` | Standalone (no catalog)            |
+
+See the [Catalog Demo example](/examples/catalog-demo/) for the full walkthrough.

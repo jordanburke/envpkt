@@ -1,0 +1,62 @@
+---
+title: SaaS Integration
+description: envpkt.toml for a payment processing service
+---
+
+Configuration for a billing service integrating with multiple SaaS providers.
+
+```toml
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# envpkt for a SaaS integration service
+
+version = 1
+
+[agent]
+name = "billing-service"
+consumer = "service"
+description = "Payment processing and subscription management"
+capabilities = ["charge", "refund", "subscription-management"]
+
+[lifecycle]
+stale_warning_days = 90
+
+[meta.STRIPE_SECRET_KEY]
+service = "stripe"
+purpose = "Process customer payments and manage subscriptions"
+capabilities = ["charges:write", "subscriptions:write", "customers:read"]
+created = "2026-01-15"
+expires = "2027-01-15"
+rotation_url = "https://dashboard.stripe.com/apikeys"
+source = "manual"
+rate_limit = "100/sec"
+
+[meta.STRIPE_WEBHOOK_SECRET]
+service = "stripe"
+purpose = "Verify incoming Stripe webhook signatures"
+capabilities = ["webhook-verification"]
+created = "2026-01-15"
+source = "manual"
+
+[meta.SENDGRID_API_KEY]
+service = "sendgrid"
+purpose = "Send transactional emails (receipts, invoices, password resets)"
+capabilities = ["mail.send"]
+created = "2025-12-01"
+rotation_url = "https://app.sendgrid.com/settings/api_keys"
+source = "manual"
+
+[meta.REDIS_URL]
+service = "redis"
+purpose = "Rate limiting and idempotency key cache"
+capabilities = ["read", "write"]
+created = "2026-02-01"
+source = "ci"
+```
+
+## Key Patterns
+
+- **`consumer = "service"`** — classifies this as a backend service (not an AI agent)
+- **`rate_limit = "100/sec"`** — documents API rate limits for Stripe
+- **Multiple SaaS providers** — Stripe (payments), SendGrid (email), Redis (caching)
+- **Mixed sources** — `manual` for developer-provisioned keys, `ci` for infrastructure

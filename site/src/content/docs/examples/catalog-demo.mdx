@@ -1,0 +1,172 @@
+---
+title: Catalog Demo
+description: Three-agent walkthrough with shared secret catalog
+---
+
+import { Tabs, TabItem } from "@astrojs/starlight/components"
+
+This demo shows three agents sharing a central catalog, demonstrating metadata reuse, capability narrowing, and mixed standalone/catalog configurations.
+
+## Directory Structure
+
+```
+examples/demo/
+├── infra/
+│   └── envpkt.toml              # Shared catalog
+└── agents/
+    ├── api-gateway/
+    │   └── envpkt.toml          # Uses catalog
+    ├── data-pipeline/
+    │   └── envpkt.toml          # Uses catalog + overrides
+    └── monitoring/
+        └── envpkt.toml          # Standalone (no catalog)
+```
+
+## Catalog (infra/envpkt.toml)
+
+The shared catalog defines metadata for all team-owned secrets:
+
+```toml
+version = 1
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+require_service = true
+
+[meta.DATABASE_URL]
+service = "postgres"
+purpose = "Primary application database"
+capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
+rotation_url = "https://wiki.internal/runbooks/rotate-db"
+source = "vault"
+created = "2026-01-15"
+expires = "2027-01-15"
+rotates = "90d"
+
+[meta.REDIS_URL]
+service = "redis"
+purpose = "Caching and session storage"
+capabilities = ["GET", "SET", "DEL"]
+created = "2026-01-15"
+expires = "2027-01-15"
+source = "vault"
+
+[meta.STRIPE_SECRET_KEY]
+service = "stripe"
+purpose = "Payment processing"
+capabilities = ["charges:write", "subscriptions:read"]
+rotation_url = "https://dashboard.stripe.com/apikeys"
+created = "2026-02-01"
+expires = "2027-02-01"
+rate_limit = "100/sec"
+source = "vault"
+
+[meta.SLACK_WEBHOOK_URL]
+service = "slack"
+purpose = "Alert notifications"
+capabilities = ["post:messages"]
+created = "2026-01-15"
+expires = "2027-01-15"
+source = "ci"
+```
+
+## Agents
+
+<Tabs>
+  <TabItem label="API Gateway">
+    Uses catalog as-is — pulls `DATABASE_URL` and `STRIPE_SECRET_KEY` with full catalog capabilities.
+
+    ```toml
+    version = 1
+    catalog = "../../infra/envpkt.toml"
+
+    [agent]
+    name = "api-gateway"
+    consumer = "service"
+    description = "REST API — handles payments and database writes"
+    capabilities = ["http:serve", "payments:process"]
+    secrets = ["DATABASE_URL", "STRIPE_SECRET_KEY"]
+    ```
+
+  </TabItem>
+  <TabItem label="Data Pipeline">
+    Uses catalog with overrides — narrows `DATABASE_URL` to read-only.
+
+    ```toml
+    version = 1
+    catalog = "../../infra/envpkt.toml"
+
+    [agent]
+    name = "data-pipeline"
+    consumer = "agent"
+    description = "ETL pipeline — reads from Postgres, caches in Redis"
+    capabilities = ["extract", "transform", "load"]
+    secrets = ["DATABASE_URL", "REDIS_URL"]
+
+    # Override: narrow DB to read-only for this agent
+    [meta.DATABASE_URL]
+    capabilities = ["SELECT"]
+    ```
+
+  </TabItem>
+  <TabItem label="Monitoring">
+    Standalone config — does not use the catalog.
+
+    ```toml
+    version = 1
+
+    [agent]
+    name = "monitoring"
+    consumer = "agent"
+    description = "Infrastructure health checks and alerting"
+    capabilities = ["monitor", "alert"]
+
+    [lifecycle]
+    stale_warning_days = 60
+
+    [meta.DATADOG_API_KEY]
+    service = "datadog"
+    purpose = "Infrastructure monitoring metrics"
+    capabilities = ["metrics:write", "events:write"]
+    created = "2025-06-01"
+    expires = "2026-01-01"
+    rotation_url = "https://app.datadoghq.com/organization-settings/api-keys"
+    source = "ci"
+
+    [meta.SLACK_WEBHOOK_URL]
+    service = "slack"
+    purpose = "Alert notifications to #ops-alerts channel"
+    capabilities = ["post:messages"]
+    created = "2026-01-15"
+    expires = "2027-01-15"
+    source = "ci"
+    ```
+
+  </TabItem>
+</Tabs>
+
+## Resolving
+
+Resolve each agent to a flat config:
+
+```bash
+# API Gateway — gets DATABASE_URL + STRIPE_SECRET_KEY from catalog
+envpkt resolve -c examples/demo/agents/api-gateway/envpkt.toml
+
+# Data Pipeline — gets DATABASE_URL (narrowed) + REDIS_URL from catalog
+envpkt resolve -c examples/demo/agents/data-pipeline/envpkt.toml
+
+# Monitoring — passes through unchanged (no catalog)
+envpkt resolve -c examples/demo/agents/monitoring/envpkt.toml
+```
+
+## Fleet Scan
+
+Scan all agents at once:
+
+```bash
+envpkt fleet -d examples/demo/agents
+```
+
+This aggregates health across all three agents, reporting the worst status as the fleet-level health.

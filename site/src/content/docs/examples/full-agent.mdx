@@ -1,0 +1,87 @@
+---
+title: Full Agent
+description: Complete envpkt.toml with agent identity, lifecycle, callbacks, and secrets
+---
+
+A comprehensive configuration demonstrating all available sections.
+
+```toml
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# Full envpkt configuration for an AI agent with lifecycle policies
+
+version = 1
+
+[agent]
+name = "data-pipeline-agent"
+consumer = "agent"
+description = "ETL pipeline processor for data ingestion"
+capabilities = ["read-s3", "write-postgres", "send-notifications"]
+expires = "2027-01-01"
+services = ["aws", "postgres", "slack"]
+
+# --- Lifecycle Policy ---
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+require_service = true
+
+# --- Callbacks ---
+
+[callbacks]
+on_expiring = "https://hooks.slack.com/services/T00/B00/xxx"
+on_expired = "https://hooks.slack.com/services/T00/B00/yyy"
+on_audit_fail = "https://hooks.slack.com/services/T00/B00/zzz"
+
+# --- Tool Integrations ---
+
+[tools]
+fnox = true
+mcp = true
+
+# --- Secret Metadata ---
+
+[meta.AWS_ACCESS_KEY_ID]
+service = "aws"
+purpose = "S3 bucket read access for raw data ingestion"
+capabilities = ["s3:GetObject", "s3:ListBucket"]
+created = "2025-11-01"
+expires = "2026-05-01"
+rotation_url = "https://console.aws.amazon.com/iam/home#/security_credentials"
+source = "vault"
+
+[meta.AWS_SECRET_ACCESS_KEY]
+service = "aws"
+purpose = "S3 bucket read access (secret counterpart)"
+capabilities = ["s3:GetObject", "s3:ListBucket"]
+created = "2025-11-01"
+expires = "2026-05-01"
+rotation_url = "https://console.aws.amazon.com/iam/home#/security_credentials"
+source = "vault"
+
+[meta.DATABASE_URL]
+service = "postgres"
+purpose = "Write processed data to the analytics database"
+capabilities = ["SELECT", "INSERT", "UPDATE"]
+created = "2025-10-15"
+expires = "2026-10-15"
+rotation_url = "https://wiki.internal/runbooks/rotate-db-creds"
+source = "vault"
+
+[meta.SLACK_WEBHOOK_URL]
+service = "slack"
+purpose = "Send pipeline completion and failure notifications"
+capabilities = ["post-message"]
+created = "2025-09-01"
+rotation_url = "https://api.slack.com/apps/A00/incoming-webhooks"
+source = "manual"
+```
+
+## Sections Breakdown
+
+- **`[agent]`** — identifies the AI agent, its role, capabilities, and service dependencies
+- **`[lifecycle]`** — configures audit policies (stale warnings, required fields)
+- **`[callbacks]`** — Slack webhooks triggered on lifecycle events
+- **`[tools]`** — enables fnox and MCP integrations
+- **`[meta.*]`** — per-secret metadata with service, purpose, capabilities, dates, and source

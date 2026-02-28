@@ -1,0 +1,87 @@
+---
+title: TOML Schema
+description: Complete field reference for envpkt.toml
+---
+
+`envpkt.toml` is validated against a JSON Schema. The schema is published at:
+
+- **npm**: `envpkt/schema` (importable via package exports)
+- **GitHub**: `schemas/envpkt.schema.json`
+
+Enable editor autocompletion by adding the schema directive on line 1:
+
+```toml
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+```
+
+## Root Fields
+
+| Field     | Type     | Required | Description                                             |
+| --------- | -------- | -------- | ------------------------------------------------------- |
+| `version` | `number` | Yes      | Schema version number (currently `1`)                   |
+| `catalog` | `string` | No       | Path to shared secret catalog (relative to config file) |
+
+## `[agent]` Section
+
+Agent identity and capabilities.
+
+| Field          | Type                                          | Required                 | Description                                |
+| -------------- | --------------------------------------------- | ------------------------ | ------------------------------------------ |
+| `name`         | `string`                                      | Yes (if section present) | Agent display name                         |
+| `consumer`     | `"agent" \| "service" \| "developer" \| "ci"` | No                       | Consumer type classification               |
+| `description`  | `string`                                      | No                       | Agent description or role                  |
+| `capabilities` | `string[]`                                    | No                       | Capabilities this agent provides           |
+| `expires`      | `string` (date)                               | No                       | Agent credential expiration (`YYYY-MM-DD`) |
+| `services`     | `string[]`                                    | No                       | Service dependencies                       |
+| `identity`     | `string`                                      | No                       | Path to encrypted agent key file           |
+| `recipient`    | `string`                                      | No                       | Agent's age public key for encryption      |
+| `secrets`      | `string[]`                                    | No                       | Secret keys this agent needs from catalog  |
+
+## `[meta.<KEY>]` Sections
+
+Per-secret metadata. Each key corresponds to an environment variable name.
+
+| Field          | Type            | Required | Tier        | Description                                   |
+| -------------- | --------------- | -------- | ----------- | --------------------------------------------- |
+| `service`      | `string`        | No       | Scan-first  | Service this secret authenticates to          |
+| `expires`      | `string` (date) | No       | Scan-first  | Expiration date (`YYYY-MM-DD`)                |
+| `rotation_url` | `string` (URI)  | No       | Scan-first  | URL for rotation procedure                    |
+| `purpose`      | `string`        | No       | Context     | Why this secret exists                        |
+| `capabilities` | `string[]`      | No       | Context     | Operations this secret grants                 |
+| `created`      | `string` (date) | No       | Context     | Provisioning date (`YYYY-MM-DD`)              |
+| `rotates`      | `string`        | No       | Operational | Rotation schedule (e.g., `90d`, `quarterly`)  |
+| `rate_limit`   | `string`        | No       | Operational | Rate limit info (e.g., `1000/min`)            |
+| `model_hint`   | `string`        | No       | Operational | Suggested model or tier                       |
+| `source`       | `string`        | No       | Operational | Secret origin (e.g., `vault`, `ci`, `manual`) |
+| `required`     | `boolean`       | No       | Enforcement | Whether secret is required for operation      |
+| `tags`         | `object`        | No       | Enforcement | Key-value tags for grouping/filtering         |
+
+## `[lifecycle]` Section
+
+Policy configuration for credential lifecycle management.
+
+| Field                | Type      | Default | Description                                    |
+| -------------------- | --------- | ------- | ---------------------------------------------- |
+| `stale_warning_days` | `number`  | `90`    | Days since creation to consider a secret stale |
+| `require_expiration` | `boolean` | `false` | Require `expires` on all secrets               |
+| `require_service`    | `boolean` | `false` | Require `service` on all secrets               |
+
+## `[callbacks]` Section
+
+Automation callbacks for lifecycle events.
+
+| Field           | Type     | Description                                  |
+| --------------- | -------- | -------------------------------------------- |
+| `on_expiring`   | `string` | Command or webhook when secrets are expiring |
+| `on_expired`    | `string` | Command or webhook when secrets have expired |
+| `on_audit_fail` | `string` | Command or webhook on audit failure          |
+
+## `[tools]` Section
+
+Tool integration configuration. Open namespace for third-party extensions.
+
+```toml
+[tools]
+fnox = true
+mcp = true
+```

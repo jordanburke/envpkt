@@ -1,0 +1,49 @@
+---
+title: envpkt exec
+description: Run pre-flight audit, inject secrets, then execute a command
+---
+
+Run a pre-flight audit, inject secrets from fnox into the environment, then execute a subprocess command.
+
+## Usage
+
+```bash
+envpkt exec [options] -- <command...>
+```
+
+## Options
+
+| Option                | Description                             | Default       |
+| --------------------- | --------------------------------------- | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`                   | Auto-detected |
+| `--profile <profile>` | fnox profile to use                     | —             |
+| `--skip-audit`        | Skip the pre-flight audit               | `false`       |
+| `--no-check`          | Skip the pre-flight audit (alias)       | `false`       |
+| `--warn-only`         | Warn on critical audit but do not abort | `false`       |
+| `--strict`            | Abort on any non-healthy secret         | `false`       |
+
+## Examples
+
+```bash
+# Audit then run
+envpkt exec -- node server.js
+
+# Skip the audit
+envpkt exec --skip-audit -- npm start
+
+# Strict mode: abort if any secret is not healthy
+envpkt exec --strict -- ./deploy.sh
+
+# Use a specific fnox profile
+envpkt exec --profile staging -- node server.js
+```
+
+## Execution Flow
+
+1. Load `envpkt.toml` (resolve catalog if present)
+2. Run audit (unless `--skip-audit`)
+3. Check audit result against policy (`--strict` / `--warn-only`)
+4. Inject secrets from fnox into subprocess environment
+5. Execute the command
+
+Requires [fnox integration](/integrations/fnox/) for secret injection.

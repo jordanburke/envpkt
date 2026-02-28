@@ -1,0 +1,43 @@
+---
+title: envpkt init
+description: Generate an envpkt.toml template in the current directory
+---
+
+Generate a new `envpkt.toml` file with optional agent identity, catalog reference, or scaffolding from fnox.
+
+## Usage
+
+```bash
+envpkt init [options]
+```
+
+## Options
+
+| Option                  | Description                                                            |
+| ----------------------- | ---------------------------------------------------------------------- |
+| `--from-fnox [path]`    | Scaffold `[meta.*]` entries from `fnox.toml` (optionally specify path) |
+| `--catalog <path>`      | Path to shared secret catalog                                          |
+| `--agent`               | Include `[agent]` section                                              |
+| `--name <name>`         | Agent name (requires `--agent`)                                        |
+| `--capabilities <caps>` | Comma-separated capabilities (requires `--agent`)                      |
+| `--expires <date>`      | Agent credential expiration `YYYY-MM-DD` (requires `--agent`)          |
+| `--force`               | Overwrite existing `envpkt.toml`                                       |
+
+## Examples
+
+```bash
+# Basic template
+envpkt init
+
+# With agent identity
+envpkt init --agent --name "my-agent"
+
+# Full agent with capabilities
+envpkt init --agent --name "bot" --capabilities "read,write" --expires "2027-01-01"
+
+# Reference a shared catalog
+envpkt init --catalog "../infra/envpkt.toml"
+
+# Scaffold from fnox.toml
+envpkt init --from-fnox
+```

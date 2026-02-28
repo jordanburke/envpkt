@@ -1,0 +1,49 @@
+---
+title: envpkt fleet
+description: Scan directory tree for envpkt.toml files and aggregate health
+---
+
+Scan a directory tree for `envpkt.toml` files and aggregate credential health across all agents.
+
+## Usage
+
+```bash
+envpkt fleet [options]
+```
+
+## Options
+
+| Option              | Description                    | Default                 |
+| ------------------- | ------------------------------ | ----------------------- |
+| `-d, --dir <path>`  | Root directory to scan         | `.` (current directory) |
+| `--depth <n>`       | Max directory depth            | `3`                     |
+| `--format <format>` | Output format: `table`, `json` | `table`                 |
+| `--status <status>` | Filter agents by health status | —                       |
+
+## Examples
+
+```bash
+# Scan current directory
+envpkt fleet
+
+# Scan specific directory
+envpkt fleet -d /opt/agents
+
+# Increase scan depth
+envpkt fleet --depth 5
+
+# JSON output
+envpkt fleet --format json
+
+# Only show critical agents
+envpkt fleet --status critical
+```
+
+## Output
+
+The fleet report shows:
+
+- **Per-agent**: path, agent name, health status, number of secrets, nearest expiration
+- **Aggregate**: total agents, total secrets, count by status (healthy, degraded, critical)
+
+See the [Fleet Management guide](/guides/fleet-management/) for operational patterns.

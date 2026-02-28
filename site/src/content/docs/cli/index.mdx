@@ -1,0 +1,46 @@
+---
+title: CLI Overview
+description: All envpkt CLI commands at a glance
+---
+
+## Commands
+
+| Command                                 | Description                                        |
+| --------------------------------------- | -------------------------------------------------- |
+| [`envpkt init`](/cli/init/)             | Generate an `envpkt.toml` template                 |
+| [`envpkt audit`](/cli/audit/)           | Check credential health against lifecycle policies |
+| [`envpkt inspect`](/cli/inspect/)       | Display a structured view of the config            |
+| [`envpkt resolve`](/cli/resolve/)       | Resolve catalog references into a flat config      |
+| [`envpkt fleet`](/cli/fleet/)           | Scan directory tree and aggregate health           |
+| [`envpkt exec`](/cli/exec/)             | Pre-flight audit, inject secrets, run a command    |
+| [`envpkt env scan`](/cli/env-scan/)     | Auto-discover credentials from shell environment   |
+| [`envpkt env check`](/cli/env-check/)   | Bidirectional drift detection                      |
+| [`envpkt shell-hook`](/cli/shell-hook/) | Output shell function for ambient warnings         |
+| [`envpkt mcp`](/cli/mcp/)               | Start the MCP server                               |
+
+## Global Options
+
+All commands support:
+
+- `--help` — Show help for the command
+- `--version` — Show envpkt version
+
+## Config Resolution
+
+Commands that read `envpkt.toml` (audit, inspect, resolve, exec, env check) follow this resolution chain:
+
+1. Explicit `-c path/to/envpkt.toml` flag
+2. `envpkt.toml` in the current working directory
+3. Search upward through parent directories
+
+If a `catalog` field is present, it's resolved relative to the config file's directory.
+
+## Exit Codes
+
+| Code | Meaning                               |
+| ---- | ------------------------------------- |
+| `0`  | Healthy — all secrets pass audit      |
+| `1`  | Degraded — some secrets have warnings |
+| `2`  | Critical — expired or missing secrets |
+
+See [Exit Codes reference](/reference/exit-codes/) for details.

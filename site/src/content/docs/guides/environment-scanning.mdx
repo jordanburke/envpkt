@@ -1,0 +1,88 @@
+---
+title: Environment Scanning
+description: How envpkt discovers credentials in your shell environment
+---
+
+The `envpkt env scan` command auto-discovers credentials from your shell by matching environment variable names and values against a registry of known patterns.
+
+## Discovery Workflow
+
+1. **Scan** — iterate over all env vars in `process.env`
+2. **Exclude** — skip known non-credential vars (`PATH`, `HOME`, `NODE_ENV`, etc.)
+3. **Match** — test each var against three pattern tiers
+4. **Score** — assign a confidence level based on match quality
+5. **Report** — display results sorted by confidence (high first)
+
+## Three Pattern Tiers
+
+### Tier 1: Exact Name (~45 patterns)
+
+Known service-specific variable names matched with **high confidence**:
+
+| Variable            | Service  |
+| ------------------- | -------- |
+| `OPENAI_API_KEY`    | openai   |
+| `AWS_ACCESS_KEY_ID` | aws      |
+| `STRIPE_SECRET_KEY` | stripe   |
+| `GITHUB_TOKEN`      | github   |
+| `DATABASE_URL`      | database |
+| `SUPABASE_ANON_KEY` | supabase |
+| `DD_API_KEY`        | datadog  |
+
+And ~38 more covering Anthropic, Azure, GCP, Slack, Twilio, SendGrid, Sentry, Vercel, Netlify, Cloudflare, Docker, npm, Hugging Face, Cohere, Replicate, Pinecone, Linear, MongoDB, Redis.
+
+### Tier 2: Value Shape (~29 patterns)
+
+Recognized value prefixes matched with **high confidence**:
+
+| Prefix                 | Service    |
+| ---------------------- | ---------- |
+| `sk-ant-`              | anthropic  |
+| `sk-`                  | openai     |
+| `sk_live_`, `sk_test_` | stripe     |
+| `AKIA`                 | aws        |
+| `ghp_`, `gho_`, `ghs_` | github     |
+| `xoxb-`, `xoxp-`       | slack      |
+| `postgres://`          | postgresql |
+| `redis://`             | redis      |
+| `mongodb://`           | mongodb    |
+
+### Tier 3: Generic Suffix (~13 patterns)
+
+Common credential suffixes matched with **medium confidence**:
+
+`_API_KEY`, `_SECRET_KEY`, `_SECRET`, `_TOKEN`, `_PASSWORD`, `_PASS`, `_AUTH_TOKEN`, `_ACCESS_TOKEN`, `_PRIVATE_KEY`, `_SIGNING_KEY`, `_WEBHOOK_SECRET`, `_DSN`, `_CONNECTION_STRING`
+
+The service name is derived by stripping the suffix and lowercasing (e.g., `ACME_API_KEY` → `acme`).
+
+## Confidence Scoring
+
+| Level      | Icon | When                                        |
+| ---------- | ---- | ------------------------------------------- |
+| **High**   | `●`  | Exact name match or recognized value prefix |
+| **Medium** | `◐`  | Generic suffix pattern with derived service |
+
+## Scaffolding
+
+Convert scan results to `envpkt.toml`:
+
+```bash
+# Preview what would be written
+envpkt env scan --dry-run
+
+# Write to envpkt.toml
+envpkt env scan --write
+```
+
+## Drift Detection
+
+After scaffolding, use `envpkt env check` for ongoing monitoring:
+
+```bash
+envpkt env check
+```
+
+This detects:
+
+- **TOML keys missing from env** — secrets defined but not set
+- **Untracked env vars** — credential-shaped vars not in TOML

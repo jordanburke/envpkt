@@ -1,0 +1,65 @@
+---
+title: envpkt audit
+description: Check credential health against lifecycle policies
+---
+
+Audit all secrets in `envpkt.toml` against lifecycle policies. Reports expiration status, staleness, missing metadata, and orphaned keys. Automatically resolves catalog references before auditing.
+
+## Usage
+
+```bash
+envpkt audit [options]
+```
+
+## Options
+
+| Option                | Description                                                                 | Default       |
+| --------------------- | --------------------------------------------------------------------------- | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`                                                       | Auto-detected |
+| `--format <format>`   | Output format: `table`, `json`, `minimal`                                   | `table`       |
+| `--expiring <days>`   | Show secrets expiring within N days                                         | —             |
+| `--status <status>`   | Filter by status: `healthy`, `expiring_soon`, `expired`, `stale`, `missing` | —             |
+| `--strict`            | Exit non-zero on any non-healthy secret                                     | `false`       |
+
+## Examples
+
+```bash
+# Standard audit
+envpkt audit
+
+# JSON output for CI
+envpkt audit --format json
+
+# Secrets expiring within 2 weeks
+envpkt audit --expiring 14
+
+# Only show expired secrets
+envpkt audit --status expired
+
+# Strict mode for CI pipelines
+envpkt audit --strict
+
+# Specify config path
+envpkt audit -c path/to/envpkt.toml
+```
+
+## Exit Codes
+
+| Code | Status   | Description                             |
+| ---- | -------- | --------------------------------------- |
+| `0`  | healthy  | All secrets pass audit                  |
+| `1`  | degraded | Some secrets are expiring soon or stale |
+| `2`  | critical | Expired or missing secrets detected     |
+
+With `--strict`, any non-healthy secret causes a non-zero exit.
+
+## Secret Statuses
+
+| Status             | Meaning                                                   |
+| ------------------ | --------------------------------------------------------- |
+| `healthy`          | Secret is valid and within policy                         |
+| `expiring_soon`    | Secret expires within `stale_warning_days`                |
+| `expired`          | Secret has passed its expiration date                     |
+| `stale`            | Secret is older than `stale_warning_days` without updates |
+| `missing`          | Secret key exists in config but has no metadata           |
+| `missing_metadata` | Required fields (service, expiration) are absent          |

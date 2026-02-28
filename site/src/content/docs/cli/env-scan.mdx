@@ -1,0 +1,55 @@
+---
+title: envpkt env scan
+description: Auto-discover credentials from your shell environment
+---
+
+Scan `process.env` for credential-shaped variables. Matches against ~45 known service names, ~13 generic suffix patterns, and ~29 value shape patterns.
+
+## Usage
+
+```bash
+envpkt env scan [options]
+```
+
+## Options
+
+| Option              | Description                                            | Default |
+| ------------------- | ------------------------------------------------------ | ------- |
+| `--format <format>` | Output format: `table`, `json`                         | `table` |
+| `--write`           | Write/append discovered credentials to `envpkt.toml`   | `false` |
+| `--dry-run`         | Preview TOML that would be written (implies `--write`) | `false` |
+| `--include-unknown` | Include vars with no inferred service                  | `false` |
+
+## Examples
+
+```bash
+# Scan and display results
+envpkt env scan
+
+# JSON output
+envpkt env scan --format json
+
+# Write to envpkt.toml
+envpkt env scan --write
+
+# Preview what would be written
+envpkt env scan --dry-run
+
+# Include unidentified credential-shaped vars
+envpkt env scan --include-unknown
+```
+
+## Confidence Levels
+
+| Level      | Icon | Meaning                                                                            |
+| ---------- | ---- | ---------------------------------------------------------------------------------- |
+| **High**   | `●`  | Exact name match (e.g., `OPENAI_API_KEY`) or recognized value prefix (e.g., `sk-`) |
+| **Medium** | `◐`  | Generic suffix pattern (e.g., `*_API_KEY`, `*_TOKEN`) with derived service name    |
+
+## Pattern Tiers
+
+1. **Exact name** (~45 patterns) — Known service-specific variable names like `STRIPE_SECRET_KEY`, `AWS_ACCESS_KEY_ID`, `GITHUB_TOKEN`
+2. **Value shape** (~29 patterns) — Recognized value prefixes like `sk-`, `ghp_`, `AKIA`, `postgres://`
+3. **Generic suffix** (~13 patterns) — Suffixes like `_API_KEY`, `_SECRET`, `_TOKEN`, `_PASSWORD`
+
+See the [Environment Scanning guide](/guides/environment-scanning/) for details on the pattern registry.

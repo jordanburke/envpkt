@@ -1,0 +1,62 @@
+---
+title: Quick Start
+description: Get up and running with envpkt in five minutes
+---
+
+import { Steps } from "@astrojs/starlight/components"
+
+<Steps>
+
+1. **Install envpkt**
+
+   ```bash
+   npm install -g envpkt
+   ```
+
+2. **Discover credentials in your environment**
+
+   envpkt scans your shell for known credential patterns — API keys, tokens, connection strings — and reports what it finds:
+
+   ```bash
+   envpkt env scan
+   ```
+
+   You'll see a table with each detected variable, its inferred service, and a confidence indicator.
+
+3. **Scaffold your envpkt.toml**
+
+   Turn those discoveries into a config file:
+
+   ```bash
+   envpkt env scan --write
+   ```
+
+   This creates (or appends to) `envpkt.toml` with `[meta.*]` sections for each discovered credential.
+
+4. **Audit credential health**
+
+   Check expiration dates, staleness, and missing metadata:
+
+   ```bash
+   envpkt audit
+   ```
+
+   Exit codes: `0` = healthy, `1` = degraded, `2` = critical.
+
+5. **Check for drift**
+
+   Detect mismatches between your config and live environment:
+
+   ```bash
+   envpkt env check
+   ```
+
+   This runs bidirectional drift detection — secrets in TOML but missing from env, and credential-shaped env vars not tracked in TOML.
+
+</Steps>
+
+## Next Steps
+
+- [The TOML File](/getting-started/the-toml-file/) — understand every field in `envpkt.toml`
+- [CLI Reference](/cli/) — full documentation for all commands
+- [Catalog System](/guides/catalog-system/) — share secret metadata across agents

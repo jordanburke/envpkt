@@ -1,0 +1,35 @@
+---
+title: Minimal
+description: The simplest possible envpkt.toml
+---
+
+The smallest valid configuration — one secret with a service name.
+
+```toml
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+version = 1
+
+[meta.API_KEY]
+service = "stripe"
+```
+
+This is enough to:
+
+- Track that `API_KEY` authenticates to Stripe
+- Run `envpkt audit` (will report `missing_metadata` for missing `expires`)
+- Run `envpkt inspect` to view the config
+
+## Adding More Detail
+
+Incrementally add fields as you learn more about your credentials:
+
+```toml
+[meta.API_KEY]
+service = "stripe"
+purpose = "Process payments"
+expires = "2027-01-15"
+rotation_url = "https://dashboard.stripe.com/apikeys"
+```
+
+See the [TOML Schema reference](/reference/toml-schema/) for all available fields.

@@ -1,0 +1,104 @@
+---
+title: CI/CD Integration
+description: Use envpkt in continuous integration and deployment pipelines
+---
+
+envpkt integrates into CI/CD pipelines for automated credential health checks.
+
+## CI Agent Configuration
+
+Create an `envpkt.toml` for your CI agent:
+
+```toml
+version = 1
+
+[agent]
+name = "deploy-bot"
+consumer = "ci"
+description = "CI/CD deployment agent"
+capabilities = ["build", "test", "deploy"]
+expires = "2026-12-31"
+
+[lifecycle]
+stale_warning_days = 45
+require_expiration = true
+
+[meta.GITHUB_TOKEN]
+service = "github"
+purpose = "Clone repos and create deployment status checks"
+capabilities = ["repo:read", "deployments:write"]
+created = "2026-02-01"
+expires = "2026-08-01"
+source = "ci"
+
+[meta.DOCKER_REGISTRY_TOKEN]
+service = "ghcr.io"
+purpose = "Push container images"
+capabilities = ["packages:write"]
+created = "2026-02-01"
+expires = "2026-08-01"
+source = "ci"
+```
+
+## Strict Audit in Pipelines
+
+Use `--strict` to fail the build on any non-healthy secret:
+
+```bash
+envpkt audit --strict --format json
+```
+
+Exit codes:
+
+- `0` — all secrets healthy, pipeline continues
+- `1` — degraded, some warnings
+- `2` — critical, expired or missing secrets
+
+## GitHub Actions
+
+```yaml
+name: Credential Audit
+on:
+  schedule:
+    - cron: "0 9 * * 1" # Weekly Monday 9am
+  push:
+    paths:
+      - "envpkt.toml"
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install envpkt
+        run: npm install -g envpkt
+
+      - name: Audit credentials
+        run: envpkt audit --strict --format json
+
+      - name: Check drift
+        run: envpkt env check --strict
+```
+
+## Fleet Scanning in CI
+
+For monorepos or multi-agent deployments:
+
+```yaml
+- name: Fleet health check
+  run: envpkt fleet --format json --status critical
+```
+
+## Pre-deployment Gate
+
+Use `envpkt exec` to gate deployments on credential health:
+
+```bash
+envpkt exec --strict -- ./deploy.sh
+```
+
+This runs the audit first and aborts if any secret is expired or missing.

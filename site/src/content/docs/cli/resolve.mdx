@@ -1,0 +1,46 @@
+---
+title: envpkt resolve
+description: Resolve catalog references and output a flat, self-contained config
+---
+
+Resolve catalog references by merging catalog metadata with agent overrides, producing a flat config with no `catalog` field.
+
+## Usage
+
+```bash
+envpkt resolve [options]
+```
+
+## Options
+
+| Option                | Description                                 | Default       |
+| --------------------- | ------------------------------------------- | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`                       | Auto-detected |
+| `-o, --output <path>` | Write resolved config to file               | stdout        |
+| `--format <format>`   | Output format: `toml`, `json`               | `toml`        |
+| `--dry-run`           | Show what would be resolved without writing | `false`       |
+
+## Examples
+
+```bash
+# Resolve and print to stdout
+envpkt resolve -c agent.toml
+
+# Output as JSON
+envpkt resolve -c agent.toml --format json
+
+# Write to file
+envpkt resolve -c agent.toml -o resolved.toml
+
+# Preview without writing
+envpkt resolve -c agent.toml --dry-run
+```
+
+## Merge Rules
+
+- Each field in the agent's `[meta.KEY]` override **replaces** the catalog field (shallow merge)
+- Omitted fields keep the catalog value
+- `agent.secrets` is the source of truth for which keys the agent needs
+- Configs without a `catalog` field pass through unchanged
+
+See the [Catalog System guide](/guides/catalog-system/) for a detailed walkthrough.

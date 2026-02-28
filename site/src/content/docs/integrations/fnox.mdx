@@ -1,0 +1,76 @@
+---
+title: fnox Integration
+description: Secret resolution, scaffolding, and injection via fnox
+---
+
+envpkt integrates with [fnox](https://github.com/jordanburke/fnox) for secret resolution and injection. fnox handles access; envpkt handles awareness.
+
+## Scaffolding from fnox
+
+Generate `envpkt.toml` entries from an existing `fnox.toml`:
+
+```bash
+envpkt init --from-fnox
+```
+
+This creates `[meta.*]` sections for each secret defined in fnox, pre-populating the `service` field where possible.
+
+## Orphan Detection
+
+When both `fnox.toml` and `envpkt.toml` exist, `envpkt audit` detects orphaned keys:
+
+- **In envpkt but not in fnox** — metadata exists but no secret source
+- **In fnox but not in envpkt** — secret exists but no metadata
+
+## Secret Injection
+
+`envpkt exec` injects fnox secrets into the subprocess environment:
+
+```bash
+envpkt exec -- node server.js
+```
+
+The execution flow:
+
+1. Load `envpkt.toml`
+2. Run pre-flight audit
+3. Resolve secrets from fnox
+4. Inject into subprocess environment
+5. Execute the command
+
+## Profiles
+
+Use fnox profiles for environment-specific secrets:
+
+```bash
+envpkt exec --profile staging -- node server.js
+envpkt exec --profile production -- ./deploy.sh
+```
+
+## Agent Identity
+
+envpkt supports encrypted agent identity via age keys:
+
+```toml
+[agent]
+name = "data-pipeline"
+identity = "keys/agent.age"
+recipient = "age1..."
+```
+
+The `identity` field points to an age-encrypted key file. The `recipient` field is the agent's public key for encryption.
+
+## Library API
+
+```typescript
+import { detectFnox, fnoxAvailable, fnoxGet, compareFnoxAndEnvpkt } from "envpkt"
+
+// Check if fnox is available
+const available = fnoxAvailable()
+
+// Detect fnox.toml
+const detected = detectFnox()
+
+// Compare fnox and envpkt keys
+const comparison = compareFnoxAndEnvpkt(fnoxConfig, envpktConfig)
+```

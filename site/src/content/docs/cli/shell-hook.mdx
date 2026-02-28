@@ -1,0 +1,32 @@
+---
+title: envpkt shell-hook
+description: Output shell function for ambient credential warnings on cd
+---
+
+Generate a shell function that runs `envpkt audit --format minimal` whenever you `cd` into a directory containing `envpkt.toml`.
+
+## Usage
+
+```bash
+envpkt shell-hook <shell>
+```
+
+**Argument**: Shell type — `zsh` or `bash`
+
+## Setup
+
+Add to your shell configuration file:
+
+```bash
+# For zsh (~/.zshrc)
+eval "$(envpkt shell-hook zsh)"
+
+# For bash (~/.bashrc)
+eval "$(envpkt shell-hook bash)"
+```
+
+## Behavior
+
+After setup, every `cd` into a directory containing `envpkt.toml` triggers a minimal audit display showing credential health at a glance. This provides ambient awareness without requiring manual audit runs.
+
+See the [Shell Hooks integration](/integrations/shell-hooks/) for details.

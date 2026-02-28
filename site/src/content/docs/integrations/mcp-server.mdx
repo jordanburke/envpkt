@@ -1,0 +1,89 @@
+---
+title: MCP Server
+description: Expose credential metadata to AI agents via Model Context Protocol
+---
+
+envpkt ships an [MCP](https://modelcontextprotocol.io/) server that exposes credential metadata to AI agents. No secret values are ever exposed.
+
+## Configuration
+
+Add envpkt to your MCP client config:
+
+```json
+{
+  "mcpServers": {
+    "envpkt": {
+      "command": "envpkt",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+## Starting the Server
+
+```bash
+envpkt mcp
+```
+
+Uses stdio transport. The server reads `envpkt.toml` from the current directory (or specify with `-c`).
+
+## Tools
+
+| Tool               | Description                                             |
+| ------------------ | ------------------------------------------------------- |
+| `getPacketHealth`  | Get overall health status with per-secret audit results |
+| `listCapabilities` | List agent and per-secret capabilities                  |
+| `getSecretMeta`    | Get metadata for a specific secret by key               |
+| `checkExpiration`  | Check expiration status and days remaining              |
+
+### `getPacketHealth`
+
+Returns the full audit result including overall status and per-secret health.
+
+### `listCapabilities`
+
+Returns agent-level capabilities (from `[agent].capabilities`) and per-secret capabilities (from each `[meta.KEY].capabilities`).
+
+### `getSecretMeta`
+
+Takes a secret key and returns its metadata (service, purpose, capabilities, expiration, rotation URL, etc.).
+
+### `checkExpiration`
+
+Returns expiration status for all secrets, including days remaining and expired flags.
+
+## Resources
+
+| URI                     | Description                       |
+| ----------------------- | --------------------------------- |
+| `envpkt://health`       | Current credential health summary |
+| `envpkt://capabilities` | Agent and secret capabilities     |
+
+## Security Model
+
+The MCP server:
+
+- Never exposes secret **values**
+- Only shares **metadata** (service names, expiration dates, capabilities, rotation URLs)
+- Reads from `envpkt.toml` which itself contains no secret values
+
+This follows envpkt's core principle: **awareness, not access**.
+
+## Library API
+
+```typescript
+import { createServer, startServer, toolDefinitions, callTool, resourceDefinitions, readResource } from "envpkt"
+
+// Tool definitions for MCP registration
+const tools = toolDefinitions
+
+// Call a tool
+const result = callTool("getPacketHealth", {}, config, audit)
+
+// Resource definitions
+const resources = resourceDefinitions
+
+// Read a resource
+const data = readResource("envpkt://health", config, audit)
+```

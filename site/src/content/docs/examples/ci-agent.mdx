@@ -1,0 +1,62 @@
+---
+title: CI Agent
+description: envpkt.toml for a CI/CD deployment agent
+---
+
+Configuration for a deployment bot running in CI pipelines.
+
+```toml
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# envpkt for a CI/CD deployment agent
+
+version = 1
+
+[agent]
+name = "deploy-bot"
+consumer = "ci"
+description = "CI/CD deployment agent for staging and production"
+capabilities = ["build", "test", "deploy-staging", "deploy-production"]
+expires = "2026-12-31"
+services = ["github", "ghcr.io", "kubernetes"]
+
+[lifecycle]
+stale_warning_days = 45
+require_expiration = true
+
+[meta.GITHUB_TOKEN]
+service = "github"
+purpose = "Clone repositories and create deployment status checks"
+capabilities = ["repo:read", "deployments:write", "statuses:write"]
+created = "2026-02-01"
+expires = "2026-08-01"
+rotation_url = "https://github.com/settings/tokens"
+source = "ci"
+
+[meta.DOCKER_REGISTRY_TOKEN]
+service = "ghcr.io"
+purpose = "Push built container images to GitHub Container Registry"
+capabilities = ["packages:write"]
+created = "2026-02-01"
+expires = "2026-08-01"
+rotation_url = "https://github.com/settings/tokens"
+source = "ci"
+
+[meta.KUBE_CONFIG]
+service = "kubernetes"
+purpose = "Apply manifests to staging and production clusters"
+capabilities = ["apply", "rollout", "get"]
+created = "2026-01-15"
+expires = "2026-07-15"
+rotation_url = "https://wiki.internal/runbooks/rotate-k8s-sa"
+source = "vault"
+```
+
+## Key Patterns
+
+- **`consumer = "ci"`** — classifies this as a CI agent
+- **`stale_warning_days = 45`** — shorter rotation window for CI credentials
+- **`source = "ci"`** — secrets injected by CI system (GitHub Actions secrets)
+- **`source = "vault"`** — secrets fetched from Vault during pipeline execution
+
+See the [CI/CD guide](/guides/ci-cd/) for pipeline integration patterns.
