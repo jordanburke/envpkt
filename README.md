@@ -325,6 +325,27 @@ envpkt env check --strict               # Exit non-zero on any drift
 envpkt env check -c path/to/envpkt.toml # Specify config path
 ```
 
+### `envpkt env export`
+
+Output `export KEY='VALUE'` statements for sourcing secrets into the current shell. Secrets are resolved via sealed packets and/or fnox — the same pipeline as `envpkt exec`, but instead of spawning a subprocess, the output is designed to be `eval`'d.
+
+```bash
+# Source secrets into the current shell
+eval "$(envpkt env export)"
+
+# Use a specific fnox profile
+eval "$(envpkt env export --profile staging)"
+
+# Specify config path
+eval "$(envpkt env export -c path/to/envpkt.toml)"
+```
+
+Add to your shell startup (e.g. `~/.zshrc` or `~/.bashrc`) for automatic secret loading:
+
+```bash
+eval "$(envpkt env export 2>/dev/null)"
+```
+
 ### `envpkt shell-hook`
 
 Output a shell function that runs `envpkt audit --format minimal` whenever you `cd` into a directory containing `envpkt.toml`.

@@ -1,7 +1,7 @@
 import { Command } from "commander"
 
 import { runAudit } from "./commands/audit.js"
-import { runEnvCheck, runEnvScan } from "./commands/env.js"
+import { runEnvCheck, runEnvExport, runEnvScan } from "./commands/env.js"
 import { runExec } from "./commands/exec.js"
 import { runFleet } from "./commands/fleet.js"
 import { runInit } from "./commands/init.js"
@@ -127,6 +127,16 @@ env
   .option("--strict", "Exit non-zero on any drift")
   .action((options) => {
     runEnvCheck(options)
+  })
+
+env
+  .command("export")
+  .description("Output export statements for eval-ing secrets into the current shell")
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .option("--profile <profile>", "fnox profile to use")
+  .option("--skip-audit", "Skip the pre-flight audit")
+  .action((options) => {
+    runEnvExport(options)
   })
 
 program

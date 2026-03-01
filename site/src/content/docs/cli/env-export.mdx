@@ -1,0 +1,52 @@
+---
+title: envpkt env export
+description: Output export statements for sourcing secrets into the current shell
+---
+
+Output `export KEY='VALUE'` statements that can be `eval`'d to inject secrets into the current shell session. Secrets are resolved via sealed packets and/or fnox — the same pipeline as `envpkt exec`, but without spawning a subprocess.
+
+## Usage
+
+```bash
+envpkt env export [options]
+```
+
+## Options
+
+| Option                | Description               | Default       |
+| --------------------- | ------------------------- | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`     | Auto-detected |
+| `--profile <profile>` | fnox profile to use       | Default       |
+| `--skip-audit`        | Skip the pre-flight audit | `false`       |
+
+## Examples
+
+```bash
+# Source secrets into the current shell
+eval "$(envpkt env export)"
+
+# Use a specific fnox profile
+eval "$(envpkt env export --profile staging)"
+
+# Specify config path
+eval "$(envpkt env export -c path/to/envpkt.toml)"
+```
+
+## Shell Startup
+
+Add to `~/.zshrc` or `~/.bashrc` for automatic secret loading:
+
+```bash
+eval "$(envpkt env export 2>/dev/null)"
+```
+
+Warnings are emitted to stderr so they don't pollute the `eval` output.
+
+## How It Works
+
+1. Resolves `envpkt.toml` (auto-detected or via `--config`)
+2. Decrypts sealed packets and/or resolves via fnox
+3. Outputs `export KEY='VALUE'` for each resolved secret to stdout
+4. Emits any warnings to stderr
+
+Values containing single quotes are safely escaped (`'` becomes `'\''`).

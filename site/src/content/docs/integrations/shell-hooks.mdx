@@ -48,6 +48,27 @@ chpwd_functions=(${chpwd_functions[@]} envpkt_chpwd)
 
 For bash, it uses `PROMPT_COMMAND` or wraps `cd`.
 
+## Sourcing Secrets
+
+In addition to ambient health warnings, you can source envpkt-managed secrets directly into your shell session using `envpkt env export`:
+
+```bash
+# Add to ~/.zshrc or ~/.bashrc
+eval "$(envpkt env export 2>/dev/null)"
+```
+
+This resolves secrets via sealed packets and/or fnox and emits `export KEY='VALUE'` statements. Warnings go to stderr so they don't interfere with `eval`.
+
+You can combine both hooks for a complete setup:
+
+```bash
+# Shell startup
+eval "$(envpkt shell-hook zsh)"        # Ambient health on cd
+eval "$(envpkt env export 2>/dev/null)" # Load secrets into current session
+```
+
+See [envpkt env export](/cli/env-export/) for full options.
+
 ## Use Cases
 
 - **Daily development** — see credential health at a glance

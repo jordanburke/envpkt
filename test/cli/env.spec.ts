@@ -190,6 +190,61 @@ describe("envpkt shell-hook", () => {
   })
 })
 
+const ageInstalled = (() => {
+  try {
+    execFileSync("age", ["--version"], { stdio: "pipe" })
+    return true
+  } catch {
+    return false
+  }
+})()
+
+describe("envpkt env export", () => {
+  it("exits 0 with a valid config (no secrets source)", () => {
+    const toml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\n`
+    writeFileSync(join(tmpDir, "envpkt.toml"), toml)
+
+    const result = run(["env", "export"], { cwd: tmpDir })
+
+    expect(result.status).toBe(0)
+    // No export lines because no fnox/sealed source
+    expect(result.stdout).not.toContain("export OPENAI_API_KEY=")
+  })
+
+  it("exits 2 when no config found", () => {
+    const result = run(["env", "export"], { cwd: tmpDir })
+
+    expect(result.status).toBe(2)
+  })
+
+  it.skipIf(!ageInstalled)("outputs export lines for sealed secrets", () => {
+    const keygenOutput = execFileSync("age-keygen", [], {
+      stdio: ["pipe", "pipe", "pipe"],
+      encoding: "utf-8",
+    })
+    const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
+    const recipient = recipientLine!.replace("# public key: ", "").trim()
+
+    const identityPath = join(tmpDir, "identity.txt")
+    writeFileSync(identityPath, keygenOutput)
+
+    // Encrypt a test value
+    const encrypted = execFileSync("age", ["-r", recipient, "-a"], {
+      input: "sk-test-secret-value",
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    })
+
+    const toml = `version = 1\n\n[agent]\nname = "test"\nrecipient = "${recipient}"\nidentity = "identity.txt"\n\n[meta.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
+    writeFileSync(join(tmpDir, "envpkt.toml"), toml)
+
+    const result = run(["env", "export"], { cwd: tmpDir })
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain("export MY_SECRET='sk-test-secret-value'")
+  })
+})
+
 describe("envpkt audit --format minimal", () => {
   it("outputs single-line status for healthy audit", () => {
     const toml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\ncreated = "2026-01-01"\nexpires = "2027-01-01"\n`

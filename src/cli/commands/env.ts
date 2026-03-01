@@ -3,6 +3,7 @@ import { dirname, join } from "node:path"
 
 import { Try } from "functype"
 
+import { bootSafe } from "../../core/boot.js"
 import { resolveConfig } from "../../core/catalog.js"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import { envCheck, envScan, generateTomlFromScan } from "../../core/env.js"
@@ -18,6 +19,7 @@ import {
   GREEN,
   RED,
   RESET,
+  YELLOW,
 } from "../output.js"
 
 type ScanOptions = {
@@ -31,6 +33,12 @@ type CheckOptions = {
   readonly config?: string
   readonly format?: string
   readonly strict?: boolean
+}
+
+type ExportOptions = {
+  readonly config?: string
+  readonly profile?: string
+  readonly skipAudit?: boolean
 }
 
 export const runEnvScan = (options: ScanOptions): void => {
@@ -144,6 +152,33 @@ export const runEnvCheck = (options: CheckOptions): void => {
           )
         },
       )
+    },
+  )
+}
+
+const shellEscape = (value: string): string => value.replace(/'/g, "'\\''")
+
+export const runEnvExport = (options: ExportOptions): void => {
+  const result = bootSafe({
+    inject: false,
+    configPath: options.config,
+    profile: options.profile,
+    warnOnly: true,
+  })
+
+  result.fold(
+    (err) => {
+      console.error(formatError(err))
+      process.exit(2)
+    },
+    (boot) => {
+      for (const warning of boot.warnings) {
+        console.error(`${YELLOW}Warning:${RESET} ${warning}`)
+      }
+
+      for (const [key, value] of Object.entries(boot.secrets)) {
+        console.log(`export ${key}='${shellEscape(value)}'`)
+      }
     },
   )
 }
