@@ -46,7 +46,8 @@ const classifySecret = (
     () => false,
     (d) => d > staleWarningDays,
   )
-  const isMissing = fnoxKeys.size > 0 && !fnoxKeys.has(key)
+  const hasSealed = !!meta?.encrypted_value
+  const isMissing = fnoxKeys.size > 0 && !fnoxKeys.has(key) && !hasSealed
 
   const isMissingMetadata = (requireExpiration && expires.isNone()) || (requireService && service.isNone())
 

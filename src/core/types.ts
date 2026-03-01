@@ -138,3 +138,9 @@ export type IdentityError =
   | { readonly _tag: "AgeNotFound"; readonly message: string }
   | { readonly _tag: "DecryptFailed"; readonly message: string }
   | { readonly _tag: "IdentityNotFound"; readonly path: string }
+
+export type SealError =
+  | { readonly _tag: "AgeNotFound"; readonly message: string }
+  | { readonly _tag: "EncryptFailed"; readonly key: string; readonly message: string }
+  | { readonly _tag: "DecryptFailed"; readonly key: string; readonly message: string }
+  | { readonly _tag: "NoRecipient"; readonly message: string }

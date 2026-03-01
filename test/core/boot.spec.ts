@@ -1,9 +1,20 @@
+import { execFileSync } from "node:child_process"
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
 import { boot, bootSafe, EnvpktBootError } from "../../src/core/boot.js"
+import { ageEncrypt } from "../../src/core/seal.js"
+
+const ageInstalled = (() => {
+  try {
+    execFileSync("age", ["--version"], { stdio: "pipe" })
+    return true
+  } catch {
+    return false
+  }
+})()
 
 let tmpDir: string
 
@@ -198,6 +209,109 @@ describe("boot with catalog", () => {
     result.fold(
       (err) => expect(err._tag).toBe("CatalogNotFound"),
       () => expect.unreachable("Expected Left"),
+    )
+  })
+})
+
+describe("boot with sealed values", () => {
+  it.skipIf(!ageInstalled)("decrypts sealed values during boot", () => {
+    // Generate a test keypair
+    const keygenOutput = execFileSync("age-keygen", [], {
+      stdio: ["pipe", "pipe", "pipe"],
+      encoding: "utf-8",
+    })
+    const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
+    const recipient = recipientLine!.replace("# public key: ", "").trim()
+
+    // Write identity file
+    const identityPath = join(tmpDir, "identity.txt")
+    writeFileSync(identityPath, keygenOutput)
+
+    // Encrypt a test value
+    const encrypted = ageEncrypt("my-secret-value", recipient)
+    const ciphertext = encrypted.fold(
+      () => "",
+      (v) => v,
+    )
+    expect(ciphertext).toContain("-----BEGIN AGE ENCRYPTED FILE-----")
+
+    // Write config with sealed value
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[agent]`,
+        `name = "test-sealed"`,
+        `recipient = "${recipient}"`,
+        `identity = "identity.txt"`,
+        `[meta.SEALED_KEY]`,
+        `service = "test"`,
+        `encrypted_value = """`,
+        ciphertext,
+        `"""`,
+      ].join("\n"),
+    )
+
+    delete process.env["SEALED_KEY"]
+
+    const result = bootSafe({ configPath, inject: false })
+
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      (boot) => {
+        expect(boot.injected).toContain("SEALED_KEY")
+        expect(boot.secrets["SEALED_KEY"]).toBe("my-secret-value")
+      },
+    )
+
+    delete process.env["SEALED_KEY"]
+  })
+
+  it.skipIf(!ageInstalled)("falls back to fnox for keys without encrypted_value", () => {
+    const keygenOutput = execFileSync("age-keygen", [], {
+      stdio: ["pipe", "pipe", "pipe"],
+      encoding: "utf-8",
+    })
+    const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
+    const recipient = recipientLine!.replace("# public key: ", "").trim()
+
+    const identityPath = join(tmpDir, "identity.txt")
+    writeFileSync(identityPath, keygenOutput)
+
+    // Encrypt one value, leave other unsealed
+    const encrypted = ageEncrypt("sealed-value", recipient)
+    const ciphertext = encrypted.fold(
+      () => "",
+      (v) => v,
+    )
+
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[agent]`,
+        `name = "mixed"`,
+        `recipient = "${recipient}"`,
+        `identity = "identity.txt"`,
+        `[meta.SEALED_KEY]`,
+        `service = "test"`,
+        `encrypted_value = """`,
+        ciphertext,
+        `"""`,
+        `[meta.FNOX_KEY]`,
+        `service = "other"`,
+      ].join("\n"),
+    )
+
+    const result = bootSafe({ configPath, inject: false })
+
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      (boot) => {
+        // SEALED_KEY should be injected from sealed value
+        expect(boot.injected).toContain("SEALED_KEY")
+        expect(boot.secrets["SEALED_KEY"]).toBe("sealed-value")
+        // FNOX_KEY should be skipped (fnox not available in test)
+        expect(boot.skipped).toContain("FNOX_KEY")
+      },
     )
   })
 })

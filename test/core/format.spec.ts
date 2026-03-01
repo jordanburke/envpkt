@@ -254,6 +254,36 @@ describe("formatPacket", () => {
     })
   })
 
+  describe("sealed indicator", () => {
+    it("shows [sealed] tag for secrets with encrypted_value", () => {
+      const result = makeResult({
+        version: 1,
+        meta: {
+          API_KEY: {
+            service: "openai",
+            encrypted_value: "-----BEGIN AGE ENCRYPTED FILE-----\ntest\n-----END AGE ENCRYPTED FILE-----",
+          },
+          DB_URL: { service: "postgres" },
+        },
+      })
+      const output = formatPacket(result)
+
+      expect(output).toContain("API_KEY → openai [sealed]")
+      expect(output).not.toContain("DB_URL → postgres [sealed]")
+      expect(output).toContain("DB_URL → postgres")
+    })
+
+    it("does not show [sealed] when no encrypted_value", () => {
+      const result = makeResult({
+        version: 1,
+        meta: { KEY: { service: "svc" } },
+      })
+      const output = formatPacket(result)
+
+      expect(output).not.toContain("[sealed]")
+    })
+  })
+
   it("contains no ANSI escape sequences", () => {
     const result = makeResult({
       version: 1,

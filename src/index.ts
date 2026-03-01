@@ -30,6 +30,7 @@ export type {
   LifecycleConfig,
   ResolveOptions,
   ResolveResult,
+  SealError,
   SecretHealth,
   SecretMeta,
   SecretStatus,
@@ -67,6 +68,12 @@ export { envCheck, envScan, generateTomlFromScan } from "./core/env.js"
 
 // Boot API
 export { boot, bootSafe, EnvpktBootError } from "./core/boot.js"
+
+// Seal API
+export { ageDecrypt, ageEncrypt, sealSecrets, unsealSecrets } from "./core/seal.js"
+
+// Value resolution
+export { resolveValues } from "./core/resolve-values.js"
 
 // Fleet scanner
 export { scanFleet } from "./core/fleet.js"

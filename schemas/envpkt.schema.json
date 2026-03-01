@@ -144,6 +144,10 @@
               "description": "Where the secret value originates (e.g. 'vault', 'ci')",
               "type": "string"
             },
+            "encrypted_value": {
+              "description": "Age-encrypted secret value (armored ciphertext, safe to commit)",
+              "type": "string"
+            },
             "required": {
               "description": "Whether this secret is required for operation",
               "type": "boolean"

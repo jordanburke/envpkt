@@ -64,6 +64,10 @@ export const SecretMetaSchema = Type.Object(
     rate_limit: Type.Optional(Type.String({ description: "Rate limit or quota info (e.g. '1000/min')" })),
     model_hint: Type.Optional(Type.String({ description: "Suggested model or tier for this credential" })),
     source: Type.Optional(Type.String({ description: "Where the secret value originates (e.g. 'vault', 'ci')" })),
+    // Sealed value (age-encrypted, safe to commit)
+    encrypted_value: Type.Optional(
+      Type.String({ description: "Age-encrypted secret value (armored ciphertext, safe to commit)" }),
+    ),
     // Tier 4: enforcement/extensibility
     required: Type.Optional(Type.Boolean({ description: "Whether this secret is required for operation" })),
     tags: Type.Optional(

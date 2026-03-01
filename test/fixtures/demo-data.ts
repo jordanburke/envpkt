@@ -107,6 +107,45 @@ export const dataPipelineResult: ResolveResult = {
 }
 
 // ---------------------------------------------------------------------------
+// sealed-agent — standalone with sealed (encrypted_value) secrets
+// ---------------------------------------------------------------------------
+
+export const sealedAgentResult: ResolveResult = {
+  config: {
+    version: 1,
+    agent: {
+      name: "sealed-agent",
+      consumer: "agent",
+      description: "Agent with sealed secrets for offline operation",
+      capabilities: ["inference"],
+      recipient: "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p",
+      identity: "identity.age",
+    },
+    meta: {
+      OPENAI_API_KEY: {
+        service: "openai",
+        purpose: "LLM inference",
+        capabilities: ["chat:completions"],
+        created: "2026-01-15",
+        expires: "2027-01-15",
+        encrypted_value: "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24=\n-----END AGE ENCRYPTED FILE-----",
+      },
+      ANTHROPIC_API_KEY: {
+        service: "anthropic",
+        purpose: "Claude inference",
+        capabilities: ["messages:create"],
+        created: "2026-02-01",
+        expires: "2027-02-01",
+        encrypted_value: "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24=\n-----END AGE ENCRYPTED FILE-----",
+      },
+    },
+  },
+  merged: [],
+  overridden: [],
+  warnings: [],
+}
+
+// ---------------------------------------------------------------------------
 // monitoring — standalone, no catalog, lifecycle, expired DATADOG_API_KEY
 // ---------------------------------------------------------------------------
 

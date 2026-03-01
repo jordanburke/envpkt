@@ -9,6 +9,7 @@ import { extractFnoxKeys, readFnoxConfig } from "../fnox/parse.js"
 import { computeAudit } from "./audit.js"
 import { resolveConfig } from "./catalog.js"
 import { loadConfig, resolveConfigPath } from "./config.js"
+import { unsealSecrets } from "./seal.js"
 import type { AuditResult, BootError, BootOptions, BootResult, EnvpktConfig } from "./types.js"
 
 type ResolvedConfig = {
@@ -83,27 +84,67 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
   const failOnExpired = opts.failOnExpired !== false
   const warnOnly = opts.warnOnly ?? false
 
-  return resolveAndLoad(opts).flatMap(({ config, configDir }) =>
-    resolveAgentKey(config, configDir).flatMap((agentKey) => {
-      const fnoxKeys = detectFnoxKeys(configDir)
-      const audit = computeAudit(config, fnoxKeys)
+  return resolveAndLoad(opts).flatMap(({ config, configDir }) => {
+    const metaKeys = Object.keys(config.meta)
+    const hasSealedValues = metaKeys.some((k) => !!config.meta[k]?.encrypted_value)
 
-      return checkExpiration(audit, failOnExpired, warnOnly).map((warnings) => {
-        const secrets: Record<string, string> = {}
-        const injected: string[] = []
-        const skipped: string[] = []
-        const metaKeys = Object.keys(config.meta)
+    // Resolve agent key — non-fatal when sealed values exist (identity may be a plain age identity)
+    const agentKeyResult = resolveAgentKey(config, configDir)
+    const agentKey = agentKeyResult.fold(
+      () => undefined,
+      (k) => k,
+    )
 
+    // If agent key resolution failed AND no sealed values, propagate the error
+    const agentKeyError = agentKeyResult.fold<BootError | undefined>(
+      (err) => err,
+      () => undefined,
+    )
+    if (agentKeyError && !hasSealedValues) {
+      return Left(agentKeyError)
+    }
+
+    const fnoxKeys = detectFnoxKeys(configDir)
+    const audit = computeAudit(config, fnoxKeys)
+
+    return checkExpiration(audit, failOnExpired, warnOnly).map((warnings) => {
+      const secrets: Record<string, string> = {}
+      const injected: string[] = []
+      const skipped: string[] = []
+
+      // Phase 1: try sealed values (encrypted_value in meta)
+      const sealedKeys = new Set<string>()
+
+      if (hasSealedValues && config.agent?.identity) {
+        const identityPath = resolve(configDir, config.agent.identity)
+        unsealSecrets(config.meta, identityPath).fold(
+          (err) => {
+            warnings.push(`Sealed value decryption failed: ${err.message}`)
+          },
+          (unsealed) => {
+            for (const [key, value] of Object.entries(unsealed)) {
+              secrets[key] = value
+              injected.push(key)
+              sealedKeys.add(key)
+            }
+          },
+        )
+      }
+
+      // Phase 2: fnox for remaining keys
+      const remainingKeys = metaKeys.filter((k) => !sealedKeys.has(k))
+
+      if (remainingKeys.length > 0) {
         if (fnoxAvailable()) {
           fnoxExport(opts.profile, agentKey).fold(
             (err) => {
               warnings.push(`fnox export failed: ${err.message}`)
-              for (const key of metaKeys) {
+              for (const key of remainingKeys) {
                 skipped.push(key)
               }
             },
             (exported) => {
-              for (const key of metaKeys) {
+              for (const key of remainingKeys) {
                 if (key in exported) {
                   secrets[key] = exported[key]!
                   injected.push(key)
@@ -114,28 +155,30 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
             },
           )
         } else {
-          warnings.push("fnox not available — no secrets injected")
-          for (const key of metaKeys) {
+          if (!hasSealedValues) {
+            warnings.push("fnox not available — no secrets injected")
+          }
+          for (const key of remainingKeys) {
             skipped.push(key)
           }
         }
+      }
 
-        if (inject) {
-          for (const [key, value] of Object.entries(secrets)) {
-            process.env[key] = value
-          }
+      if (inject) {
+        for (const [key, value] of Object.entries(secrets)) {
+          process.env[key] = value
         }
+      }
 
-        return {
-          audit,
-          injected: injected as ReadonlyArray<string>,
-          skipped: skipped as ReadonlyArray<string>,
-          secrets: secrets as Readonly<Record<string, string>>,
-          warnings: warnings as ReadonlyArray<string>,
-        }
-      })
-    }),
-  )
+      return {
+        audit,
+        injected: injected as ReadonlyArray<string>,
+        skipped: skipped as ReadonlyArray<string>,
+        secrets: secrets as Readonly<Record<string, string>>,
+        warnings: warnings as ReadonlyArray<string>,
+      }
+    })
+  })
 }
 
 /** Programmatic boot — throws EnvpktBootError on failure */

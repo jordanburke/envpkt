@@ -8,6 +8,7 @@ import { runInit } from "./commands/init.js"
 import { runInspect } from "./commands/inspect.js"
 import { runMcp } from "./commands/mcp.js"
 import { runResolve } from "./commands/resolve.js"
+import { runSeal } from "./commands/seal.js"
 import { runShellHook } from "./commands/shell-hook.js"
 
 const program = new Command()
@@ -86,6 +87,15 @@ program
   .option("--dry-run", "Show what would be resolved without writing")
   .action((options) => {
     runResolve(options)
+  })
+
+program
+  .command("seal")
+  .description("Encrypt secret values into envpkt.toml using age (sealed packets)")
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .option("--profile <profile>", "fnox profile to use for value resolution")
+  .action(async (options) => {
+    await runSeal(options)
   })
 
 program

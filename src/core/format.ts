@@ -71,12 +71,13 @@ export const formatPacket = (result: ResolveResult, options?: FormatPacketOption
   const secretHeader = `secrets: ${metaEntries.length}`
   const secretLines = metaEntries.map(([key, meta]) => {
     const service = meta.service ?? key
+    const sealedTag = meta.encrypted_value ? " [sealed]" : ""
     const secretValue = options?.secrets?.[key]
     const valueSuffix =
       secretValue !== undefined
         ? ` = ${(options?.secretDisplay ?? "encrypted") === "plaintext" ? secretValue : maskValue(secretValue)}`
         : ""
-    const header = `  ${key} → ${service}${valueSuffix}`
+    const header = `  ${key} → ${service}${sealedTag}${valueSuffix}`
     const fields = formatSecretFields(meta, "    ")
     return fields ? `${header}\n${fields}` : header
   })
