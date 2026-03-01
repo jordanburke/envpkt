@@ -15,6 +15,7 @@ description: All envpkt CLI commands at a glance
 | [`envpkt exec`](/cli/exec/)             | Pre-flight audit, inject secrets, run a command    |
 | [`envpkt env scan`](/cli/env-scan/)     | Auto-discover credentials from shell environment   |
 | [`envpkt env check`](/cli/env-check/)   | Bidirectional drift detection                      |
+| [`envpkt env export`](/cli/env-export/) | Output export statements for sourcing secrets      |
 | [`envpkt shell-hook`](/cli/shell-hook/) | Output shell function for ambient warnings         |
 | [`envpkt mcp`](/cli/mcp/)               | Start the MCP server                               |
 
@@ -27,7 +28,7 @@ All commands support:
 
 ## Config Resolution
 
-Commands that read `envpkt.toml` (audit, inspect, resolve, exec, env check) follow this resolution chain:
+Commands that read `envpkt.toml` (audit, inspect, resolve, exec, env check, env export) follow this resolution chain:
 
 1. Explicit `-c path/to/envpkt.toml` flag
 2. `envpkt.toml` in the current working directory

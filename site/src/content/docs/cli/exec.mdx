@@ -46,4 +46,8 @@ envpkt exec --profile staging -- node server.js
 4. Inject secrets from fnox into subprocess environment
 5. Execute the command
 
-Requires [fnox integration](/integrations/fnox/) for secret injection.
+Requires [fnox integration](/integrations/fnox/) or [sealed packets](/getting-started/the-toml-file/) for secret injection.
+
+:::tip
+Need secrets in the **current** shell instead of a subprocess? Use [`envpkt env export`](/cli/env-export/) with `eval`.
+:::
