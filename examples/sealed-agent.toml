@@ -9,7 +9,7 @@
 #   4. Run: envpkt seal
 #
 # At runtime, `envpkt exec -- node app.js` (or boot() in code) will
-# decrypt sealed values using the identity file. No fnox needed.
+# decrypt sealed values using the identity file.
 
 version = 1
 
@@ -39,7 +39,7 @@ capabilities = ["chat:completions", "embeddings:create"]
 created = "2026-02-01"
 expires = "2027-02-01"
 rotation_url = "https://platform.openai.com/api-keys"
-source = "manual"
+source = "fnox"
 rate_limit = "500/min"
 
 encrypted_value = """
@@ -58,7 +58,7 @@ capabilities = ["messages:create"]
 created = "2026-02-15"
 expires = "2027-02-15"
 rotation_url = "https://platform.claude.com/settings/keys"
-source = "manual"
+source = "fnox"
 rate_limit = "1000/min"
 
 encrypted_value = """

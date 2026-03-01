@@ -8,7 +8,7 @@ import { unwrapAgentKey } from "../fnox/identity.js"
 import { extractFnoxKeys, readFnoxConfig } from "../fnox/parse.js"
 import { computeAudit } from "./audit.js"
 import { resolveConfig } from "./catalog.js"
-import { loadConfig, resolveConfigPath } from "./config.js"
+import { expandPath, loadConfig, resolveConfigPath } from "./config.js"
 import { unsealSecrets } from "./seal.js"
 import type { AuditResult, BootError, BootOptions, BootResult, EnvpktConfig } from "./types.js"
 
@@ -41,7 +41,7 @@ const resolveAgentKey = (config: EnvpktConfig, configDir: string): AgentKeyResul
     const result: AgentKeyResult = Right(undefined as string | undefined)
     return result
   }
-  const identityPath = resolve(configDir, config.agent.identity)
+  const identityPath = resolve(configDir, expandPath(config.agent.identity))
   return unwrapAgentKey(identityPath).fold<AgentKeyResult>(
     (err) => Left(err),
     (key) => Right(key as string | undefined),
@@ -116,7 +116,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
       const sealedKeys = new Set<string>()
 
       if (hasSealedValues && config.agent?.identity) {
-        const identityPath = resolve(configDir, config.agent.identity)
+        const identityPath = resolve(configDir, expandPath(config.agent.identity))
         unsealSecrets(config.meta, identityPath).fold(
           (err) => {
             warnings.push(`Sealed value decryption failed: ${err.message}`)

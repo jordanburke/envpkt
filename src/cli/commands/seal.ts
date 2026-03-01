@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
-import { loadConfig, resolveConfigPath } from "../../core/config.js"
+import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import { resolveValues } from "../../core/resolve-values.js"
 import { sealSecrets } from "../../core/seal.js"
 import { unwrapAgentKey } from "../../fnox/identity.js"
@@ -142,7 +142,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   // Resolve agent key if identity is configured
   let agentKey: string | undefined
   if (config.agent.identity) {
-    const identityPath = resolve(configDir, config.agent.identity)
+    const identityPath = resolve(configDir, expandPath(config.agent.identity))
     const keyResult = unwrapAgentKey(identityPath)
     agentKey = keyResult.fold(
       (err) => {

@@ -4,7 +4,7 @@ import { dirname, resolve } from "node:path"
 import { Try } from "functype"
 
 import { computeAudit } from "../../core/audit.js"
-import { loadConfig, resolveConfigPath } from "../../core/config.js"
+import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import { fnoxAvailable } from "../../fnox/detect.js"
 import { unwrapAgentKey } from "../../fnox/identity.js"
 import { BOLD, exitCodeForAudit, formatAudit, formatError, RED, RESET, YELLOW } from "../output.js"
@@ -77,7 +77,7 @@ export const runExec = (args: ReadonlyArray<string>, options: ExecOptions): void
   // 3. Unwrap agent key if identity configured
   let agentKey: string | undefined
   if (config.agent?.identity) {
-    const identityPath = resolve(configDir, config.agent.identity)
+    const identityPath = resolve(configDir, expandPath(config.agent.identity))
     const keyResult = unwrapAgentKey(identityPath)
     keyResult.fold(
       (err) => {

@@ -2,7 +2,15 @@ import { describe, expect, it, beforeEach, afterEach } from "vitest"
 import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { findConfigPath, readConfigFile, parseToml, loadConfig, validateConfig } from "../../src/core/config.js"
+import { homedir } from "node:os"
+import {
+  expandPath,
+  findConfigPath,
+  readConfigFile,
+  parseToml,
+  loadConfig,
+  validateConfig,
+} from "../../src/core/config.js"
 
 let tmpDir: string
 
@@ -12,6 +20,45 @@ beforeEach(() => {
 
 afterEach(() => {
   rmSync(tmpDir, { recursive: true, force: true })
+})
+
+describe("expandPath", () => {
+  it("expands ~ to home directory", () => {
+    expect(expandPath("~/keys/identity.txt")).toBe(join(homedir(), "keys/identity.txt"))
+  })
+
+  it("expands bare ~", () => {
+    expect(expandPath("~")).toBe(homedir())
+  })
+
+  it("does not expand ~ in the middle of a path", () => {
+    expect(expandPath("/some/~file")).toBe("/some/~file")
+  })
+
+  it("expands $VAR syntax", () => {
+    process.env["ENVPKT_TEST_DIR"] = "/tmp/secrets"
+    expect(expandPath("$ENVPKT_TEST_DIR/identity.txt")).toBe("/tmp/secrets/identity.txt")
+    delete process.env["ENVPKT_TEST_DIR"]
+  })
+
+  it("expands ${VAR} syntax", () => {
+    process.env["ENVPKT_TEST_DIR"] = "/tmp/secrets"
+    expect(expandPath("${ENVPKT_TEST_DIR}/identity.txt")).toBe("/tmp/secrets/identity.txt")
+    delete process.env["ENVPKT_TEST_DIR"]
+  })
+
+  it("replaces undefined env vars with empty string", () => {
+    delete process.env["ENVPKT_NONEXISTENT"]
+    expect(expandPath("$ENVPKT_NONEXISTENT/file")).toBe("/file")
+  })
+
+  it("passes through plain relative paths unchanged", () => {
+    expect(expandPath("sealed-identity.txt")).toBe("sealed-identity.txt")
+  })
+
+  it("passes through absolute paths unchanged", () => {
+    expect(expandPath("/etc/keys/identity.txt")).toBe("/etc/keys/identity.txt")
+  })
 })
 
 describe("findConfigPath", () => {

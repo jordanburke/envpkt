@@ -175,6 +175,8 @@ recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
 identity = "identity.txt"
 ```
 
+The `identity` path supports `~` expansion and environment variables (`$VAR`, `${VAR}`), so you can use paths like `~/keys/identity.txt` or `$KEYS_DIR/identity.txt`. Relative paths are resolved from the config file's directory.
+
 ### Seal
 
 ```bash

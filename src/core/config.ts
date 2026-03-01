@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from "node:fs"
+import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
 import { TypeCompiler } from "@sinclair/typebox/compiler"
@@ -25,6 +26,16 @@ const normalizeDates = (obj: unknown): unknown => {
     return Object.fromEntries(Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, normalizeDates(v)]))
   }
   return obj
+}
+
+/** Expand ~ and $ENV_VAR / ${ENV_VAR} in a path string */
+export const expandPath = (p: string): string => {
+  let expanded = p.startsWith("~/") || p === "~" ? join(homedir(), p.slice(1)) : p
+  expanded = expanded.replace(/\$\{(\w+)\}|\$(\w+)/g, (_, braced: string | undefined, bare: string | undefined) => {
+    const name = braced ?? bare ?? ""
+    return process.env[name] ?? ""
+  })
+  return expanded
 }
 
 /** Find envpkt.toml in the given directory */
