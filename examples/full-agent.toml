@@ -12,8 +12,9 @@ description = "ETL pipeline processor for data ingestion"
 capabilities = ["read-s3", "write-postgres", "send-notifications"]
 expires = "2027-01-01"
 services = ["aws", "postgres", "slack"]
-# identity = "keys/agent.age"
-# recipient = "age1..."
+# Sealed packets: uncomment to enable `envpkt seal` (encrypts values into TOML)
+# identity = "identity.txt"
+# recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
 
 # --- Lifecycle Policy ---
 
@@ -41,8 +42,8 @@ mcp = true
 service = "aws"
 purpose = "S3 bucket read access for raw data ingestion"
 capabilities = ["s3:GetObject", "s3:ListBucket"]
-created = "2025-11-01"
-expires = "2026-05-01"
+created = "2026-06-01"
+expires = "2027-06-01"
 rotation_url = "https://console.aws.amazon.com/iam/home#/security_credentials"
 source = "vault"
 
@@ -50,8 +51,8 @@ source = "vault"
 service = "aws"
 purpose = "S3 bucket read access (secret counterpart)"
 capabilities = ["s3:GetObject", "s3:ListBucket"]
-created = "2025-11-01"
-expires = "2026-05-01"
+created = "2026-06-01"
+expires = "2027-06-01"
 rotation_url = "https://console.aws.amazon.com/iam/home#/security_credentials"
 source = "vault"
 
@@ -59,8 +60,8 @@ source = "vault"
 service = "postgres"
 purpose = "Write processed data to the analytics database"
 capabilities = ["SELECT", "INSERT", "UPDATE"]
-created = "2025-10-15"
-expires = "2026-10-15"
+created = "2026-06-15"
+expires = "2027-06-15"
 rotation_url = "https://wiki.internal/runbooks/rotate-db-creds"
 source = "vault"
 
@@ -68,6 +69,7 @@ source = "vault"
 service = "slack"
 purpose = "Send pipeline completion and failure notifications"
 capabilities = ["post-message"]
-created = "2025-09-01"
+created = "2026-06-01"
+expires = "2027-06-01"
 rotation_url = "https://api.slack.com/apps/A00/incoming-webhooks"
 source = "manual"

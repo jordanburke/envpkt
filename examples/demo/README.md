@@ -98,6 +98,71 @@ pnpm demo
 
 > Secret values in the HTML renders are fake demo data — not real credentials.
 
+### 7. Sealed Packets (encrypted values in TOML)
+
+Sealed packets embed age-encrypted secret values directly in the TOML, making configs fully self-contained and safe to commit to git.
+
+#### Setup
+
+```bash
+# Generate a keypair
+age-keygen -o examples/demo/agents/api-gateway/identity.txt
+
+# Note the public key printed (age1...)
+```
+
+#### Example config with sealed secrets
+
+See [`examples/sealed-agent.toml`](../sealed-agent.toml) for a full example. The key fields are:
+
+```toml
+[agent]
+name = "my-agent"
+recipient = "age1..."    # Public key — safe to commit
+identity = "identity.txt" # Private key path — add to .gitignore
+```
+
+#### Seal values
+
+```bash
+# Seal secrets into the TOML (resolves values from fnox → env → prompt)
+envpkt seal -c examples/sealed-agent.toml
+```
+
+After sealing, each secret gets an `encrypted_value` field:
+
+```toml
+[meta.OPENAI_API_KEY]
+service = "openai"
+encrypted_value = """
+-----BEGIN AGE ENCRYPTED FILE-----
+YWdlLWVuY3J5cHRpb24...
+-----END AGE ENCRYPTED FILE-----
+"""
+```
+
+#### Boot with sealed values
+
+```bash
+# Sealed values are auto-decrypted at boot — no fnox needed
+envpkt exec -c examples/sealed-agent.toml -- node app.js
+```
+
+Or in code:
+
+```typescript
+import { boot } from "envpkt"
+const result = boot({ configPath: "envpkt.toml" })
+// Sealed values decrypted and injected into process.env
+```
+
+#### Inspect sealed config
+
+```bash
+envpkt inspect -c examples/sealed-agent.toml
+# Shows [sealed] indicator next to secrets with encrypted_value
+```
+
 ## Key Concepts Demonstrated
 
 | Concept                               | Where                                                                        |
@@ -109,3 +174,4 @@ pnpm demo
 | Standalone agent (no catalog)         | `monitoring`                                                                 |
 | Expired secret detection              | `monitoring` — `DATADOG_API_KEY` expired 2026-01-01                          |
 | Lifecycle policies                    | `infra` requires expiration + service; `monitoring` has 60-day stale warning |
+| Sealed packets (encrypted values)     | `sealed-agent.toml` — age-encrypted secrets safe to commit                   |

@@ -18,7 +18,7 @@ Secrets managers store values. envpkt stores _metadata about_ those values — w
 - Automate rotation workflows
 - Share secret metadata across agents via a central catalog
 
-envpkt never touches secret values. It works alongside your existing secrets manager (Vault, fnox, CI variables, etc.).
+envpkt works alongside your existing secrets manager (Vault, fnox, CI variables, etc.). Optionally, you can embed age-encrypted secret values directly in the TOML via **sealed packets** — making configs fully self-contained and safe to commit to git.
 
 ## Quick Start
 
@@ -154,6 +154,47 @@ This produces a self-contained config with catalog metadata merged in and agent 
 - Omitted fields keep the catalog value
 - `agent.secrets` is the source of truth for which keys the agent needs
 
+## Sealed Packets
+
+Sealed packets embed age-encrypted secret values directly in `envpkt.toml`. This makes your config fully self-contained — no external secrets backend needed at runtime.
+
+### Setup
+
+```bash
+# Generate an age keypair
+age-keygen -o identity.txt
+# public key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+```
+
+Add the public key to your config and the identity file to `.gitignore`:
+
+```toml
+[agent]
+name = "my-agent"
+recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
+identity = "identity.txt"
+```
+
+### Seal
+
+```bash
+envpkt seal
+```
+
+Each secret gets an `encrypted_value` field with age-armored ciphertext. The TOML (including ciphertext) is safe to commit.
+
+### Boot
+
+At runtime, sealed values are automatically decrypted:
+
+```typescript
+import { boot } from "envpkt"
+
+const result = boot() // decrypts sealed values, injects into process.env
+```
+
+Mixed mode is supported — sealed values take priority, with fnox as fallback for keys without `encrypted_value`.
+
 ## CLI Commands
 
 ### `envpkt init`
@@ -233,6 +274,26 @@ envpkt exec --skip-audit -- npm start # Skip the audit
 envpkt exec --strict -- ./deploy.sh   # Abort if audit is not healthy
 envpkt exec --profile staging -- ...  # Use a specific fnox profile
 ```
+
+### `envpkt seal`
+
+Encrypt secret values into `envpkt.toml` using [age](https://age-encryption.org/). Sealed values are safe to commit to git — only the holder of the private key can decrypt them.
+
+```bash
+envpkt seal                            # Seal all secrets in envpkt.toml
+envpkt seal -c path/to/envpkt.toml     # Specify config path
+envpkt seal --profile staging          # Use a specific fnox profile for value resolution
+```
+
+Requires `agent.recipient` (age public key) in your config. Values are resolved via cascade:
+
+1. **fnox** (if available)
+2. **Environment variables** (e.g. `OPENAI_API_KEY` in your shell)
+3. **Interactive prompt** (asks you to paste each value)
+
+After sealing, each secret gets an `encrypted_value` field. At boot time, `envpkt exec` or `boot()` automatically decrypts sealed values using the `agent.identity` file.
+
+See [`examples/sealed-agent.toml`](./examples/sealed-agent.toml) for a complete example.
 
 ### `envpkt env scan`
 
@@ -328,12 +389,13 @@ The schema is published at:
 
 Each `[meta.<KEY>]` section describes a secret:
 
-| Tier            | Fields                                          | Description                               |
-| --------------- | ----------------------------------------------- | ----------------------------------------- |
-| **Scan-first**  | `service`, `expires`, `rotation_url`            | Key health indicators for audit           |
-| **Context**     | `purpose`, `capabilities`, `created`            | Why this secret exists and what it grants |
-| **Operational** | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime and provisioning info             |
-| **Enforcement** | `required`, `tags`                              | Filtering, grouping, and policy           |
+| Tier            | Fields                                          | Description                                 |
+| --------------- | ----------------------------------------------- | ------------------------------------------- |
+| **Scan-first**  | `service`, `expires`, `rotation_url`            | Key health indicators for audit             |
+| **Context**     | `purpose`, `capabilities`, `created`            | Why this secret exists and what it grants   |
+| **Operational** | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime and provisioning info               |
+| **Sealed**      | `encrypted_value`                               | Age-encrypted secret value (safe to commit) |
+| **Enforcement** | `required`, `tags`                              | Filtering, grouping, and policy             |
 
 ### Agent Identity
 
@@ -457,6 +519,32 @@ loadConfig("envpkt.toml").fold(
 matchEnvVar("OPENAI_API_KEY", "sk-test123").fold(
   () => console.log("Not a credential"),
   (m) => console.log(`Matched: ${m.confidence} confidence`),
+)
+```
+
+### Seal API
+
+```typescript
+import { ageEncrypt, ageDecrypt, sealSecrets, unsealSecrets } from "envpkt"
+
+// Encrypt a single value
+const encrypted = ageEncrypt("sk-my-api-key", "age1ql3z7hjy...")
+encrypted.fold(
+  (err) => console.error("Encrypt failed:", err.message),
+  (ciphertext) => console.log(ciphertext), // -----BEGIN AGE ENCRYPTED FILE-----
+)
+
+// Decrypt a single value
+const decrypted = ageDecrypt(ciphertext, "/path/to/identity.txt")
+
+// Seal all secrets in a config's meta
+const sealed = sealSecrets(config.meta, { OPENAI_API_KEY: "sk-..." }, recipientPublicKey)
+
+// Unseal all encrypted_value entries
+const values = unsealSecrets(config.meta, "/path/to/identity.txt")
+values.fold(
+  (err) => console.error("Unseal failed:", err.message),
+  (secrets) => console.log(secrets), // { OPENAI_API_KEY: "sk-..." }
 )
 ```
 

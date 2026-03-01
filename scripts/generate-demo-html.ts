@@ -1,8 +1,8 @@
 import { existsSync, mkdirSync, unlinkSync, writeFileSync } from "node:fs"
 import { dirname, join } from "node:path"
 
-import type { FormatPacketOptions } from "../src/core/format.js"
-import { formatPacket } from "../src/core/format.js"
+import type { FormatPacketOptions } from "../src"
+import { formatPacket } from "../src"
 import { apiGatewayResult, dataPipelineResult, demoSecrets, monitoringResult } from "../test/fixtures/demo-data.js"
 
 // ---------------------------------------------------------------------------

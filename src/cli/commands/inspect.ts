@@ -72,7 +72,8 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
       secretValue !== undefined
         ? ` = ${YELLOW}${(opts?.secretDisplay ?? "encrypted") === "plaintext" ? secretValue : maskValue(secretValue)}${RESET}`
         : ""
-    console.log(`  ${BOLD}${key}${RESET} → ${meta.service ?? key}${valueSuffix}`)
+    const sealedTag = meta.encrypted_value ? ` ${CYAN}[sealed]${RESET}` : ""
+    console.log(`  ${BOLD}${key}${RESET} → ${meta.service ?? key}${sealedTag}${valueSuffix}`)
     printSecretMeta(meta, "    ")
   }
 

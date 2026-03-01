@@ -1,0 +1,92 @@
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# Sealed agent — secrets encrypted inline with age, safe to commit to git.
+#
+# Setup:
+#   1. Generate a keypair:  age-keygen -o identity.txt
+#   2. Copy the public key into `recipient` below
+#   3. Add identity.txt to .gitignore
+#   4. Run: envpkt seal
+#
+# At runtime, `envpkt exec -- node app.js` (or boot() in code) will
+# decrypt sealed values using the identity file. No fnox needed.
+
+version = 1
+
+[agent]
+name = "inference-agent"
+consumer = "agent"
+description = "LLM inference agent with sealed API keys"
+capabilities = ["chat:completions", "embeddings"]
+expires = "2027-06-01"
+services = ["openai", "anthropic"]
+recipient = "age1reznz3x4gmec8quu4ttmfxy7v5w5pdjs3kukqz9vej5uvkwd23fs5a39n8"
+identity = "sealed-identity.txt"
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+require_service = true
+
+# --- Secrets ---
+# After running `envpkt seal`, each secret will get an `encrypted_value`
+# field containing age-armored ciphertext. That ciphertext is safe to commit.
+
+[meta.OPENAI_API_KEY]
+service = "openai"
+purpose = "GPT-4 chat completions and embeddings"
+capabilities = ["chat:completions", "embeddings:create"]
+created = "2026-02-01"
+expires = "2027-02-01"
+rotation_url = "https://platform.openai.com/api-keys"
+source = "manual"
+rate_limit = "500/min"
+
+encrypted_value = """
+-----BEGIN AGE ENCRYPTED FILE-----
+YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBZdnZUSHJZTllzNHR6dEhy
+dmtSQ2R4QW1oUE5uekhZOWRGOENWMnVCNFZRClpCOGdRenhRYUZvUVQ1c0xjaHlF
+QkdFbS8wWWxtOGg4cUd6cXlETVlobk0KLS0tIFNyWm84ME9PM1ZIM0xjNG14d2dz
+bVpRM1QrOUxLdUNKaTY2c2VVRWV1Rk0KXiBqrRNxJjhpLABxlNFLf62WzCywc0H3
+pHpfTdy9JgbL1t7fKh5+D7Izv2c+pYUyRMmLYC5akfGbnvBZS+KH7c8jHA==
+-----END AGE ENCRYPTED FILE-----
+"""
+[meta.ANTHROPIC_API_KEY]
+service = "anthropic"
+purpose = "Claude inference via Messages API"
+capabilities = ["messages:create"]
+created = "2026-02-15"
+expires = "2027-02-15"
+rotation_url = "https://platform.claude.com/settings/keys"
+source = "manual"
+rate_limit = "1000/min"
+
+encrypted_value = """
+-----BEGIN AGE ENCRYPTED FILE-----
+YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSA1M05WRlJYMDhVdndLYkx4
+dDhrb0JrYkRCM045Zk5NdHZQOUNkNkFpUUhJCll2cGVZYTkvSytKM25wQzdNZHpF
+UHNaV1IzL053VndzYnQvRXE0LzhVOUkKLS0tIFdaWmtLQ0IyMGpLL1ZkeG5JSGEr
+MjhNQ29kTnlyK2x1RkxocE12bENGOE0KLMPXiUwOvRJ3uwNj3JB/aRjrWnoXpYUU
+8ZaDpvxEniGSmb2GpThSXhi//Cr03/C5ObWmwgDS67mc3zHQYoY0sq1psqXqCn6B
+iLM=
+-----END AGE ENCRYPTED FILE-----
+"""
+[meta.DATABASE_URL]
+service = "postgres"
+purpose = "Conversation history and embedding cache"
+capabilities = ["SELECT", "INSERT"]
+created = "2026-01-15"
+expires = "2027-01-15"
+rotation_url = "https://wiki.internal/runbooks/rotate-db"
+source = "vault"
+
+encrypted_value = """
+-----BEGIN AGE ENCRYPTED FILE-----
+YWdlLWVuY3J5cHRpb24ub3JnL3YxCi0+IFgyNTUxOSBHYld6R0xYU0JXV2IwR25M
+RVM1dVNHcVhCUE4vU2x2cEQ4bUFuQ0o3SlVBCnY4OFhPdWhYYUxSQnJSN3M2azdh
+OTdIVTFFRTVrY21EaHRkcTE3UzlubEUKLS0tIDVmNHJFek11ZkZ3WWVweE9VSlpt
+UklHY1pjT2tSbTdkR1dPT1I1ck1yNEkKUFlmNJniJkG9vo0hlI14TQC/i77e10cj
+wujzqb4XUtWz+VCwXifFG3wCNJvJdSwlZ5szLNOUkjjFBeEe/GWYkZMHfYrjJu23
+jWyxVjnLagyPZA==
+-----END AGE ENCRYPTED FILE-----
+"""

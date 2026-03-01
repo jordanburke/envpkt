@@ -39,6 +39,10 @@ node_modules/
 .env.*.local
 .env.local
 
+# age identity files (private keys — never commit)
+**/identity.txt
+**/sealed-identity.txt
+
 # Claude Code
 .claude/settings.local.json
 .claude/worktrees/
