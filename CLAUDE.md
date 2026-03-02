@@ -4,87 +4,83 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a TypeScript library template designed to be cloned/forked for creating new npm packages. It uses the `ts-builds` toolchain for standardized build scripts with ESM output.
+**envpkt** is a credential lifecycle and fleet management library/CLI for AI agents. It stores _metadata about_ secrets (not the secrets themselves) in `envpkt.toml` files — answering What/Where/Why/When/How for each credential. It optionally embeds age-encrypted secret values via "sealed packets."
 
-**Template Usage**: See STANDARDIZATION_GUIDE.md for applying this pattern to other TypeScript projects.
+Key capabilities: audit credential health, detect drift between config and environment, scan for credentials in process.env, manage shared catalogs across agent fleets, encrypt/decrypt secrets with age, and expose metadata to AI agents via MCP.
 
 ## Development Commands
 
-All commands delegate to `ts-builds` for consistency across projects:
-
 ```bash
-pnpm validate        # Main command: format + lint + test + build (use before commits)
-
-pnpm format          # Format code with Prettier
-pnpm format:check    # Check formatting only
-
-pnpm lint            # Fix ESLint issues
-pnpm lint:check      # Check ESLint issues only
-
-pnpm test            # Run tests once
-pnpm test:watch      # Run tests in watch mode
-pnpm test:coverage   # Run tests with coverage
-
-pnpm build           # Production build (outputs to dist/)
-pnpm dev             # Development build with watch mode
-
-pnpm typecheck       # Check TypeScript types
+pnpm validate          # Full pipeline: format → lint → typecheck → test → build:schema → build
+pnpm test              # Run tests only
+pnpm test -- test/core/seal.spec.ts           # Single test file
+pnpm test -- --testNamePattern="pattern"      # Filter by test name
+pnpm build             # Production build (dist/)
+pnpm build:schema      # Regenerate schemas/envpkt.schema.json from TypeBox
+pnpm dev               # Watch mode build
+pnpm demo              # Regenerate demo HTML renders in examples/demo/
+pnpm docs:dev          # Astro docs site dev server (site/ subdirectory)
 ```
 
-### Running a Single Test
-
-```bash
-pnpm test -- --testNamePattern="pattern"    # Filter by test name
-pnpm test -- test/specific.spec.ts          # Run specific file
-```
+The validate chain is customized in `ts-builds.config.json` to include `build:schema` between test and build.
 
 ## Architecture
 
-### Build System: ts-builds + tsdown
+### Dual Output Build
 
-- **ts-builds**: Centralized toolchain package providing all build scripts
-- **tsdown**: Underlying bundler configured via `ts-builds/tsdown`
-- **Configuration**: `tsdown.config.ts` imports default config from ts-builds
-- **TypeScript**: `tsconfig.json` extends `ts-builds/tsconfig`
-- **Prettier**: Uses `ts-builds/prettier` shared config
+`tsdown.config.ts` defines two entry points:
 
-### Output Format
+- `src/index.ts` → `dist/index.js` + `dist/index.d.ts` (library API with types)
+- `src/cli/index.ts` → `dist/cli.js` (CLI binary with `#!/usr/bin/env node` banner, no types)
 
-- **dist/**: Production builds containing:
-  - `index.js` - ES module format
-  - `index.d.ts` - TypeScript declarations
-- **lib/**: Development builds (also published)
+### Core Layer (`src/core/`)
 
-### Package Exports
+| File                | Purpose                                                                                                                                               |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `schema.ts`         | TypeBox schema definitions → runtime validation + type generation. Source of truth for `EnvpktConfig` shape.                                          |
+| `types.ts`          | Domain types re-exported from schema + audit/fleet/error union types. Uses functype `Option`/`List`.                                                  |
+| `config.ts`         | TOML parsing (smol-toml), TypeBox validation, config path resolution (flag → `ENVPKT_CONFIG` env → CWD).                                              |
+| `catalog.ts`        | Catalog resolution — merges shared secret metadata from a referenced catalog file into agent configs.                                                 |
+| `audit.ts`          | Health computation: compares secret metadata against lifecycle policies → `AuditResult` with per-secret status.                                       |
+| `boot.ts`           | Programmatic entry point. `boot()`/`bootSafe()` pipeline: load config → resolve catalog → audit → unseal → fnox fallback → inject into `process.env`. |
+| `seal.ts`           | Age encryption/decryption via `age` CLI. `sealSecrets`/`unsealSecrets` operate on config metadata records.                                            |
+| `env.ts`            | Environment scanning (`envScan`) and drift detection (`envCheck`).                                                                                    |
+| `patterns.ts`       | Credential pattern registry: ~45 exact names, ~13 suffix patterns, ~29 value shape regexes for auto-discovery.                                        |
+| `fleet.ts`          | Directory tree scanner for `envpkt.toml` files, aggregates health across agents.                                                                      |
+| `format.ts`         | Human-readable packet formatting with optional secret masking.                                                                                        |
+| `resolve-values.ts` | Value resolution cascade: sealed → fnox → env → interactive prompt.                                                                                   |
 
-```json
-{
-  "main": "./dist/index.js",
-  "module": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js",
-      "default": "./dist/index.js"
-    }
-  }
-}
-```
+### CLI Layer (`src/cli/`)
 
-### Testing: Vitest
+Commander-based CLI. Each command in `src/cli/commands/` maps 1:1 to a subcommand (`audit`, `env`, `exec`, `fleet`, `init`, `inspect`, `mcp`, `resolve`, `seal`, `shell-hook`). Output formatting is in `src/cli/output.ts`.
 
-- Tests located in `test/*.spec.ts`
-- Uses Vitest with configuration from ts-builds
-- Coverage via v8 provider
+### MCP Layer (`src/mcp/`)
 
-## Key Files
+MCP server using `@modelcontextprotocol/sdk` with stdio transport. Exposes 4 tools (`getPacketHealth`, `listCapabilities`, `getSecretMeta`, `checkExpiration`) and 2 resources (`envpkt://health`, `envpkt://capabilities`). No secret values exposed.
 
-- `src/index.ts` - Main library entry point
-- `test/*.spec.ts` - Test files
-- `tsdown.config.ts` - Build config (imports from ts-builds)
-- `tsconfig.json` - TypeScript config (extends ts-builds)
-- `.claude/skills/ts-builds-template/` - Claude Code skill for bootstrapping libraries from this template
+### fnox Integration (`src/fnox/`)
+
+Bridge to the `fnox` credential store: detection, CLI invocation, TOML parsing, sync comparison, and age identity management.
+
+## Key Design Patterns
+
+- **functype everywhere**: All fallible operations return `Either<Error, T>`. Optional values use `Option<T>`. Collections use `List<T>`. Error types are discriminated unions with `_tag` field.
+- **TypeBox schemas**: `src/core/schema.ts` is the single source of truth. Types are derived via `Static<typeof Schema>`. The JSON Schema in `schemas/` is generated from these via `scripts/build-schema.ts`.
+- **TOML config**: Parsed with `smol-toml`, validated with compiled TypeBox, dates normalized from `TomlDate` to ISO strings.
+- **No thrown exceptions in library API**: `bootSafe()` returns `Either`; `boot()` is the throwing convenience wrapper.
+
+## Dependencies
+
+- **functype** — FP primitives (Option, Either, List, Try)
+- **@sinclair/typebox** — Runtime schema validation + TypeScript type derivation
+- **smol-toml** — TOML parser
+- **commander** — CLI framework
+- **@modelcontextprotocol/sdk** — MCP server implementation
+- **age** (external CLI) — Required at runtime for seal/unseal operations
+
+## Test Structure
+
+Tests mirror source: `test/core/`, `test/cli/`, `test/fnox/`, `test/e2e/`, `test/mcp/`. Fixture data in `test/fixtures/demo-data.ts`. Vitest with v8 coverage.
 
 ## Publishing
 
@@ -93,4 +89,4 @@ npm version patch|minor|major
 npm publish --access public
 ```
 
-The `prepublishOnly` hook automatically runs `pnpm validate` before publishing.
+`prepublishOnly` runs `pnpm validate`. The `schemas/` directory and JSON Schema export (`envpkt/schema`) are part of the published package.
