@@ -1,14 +1,23 @@
 {
-  "name": "ts-builds-template",
+  "name": "envpkt-skills",
+  "description": "Skills for credential lifecycle and fleet management with envpkt",
   "owner": {
     "name": "Jordan Burke",
     "email": "jordan.burke@gmail.com"
   },
-  "metadata": {
-    "description": "Skills for bootstrapping new TypeScript libraries from the ts-builds-template",
-    "version": "1.0.0"
-  },
   "plugins": [
+    {
+      "name": "envpkt",
+      "description": "Help developers use envpkt for credential management — CLI usage, envpkt.toml configuration, library API, boot patterns, MCP server integration, and fleet health monitoring",
+      "version": "1.0.0",
+      "author": {
+        "name": "Jordan Burke",
+        "email": "jordan.burke@gmail.com"
+      },
+      "source": "./",
+      "category": "development",
+      "strict": false
+    },
     {
       "name": "ts-builds-template",
       "description": "Guide for bootstrapping new TypeScript libraries from the ts-builds-template. Use when creating a new npm package from this template, customizing the template for a new project, or understanding the template's project structure and dev workflow.",
