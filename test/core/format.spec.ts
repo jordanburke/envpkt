@@ -8,7 +8,7 @@ describe("formatPacket", () => {
   it("formats a minimal standalone config", () => {
     const result = makeResult({
       version: 1,
-      meta: { API_KEY: { service: "openai" } },
+      secret: { API_KEY: { service: "openai" } },
     })
     const output = formatPacket(result)
 
@@ -22,7 +22,7 @@ describe("formatPacket", () => {
     const result = makeResult({
       version: 1,
       agent: { name: "api-gateway", consumer: "service", description: "REST API server" },
-      meta: {},
+      secret: {},
     })
     const output = formatPacket(result)
 
@@ -34,7 +34,7 @@ describe("formatPacket", () => {
     const result = makeResult({
       version: 1,
       agent: { name: "bot", capabilities: ["http:serve", "payments:process"] },
-      meta: {},
+      secret: {},
     })
     const output = formatPacket(result)
 
@@ -44,7 +44,7 @@ describe("formatPacket", () => {
   it("formats all secret metadata tiers", () => {
     const result = makeResult({
       version: 1,
-      meta: {
+      secret: {
         DATABASE_URL: {
           service: "postgres",
           purpose: "Primary database",
@@ -80,7 +80,7 @@ describe("formatPacket", () => {
   it("combines date fields on one line", () => {
     const result = makeResult({
       version: 1,
-      meta: {
+      secret: {
         KEY: { created: "2026-01-01", expires: "2027-01-01" },
       },
     })
@@ -92,7 +92,7 @@ describe("formatPacket", () => {
   it("combines operational fields on one line", () => {
     const result = makeResult({
       version: 1,
-      meta: {
+      secret: {
         KEY: { rotates: "30d", rate_limit: "500/sec" },
       },
     })
@@ -104,7 +104,7 @@ describe("formatPacket", () => {
   it("uses key name when service is absent", () => {
     const result = makeResult({
       version: 1,
-      meta: { MY_SECRET: {} },
+      secret: { MY_SECRET: {} },
     })
     const output = formatPacket(result)
 
@@ -114,7 +114,7 @@ describe("formatPacket", () => {
   it("formats lifecycle section", () => {
     const result = makeResult({
       version: 1,
-      meta: {},
+      secret: {},
       lifecycle: { stale_warning_days: 90, require_expiration: true, require_service: false },
     })
     const output = formatPacket(result)
@@ -129,7 +129,7 @@ describe("formatPacket", () => {
     const result = makeResult(
       {
         version: 1,
-        meta: { DB: { service: "pg" }, REDIS: { service: "redis" } },
+        secret: { DB: { service: "pg" }, REDIS: { service: "redis" } },
       },
       {
         catalogPath: "/infra/envpkt.toml",
@@ -147,7 +147,7 @@ describe("formatPacket", () => {
 
   it("shows (none) for no overrides", () => {
     const result = makeResult(
-      { version: 1, meta: { KEY: { service: "svc" } } },
+      { version: 1, secret: { KEY: { service: "svc" } } },
       {
         catalogPath: "/catalog.toml",
         merged: ["KEY"],
@@ -161,7 +161,7 @@ describe("formatPacket", () => {
 
   it("shows catalog warnings", () => {
     const result = makeResult(
-      { version: 1, meta: {} },
+      { version: 1, secret: {} },
       {
         catalogPath: "/catalog.toml",
         merged: [],
@@ -175,7 +175,7 @@ describe("formatPacket", () => {
   })
 
   it("omits catalog section when no catalog was used", () => {
-    const result = makeResult({ version: 1, meta: {} })
+    const result = makeResult({ version: 1, secret: {} })
     const output = formatPacket(result)
 
     expect(output).not.toContain("catalog:")
@@ -184,7 +184,7 @@ describe("formatPacket", () => {
   describe("secret value display", () => {
     const secretResult = makeResult({
       version: 1,
-      meta: {
+      secret: {
         DATABASE_URL: { service: "postgres" },
         SHORT_KEY: { service: "svc" },
       },
@@ -258,7 +258,7 @@ describe("formatPacket", () => {
     it("shows [sealed] tag for secrets with encrypted_value", () => {
       const result = makeResult({
         version: 1,
-        meta: {
+        secret: {
           API_KEY: {
             service: "openai",
             encrypted_value: "-----BEGIN AGE ENCRYPTED FILE-----\ntest\n-----END AGE ENCRYPTED FILE-----",
@@ -276,7 +276,7 @@ describe("formatPacket", () => {
     it("does not show [sealed] when no encrypted_value", () => {
       const result = makeResult({
         version: 1,
-        meta: { KEY: { service: "svc" } },
+        secret: { KEY: { service: "svc" } },
       })
       const output = formatPacket(result)
 
@@ -288,7 +288,7 @@ describe("formatPacket", () => {
     const result = makeResult({
       version: 1,
       agent: { name: "test", consumer: "agent", description: "A test agent", capabilities: ["read"] },
-      meta: {
+      secret: {
         KEY: { service: "svc", purpose: "test", capabilities: ["read"], source: "vault" },
       },
       lifecycle: { stale_warning_days: 90 },
@@ -309,7 +309,7 @@ describe("formatPacket", () => {
           description: "REST API — handles payments and database writes",
           capabilities: ["http:serve", "payments:process"],
         },
-        meta: {
+        secret: {
           DATABASE_URL: {
             service: "postgres",
             purpose: "Primary application database",

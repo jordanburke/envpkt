@@ -72,7 +72,7 @@ export const runEnvScan = (options: ScanOptions): void => {
         (c) => c,
       )
 
-      const newEntries = scan.discovered.toArray().filter((m) => !existing.includes(`[meta.${m.envVar}]`))
+      const newEntries = scan.discovered.toArray().filter((m) => !existing.includes(`[secret.${m.envVar}]`))
 
       if (newEntries.length === 0) {
         console.log(`\n${GREEN}✓${RESET} All discovered credentials already tracked in envpkt.toml`)
@@ -174,6 +174,10 @@ export const runEnvExport = (options: ExportOptions): void => {
     (boot) => {
       for (const warning of boot.warnings) {
         console.error(`${YELLOW}Warning:${RESET} ${warning}`)
+      }
+
+      for (const [key, value] of Object.entries(boot.envDefaults)) {
+        console.log(`export ${key}='${shellEscape(value)}'`)
       }
 
       for (const [key, value] of Object.entries(boot.secrets)) {

@@ -82,7 +82,7 @@ describe("envpkt CLI e2e", () => {
 
   describe("audit", () => {
     it("outputs healthy for a valid config", () => {
-      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[meta.KEY]\nservice = "svc"\n`)
+      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[secret.KEY]\nservice = "svc"\n`)
       const { stdout, status } = run(["audit", "-c", join(tmpDir, "envpkt.toml")])
       expect(status).toBe(0)
       expect(stdout).toContain("HEALTHY")
@@ -91,7 +91,7 @@ describe("envpkt CLI e2e", () => {
     it("exits non-zero for expired secrets", () => {
       writeFileSync(
         join(tmpDir, "envpkt.toml"),
-        `version = 1\n[meta.OLD]\nservice = "old"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
+        `version = 1\n[secret.OLD]\nservice = "old"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
       )
       const { stdout, status } = run(["audit", "-c", join(tmpDir, "envpkt.toml")])
       expect(status).toBeGreaterThan(0)
@@ -99,7 +99,7 @@ describe("envpkt CLI e2e", () => {
     })
 
     it("outputs JSON with --format json", () => {
-      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[meta.K]\nservice = "s"\n`)
+      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[secret.K]\nservice = "s"\n`)
       const { stdout, status } = run(["audit", "-c", join(tmpDir, "envpkt.toml"), "--format", "json"])
       expect(status).toBe(0)
       const data = JSON.parse(stdout)
@@ -112,7 +112,7 @@ describe("envpkt CLI e2e", () => {
     it("shows structured config view", () => {
       writeFileSync(
         join(tmpDir, "envpkt.toml"),
-        `version = 1\n[agent]\nname = "bot"\n[meta.API_KEY]\nservice = "stripe"\npurpose = "Payments"\n`,
+        `version = 1\n[agent]\nname = "bot"\n[secret.API_KEY]\nservice = "stripe"\npurpose = "Payments"\n`,
       )
       const { stdout, status } = run(["inspect", "-c", join(tmpDir, "envpkt.toml")])
       expect(status).toBe(0)
@@ -122,12 +122,12 @@ describe("envpkt CLI e2e", () => {
     })
 
     it("outputs JSON with --format json", () => {
-      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[meta.X]\nservice = "y"\n`)
+      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[secret.X]\nservice = "y"\n`)
       const { stdout, status } = run(["inspect", "-c", join(tmpDir, "envpkt.toml"), "--format", "json"])
       expect(status).toBe(0)
       const data = JSON.parse(stdout)
       expect(data.version).toBe(1)
-      expect(data.meta.X.service).toBe("y")
+      expect(data.secret.X.service).toBe("y")
     })
   })
 
@@ -135,7 +135,7 @@ describe("envpkt CLI e2e", () => {
     it("scans directory tree for envpkt configs", () => {
       const agentDir = join(tmpDir, "agent-a")
       mkdirSync(agentDir, { recursive: true })
-      writeFileSync(join(agentDir, "envpkt.toml"), `version = 1\n[meta.K]\nservice = "s"\n`)
+      writeFileSync(join(agentDir, "envpkt.toml"), `version = 1\n[secret.K]\nservice = "s"\n`)
 
       const { stdout, status } = run(["fleet", "-d", tmpDir])
       expect(status).toBe(0)
@@ -145,7 +145,7 @@ describe("envpkt CLI e2e", () => {
     it("outputs JSON with --format json", () => {
       const agentDir = join(tmpDir, "agent-b")
       mkdirSync(agentDir, { recursive: true })
-      writeFileSync(join(agentDir, "envpkt.toml"), `version = 1\n[meta.K]\nservice = "s"\n`)
+      writeFileSync(join(agentDir, "envpkt.toml"), `version = 1\n[secret.K]\nservice = "s"\n`)
 
       const { stdout, status } = run(["fleet", "-d", tmpDir, "--format", "json"])
       expect(status).toBe(0)
@@ -156,21 +156,21 @@ describe("envpkt CLI e2e", () => {
 
   describe("exec", () => {
     it("runs a command after pre-flight audit", () => {
-      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[meta.K]\nservice = "s"\n`)
+      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[secret.K]\nservice = "s"\n`)
       const { stdout, status } = run(["exec", "-c", join(tmpDir, "envpkt.toml"), "echo", "hello"])
       expect(status).toBe(0)
       expect(stdout).toContain("hello")
     })
 
     it("runs with --skip-audit", () => {
-      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[meta.K]\nservice = "s"\n`)
+      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[secret.K]\nservice = "s"\n`)
       const { stdout, status } = run(["exec", "-c", join(tmpDir, "envpkt.toml"), "--skip-audit", "echo", "world"])
       expect(status).toBe(0)
       expect(stdout).toContain("world")
     })
 
     it("runs with --no-check (alias for --skip-audit)", () => {
-      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[meta.K]\nservice = "s"\n`)
+      writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n[secret.K]\nservice = "s"\n`)
       const { stdout, status } = run(["exec", "-c", join(tmpDir, "envpkt.toml"), "--no-check", "echo", "aliased"])
       expect(status).toBe(0)
       expect(stdout).toContain("aliased")
@@ -179,7 +179,7 @@ describe("envpkt CLI e2e", () => {
     it("exits non-zero with --strict on critical audit", () => {
       writeFileSync(
         join(tmpDir, "envpkt.toml"),
-        `version = 1\n[meta.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
+        `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
       )
       const { status } = run(["exec", "-c", join(tmpDir, "envpkt.toml"), "--strict", "echo", "nope"])
       expect(status).toBeGreaterThan(0)
@@ -188,7 +188,7 @@ describe("envpkt CLI e2e", () => {
     it("runs with --warn-only on critical audit", () => {
       writeFileSync(
         join(tmpDir, "envpkt.toml"),
-        `version = 1\n[meta.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
+        `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
       )
       const { stdout, status } = run(["exec", "-c", join(tmpDir, "envpkt.toml"), "--warn-only", "echo", "warn-passed"])
       expect(status).toBe(0)

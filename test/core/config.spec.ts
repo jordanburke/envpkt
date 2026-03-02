@@ -63,7 +63,7 @@ describe("expandPath", () => {
 
 describe("findConfigPath", () => {
   it("returns Some when envpkt.toml exists", () => {
-    writeFileSync(join(tmpDir, "envpkt.toml"), "version = 1\n[meta]\n")
+    writeFileSync(join(tmpDir, "envpkt.toml"), "version = 1\n[secret]\n")
     const result = findConfigPath(tmpDir)
     expect(result.isSome()).toBe(true)
     result.fold(
@@ -80,7 +80,7 @@ describe("findConfigPath", () => {
 
 describe("readConfigFile", () => {
   it("returns Right with file contents", () => {
-    const content = 'version = 1\n[meta.KEY]\nservice = "test"\n'
+    const content = 'version = 1\n[secret.KEY]\nservice = "test"\n'
     writeFileSync(join(tmpDir, "test.toml"), content)
     const result = readConfigFile(join(tmpDir, "test.toml"))
     result.fold(
@@ -100,7 +100,7 @@ describe("readConfigFile", () => {
 
 describe("parseToml", () => {
   it("parses valid TOML", () => {
-    const result = parseToml('version = 1\n[meta.KEY]\nservice = "test"\n')
+    const result = parseToml('version = 1\n[secret.KEY]\nservice = "test"\n')
     result.fold(
       () => expect.unreachable("Expected Right"),
       (data) => {
@@ -119,12 +119,12 @@ describe("parseToml", () => {
   })
 
   it("converts TOML dates to ISO strings", () => {
-    const result = parseToml('version = 1\n[meta.KEY]\nservice = "test"\ncreated = 2025-01-15\n')
+    const result = parseToml('version = 1\n[secret.KEY]\nservice = "test"\ncreated = 2025-01-15\n')
     result.fold(
       () => expect.unreachable("Expected Right"),
       (data) => {
-        const obj = data as { meta: { KEY: { created: string } } }
-        expect(obj.meta.KEY.created).toBe("2025-01-15")
+        const obj = data as { secret: { KEY: { created: string } } }
+        expect(obj.secret.KEY.created).toBe("2025-01-15")
       },
     )
   })
@@ -132,31 +132,31 @@ describe("parseToml", () => {
 
 describe("validateConfig", () => {
   it("returns Right for valid config", () => {
-    const data = { version: 1, meta: { API_KEY: { service: "test" } } }
+    const data = { version: 1, secret: { API_KEY: { service: "test" } } }
     const result = validateConfig(data)
     result.fold(
       () => expect.unreachable("Expected Right"),
       (config) => {
         expect(config.version).toBe(1)
-        expect(config.meta["API_KEY"]?.service).toBe("test")
+        expect(config.secret["API_KEY"]?.service).toBe("test")
       },
     )
   })
 
-  it("returns Right for config with empty meta entry (service optional)", () => {
-    const data = { version: 1, meta: { API_KEY: {} } }
+  it("returns Right for config with empty secret entry (service optional)", () => {
+    const data = { version: 1, secret: { API_KEY: {} } }
     const result = validateConfig(data)
     result.fold(
       () => expect.unreachable("Expected Right"),
       (config) => {
         expect(config.version).toBe(1)
-        expect(config.meta["API_KEY"]).toBeDefined()
+        expect(config.secret["API_KEY"]).toBeDefined()
       },
     )
   })
 
   it("returns Left ValidationError for missing required fields", () => {
-    const data = { version: 1 }
+    const data = {}
     const result = validateConfig(data)
     result.fold(
       (err) => {
@@ -172,7 +172,7 @@ describe("validateConfig", () => {
 
 describe("loadConfig", () => {
   it("loads and validates a valid envpkt.toml", () => {
-    const toml = `version = 1\n\n[meta.DB_PASS]\nservice = "postgres"\ncreated = 2025-01-01\n`
+    const toml = `version = 1\n\n[secret.DB_PASS]\nservice = "postgres"\ncreated = 2025-01-01\n`
     const path = join(tmpDir, "envpkt.toml")
     writeFileSync(path, toml)
 
@@ -181,14 +181,14 @@ describe("loadConfig", () => {
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
       (config) => {
         expect(config.version).toBe(1)
-        expect(config.meta["DB_PASS"]?.service).toBe("postgres")
-        expect(config.meta["DB_PASS"]?.created).toBe("2025-01-01")
+        expect(config.secret["DB_PASS"]?.service).toBe("postgres")
+        expect(config.secret["DB_PASS"]?.created).toBe("2025-01-01")
       },
     )
   })
 
   it("loads config with optional service", () => {
-    const toml = `version = 1\n\n[meta.KEY]\npurpose = "testing"\n`
+    const toml = `version = 1\n\n[secret.KEY]\npurpose = "testing"\n`
     const path = join(tmpDir, "envpkt.toml")
     writeFileSync(path, toml)
 
@@ -196,8 +196,8 @@ describe("loadConfig", () => {
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
       (config) => {
-        expect(config.meta["KEY"]?.purpose).toBe("testing")
-        expect(config.meta["KEY"]?.service).toBeUndefined()
+        expect(config.secret["KEY"]?.purpose).toBe("testing")
+        expect(config.secret["KEY"]?.service).toBeUndefined()
       },
     )
   })

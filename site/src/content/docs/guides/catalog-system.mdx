@@ -33,7 +33,7 @@ agents/
 
 ## Catalog File
 
-The catalog is a standard `envpkt.toml` with lifecycle policies and `[meta.*]` sections:
+The catalog is a standard `envpkt.toml` with lifecycle policies and `[secret.*]` sections:
 
 ```toml
 version = 1
@@ -43,7 +43,7 @@ stale_warning_days = 90
 require_expiration = true
 require_service = true
 
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 service = "postgres"
 purpose = "Primary application database"
 capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
@@ -52,13 +52,13 @@ source = "vault"
 created = "2026-01-15"
 expires = "2027-01-15"
 
-[meta.REDIS_URL]
+[secret.REDIS_URL]
 service = "redis"
 purpose = "Caching and session storage"
 created = "2026-01-15"
 expires = "2027-01-15"
 
-[meta.STRIPE_SECRET_KEY]
+[secret.STRIPE_SECRET_KEY]
 service = "stripe"
 purpose = "Payment processing"
 capabilities = ["charges:write", "subscriptions:read"]
@@ -68,7 +68,7 @@ expires = "2027-02-01"
 rate_limit = "100/sec"
 source = "vault"
 
-[meta.SLACK_WEBHOOK_URL]
+[secret.SLACK_WEBHOOK_URL]
 service = "slack"
 purpose = "Alert notifications"
 capabilities = ["post:messages"]
@@ -109,7 +109,7 @@ consumer = "agent"
 secrets = ["DATABASE_URL", "REDIS_URL"]
 
 # Override: narrow DB to read-only for this agent
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 capabilities = ["SELECT"]
 ```
 
@@ -119,7 +119,7 @@ The catalog defines full CRUD capabilities, but this agent only needs `SELECT`.
 
 When resolving a catalog:
 
-- Each field in the agent's `[meta.KEY]` override **replaces** the catalog field (shallow merge)
+- Each field in the agent's `[secret.KEY]` override **replaces** the catalog field (shallow merge)
 - Omitted fields keep the catalog value
 - `agent.secrets` is the source of truth for which keys the agent needs
 

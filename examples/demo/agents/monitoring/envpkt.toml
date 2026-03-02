@@ -9,7 +9,7 @@ capabilities = ["monitor", "alert"]
 [lifecycle]
 stale_warning_days = 60
 
-[meta.DATADOG_API_KEY]
+[secret.DATADOG_API_KEY]
 service = "datadog"
 purpose = "Infrastructure monitoring metrics"
 capabilities = ["metrics:write", "events:write"]
@@ -18,7 +18,7 @@ expires = "2026-01-01"
 rotation_url = "https://app.datadoghq.com/organization-settings/api-keys"
 source = "ci"
 
-[meta.SLACK_WEBHOOK_URL]
+[secret.SLACK_WEBHOOK_URL]
 service = "slack"
 purpose = "Alert notifications to #ops-alerts channel"
 capabilities = ["post:messages"]

@@ -10,7 +10,7 @@ stale_warning_days = 90
 require_expiration = true
 require_service = true
 
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 service = "postgres"
 purpose = "Primary application database"
 capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
@@ -19,13 +19,13 @@ source = "vault"
 created = "2026-06-01"
 expires = "2027-06-01"
 
-[meta.REDIS_URL]
+[secret.REDIS_URL]
 service = "redis"
 purpose = "Caching and session storage"
 created = "2026-06-01"
 expires = "2027-06-01"
 
-[meta.AWS_ACCESS_KEY_ID]
+[secret.AWS_ACCESS_KEY_ID]
 service = "aws"
 purpose = "S3 bucket access for data storage"
 capabilities = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]
@@ -34,7 +34,7 @@ source = "vault"
 created = "2026-06-01"
 expires = "2027-06-01"
 
-[meta.AWS_SECRET_ACCESS_KEY]
+[secret.AWS_SECRET_ACCESS_KEY]
 service = "aws"
 purpose = "S3 bucket access (secret counterpart)"
 capabilities = ["s3:GetObject", "s3:PutObject", "s3:ListBucket"]

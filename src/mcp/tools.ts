@@ -1,6 +1,6 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
 
-import { computeAudit } from "../core/audit.js"
+import { computeAudit, computeEnvAudit } from "../core/audit.js"
 import { loadConfig, resolveConfigPath } from "../core/config.js"
 import type { EnvpktConfig } from "../core/types.js"
 
@@ -95,6 +95,17 @@ export const toolDefinitions: readonly ToolDef[] = [
       required: ["key"],
     },
   },
+  {
+    name: "getEnvMeta",
+    description:
+      "Get metadata for environment defaults — returns configured default values, purposes, and current drift status",
+    inputSchema: {
+      type: "object",
+      properties: {
+        configPath: { type: "string", description: "Optional path to envpkt.toml" },
+      },
+    },
+  },
 ] as const
 
 // --- Tool handlers ---
@@ -152,7 +163,8 @@ const handleListCapabilities = (args: Record<string, unknown>): CallToolResult =
   const agentCapabilities = config.agent?.capabilities ?? []
   const secretCapabilities: Record<string, readonly string[]> = {}
 
-  for (const [key, meta] of Object.entries(config.meta)) {
+  const secretEntries = config.secret ?? {}
+  for (const [key, meta] of Object.entries(secretEntries)) {
     if (meta.capabilities && meta.capabilities.length > 0) {
       secretCapabilities[key] = meta.capabilities
     }
@@ -170,6 +182,7 @@ const handleListCapabilities = (args: Record<string, unknown>): CallToolResult =
             }
           : null,
         secrets: secretCapabilities,
+        env_defaults: Object.keys(config.env ?? {}).length,
       },
       null,
       2,
@@ -185,7 +198,8 @@ const handleGetSecretMeta = (args: Record<string, unknown>): CallToolResult => {
   if (!loaded.ok) return loaded.result
 
   const { config } = loaded
-  const meta = config.meta[key]
+  const secretEntries = config.secret ?? {}
+  const meta = secretEntries[key]
   if (!meta) return errorResult(`Secret not found: ${key}`)
 
   return textResult(JSON.stringify({ key, ...meta }, null, 2))
@@ -232,11 +246,22 @@ const handleCheckExpiration = (args: Record<string, unknown>): CallToolResult =>
   )
 }
 
+const handleGetEnvMeta = (args: Record<string, unknown>): CallToolResult => {
+  const loaded = loadConfigForTool(args.configPath as string | undefined)
+  if (!loaded.ok) return loaded.result
+
+  const { config } = loaded
+  const envAudit = computeEnvAudit(config)
+
+  return textResult(JSON.stringify(envAudit, null, 2))
+}
+
 const handlers: Record<string, (args: Record<string, unknown>) => CallToolResult> = {
   getPacketHealth: handleGetPacketHealth,
   listCapabilities: handleListCapabilities,
   getSecretMeta: handleGetSecretMeta,
   checkExpiration: handleCheckExpiration,
+  getEnvMeta: handleGetEnvMeta,
 }
 
 export const callTool = (name: string, args: Record<string, unknown>): CallToolResult => {

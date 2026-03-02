@@ -10,17 +10,17 @@ describe("EnvpktConfigSchema", () => {
   it("validates a minimal config", () => {
     const config = {
       version: 1,
-      meta: {
+      secret: {
         API_KEY: { service: "example" },
       },
     }
     expect(configChecker.Check(config)).toBe(true)
   })
 
-  it("validates a config with empty meta entry (service is now optional)", () => {
+  it("validates a config with empty secret entry (service is now optional)", () => {
     const config = {
       version: 1,
-      meta: { API_KEY: {} },
+      secret: { API_KEY: {} },
     }
     expect(configChecker.Check(config)).toBe(true)
   })
@@ -38,7 +38,7 @@ describe("EnvpktConfigSchema", () => {
         identity: "keys/agent.age",
         recipient: "age1abc123",
       },
-      meta: {
+      secret: {
         DB_PASSWORD: {
           service: "postgres",
           purpose: "Database authentication",
@@ -74,13 +74,13 @@ describe("EnvpktConfigSchema", () => {
   })
 
   it("rejects config without version", () => {
-    const config = { meta: { API_KEY: { service: "example" } } }
+    const config = { secret: { API_KEY: { service: "example" } } }
     expect(configChecker.Check(config)).toBe(false)
   })
 
-  it("rejects config without meta", () => {
+  it("accepts config without secret (optional)", () => {
     const config = { version: 1 }
-    expect(configChecker.Check(config)).toBe(false)
+    expect(configChecker.Check(config)).toBe(true)
   })
 })
 

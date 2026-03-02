@@ -37,6 +37,10 @@ program
   .option("--expiring <days>", "Show secrets expiring within N days", parseInt)
   .option("--status <status>", "Filter by status: healthy | expiring_soon | expired | stale | missing")
   .option("--strict", "Exit non-zero on any non-healthy secret")
+  .option("--all", "Show both secrets and env defaults")
+  .option("--env-only", "Show only env defaults (drift detection)")
+  .option("--sealed", "Show only secrets with encrypted_value")
+  .option("--external", "Show only secrets without encrypted_value")
   .action((options) => {
     runAudit(options)
   })

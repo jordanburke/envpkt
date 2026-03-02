@@ -5,8 +5,7 @@
   "description": "Credential lifecycle and fleet management configuration for AI agents",
   "type": "object",
   "required": [
-    "version",
-    "meta"
+    "version"
   ],
   "properties": {
     "version": {
@@ -90,7 +89,7 @@
         }
       }
     },
-    "meta": {
+    "secret": {
       "description": "Per-secret metadata keyed by secret name",
       "type": "object",
       "patternProperties": {
@@ -151,6 +150,38 @@
             "required": {
               "description": "Whether this secret is required for operation",
               "type": "boolean"
+            },
+            "tags": {
+              "description": "Key-value tags for grouping and filtering",
+              "type": "object",
+              "patternProperties": {
+                "^(.*)$": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "env": {
+      "description": "Plaintext environment defaults keyed by variable name",
+      "type": "object",
+      "patternProperties": {
+        "^(.*)$": {
+          "description": "Metadata for a plaintext environment default (non-secret)",
+          "type": "object",
+          "required": [
+            "value"
+          ],
+          "properties": {
+            "value": {
+              "description": "Default value for this environment variable",
+              "type": "string"
+            },
+            "purpose": {
+              "description": "Why this env var exists",
+              "type": "string"
             },
             "tags": {
               "description": "Key-value tags for grouping and filtering",

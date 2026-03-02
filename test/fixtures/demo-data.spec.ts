@@ -24,11 +24,11 @@ describe("demo fixture cross-check", () => {
         (resolved) => {
           expect(resolved.config.agent?.name).toBe(apiGatewayResult.config.agent?.name)
           expect(resolved.config.agent?.consumer).toBe(apiGatewayResult.config.agent?.consumer)
-          expect(Object.keys(resolved.config.meta).sort()).toEqual(Object.keys(apiGatewayResult.config.meta).sort())
+          expect(Object.keys(resolved.config.secret).sort()).toEqual(Object.keys(apiGatewayResult.config.secret).sort())
           expect(resolved.overridden).toEqual([...apiGatewayResult.overridden])
           expect(resolved.merged.sort()).toEqual([...apiGatewayResult.merged].sort())
-          expect(resolved.config.meta.DATABASE_URL.capabilities).toEqual(
-            apiGatewayResult.config.meta.DATABASE_URL.capabilities,
+          expect(resolved.config.secret.DATABASE_URL.capabilities).toEqual(
+            apiGatewayResult.config.secret.DATABASE_URL.capabilities,
           )
         },
       )
@@ -44,11 +44,13 @@ describe("demo fixture cross-check", () => {
         (resolved) => {
           expect(resolved.config.agent?.name).toBe(dataPipelineResult.config.agent?.name)
           expect(resolved.config.agent?.consumer).toBe(dataPipelineResult.config.agent?.consumer)
-          expect(Object.keys(resolved.config.meta).sort()).toEqual(Object.keys(dataPipelineResult.config.meta).sort())
+          expect(Object.keys(resolved.config.secret).sort()).toEqual(
+            Object.keys(dataPipelineResult.config.secret).sort(),
+          )
           expect(resolved.overridden).toEqual([...dataPipelineResult.overridden])
           expect(resolved.merged.sort()).toEqual([...dataPipelineResult.merged].sort())
           // Verify capability narrowing: data-pipeline gets SELECT only
-          expect(resolved.config.meta.DATABASE_URL.capabilities).toEqual(["SELECT"])
+          expect(resolved.config.secret.DATABASE_URL.capabilities).toEqual(["SELECT"])
         },
       )
     })
@@ -63,7 +65,7 @@ describe("demo fixture cross-check", () => {
         (resolved) => {
           expect(resolved.config.agent?.name).toBe(monitoringResult.config.agent?.name)
           expect(resolved.config.agent?.consumer).toBe(monitoringResult.config.agent?.consumer)
-          expect(Object.keys(resolved.config.meta).sort()).toEqual(Object.keys(monitoringResult.config.meta).sort())
+          expect(Object.keys(resolved.config.secret).sort()).toEqual(Object.keys(monitoringResult.config.secret).sort())
           // Standalone — no catalog
           expect(resolved.catalogPath).toBeUndefined()
           expect(resolved.merged).toEqual([])

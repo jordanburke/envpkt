@@ -5,7 +5,7 @@ import type { EnvpktConfig } from "../../src/core/types.js"
 
 const makeConfig = (metaKeys: Record<string, { service?: string }>): EnvpktConfig => ({
   version: 1,
-  meta: Object.fromEntries(Object.entries(metaKeys).map(([k, v]) => [k, { service: v.service }])),
+  secret: Object.fromEntries(Object.entries(metaKeys).map(([k, v]) => [k, { service: v.service }])),
 })
 
 describe("env core", () => {
@@ -151,9 +151,9 @@ describe("env core", () => {
       const scan = envScan(env)
       const toml = generateTomlFromScan(scan.discovered.toArray())
 
-      expect(toml).toContain("[meta.OPENAI_API_KEY]")
+      expect(toml).toContain("[secret.OPENAI_API_KEY]")
       expect(toml).toContain('service = "openai"')
-      expect(toml).toContain("[meta.STRIPE_SECRET_KEY]")
+      expect(toml).toContain("[secret.STRIPE_SECRET_KEY]")
       expect(toml).toContain('service = "stripe"')
       expect(toml).toContain("created = ")
     })

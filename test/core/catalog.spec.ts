@@ -33,14 +33,14 @@ const writeAgent = (content: string, subdir?: string): string => {
 
 describe("loadCatalog", () => {
   it("loads a valid catalog", () => {
-    const path = writeCatalog(`version = 1\n[meta.KEY]\nservice = "svc"\n`)
+    const path = writeCatalog(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
     const result = loadCatalog(path)
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
       (config) => {
         expect(config.version).toBe(1)
-        expect(config.meta.KEY?.service).toBe("svc")
+        expect(config.secret.KEY?.service).toBe("svc")
       },
     )
   })
@@ -124,7 +124,7 @@ describe("resolveConfig", () => {
   it("passes through config with no catalog field (backward compatible)", () => {
     const config: EnvpktConfig = {
       version: 1,
-      meta: { KEY: { service: "svc" } },
+      secret: { KEY: { service: "svc" } },
     }
     const result = resolveConfig(config, tmpDir)
 
@@ -141,22 +141,22 @@ describe("resolveConfig", () => {
 
   it("resolves catalog + secrets into flat config", () => {
     writeCatalog(
-      `version = 1\n[meta.DB_URL]\nservice = "postgres"\npurpose = "Database"\n[meta.REDIS]\nservice = "redis"\n`,
+      `version = 1\n[secret.DB_URL]\nservice = "postgres"\npurpose = "Database"\n[secret.REDIS]\nservice = "redis"\n`,
     )
 
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
       agent: { name: "test-agent", consumer: "agent", secrets: ["DB_URL", "REDIS"] },
-      meta: {},
+      secret: {},
     }
     const result = resolveConfig(config, tmpDir)
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
       (r) => {
-        expect(r.config.meta.DB_URL?.service).toBe("postgres")
-        expect(r.config.meta.REDIS?.service).toBe("redis")
+        expect(r.config.secret.DB_URL?.service).toBe("postgres")
+        expect(r.config.secret.REDIS?.service).toBe("redis")
         expect(r.merged).toEqual(["DB_URL", "REDIS"])
         expect(r.overridden).toEqual([])
         expect(r.catalogPath).toContain("catalog.toml")
@@ -168,13 +168,13 @@ describe("resolveConfig", () => {
   })
 
   it("returns MissingSecretsList when catalog set but no agent.secrets", () => {
-    writeCatalog(`version = 1\n[meta.KEY]\nservice = "svc"\n`)
+    writeCatalog(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
 
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
       agent: { name: "test-agent" },
-      meta: {},
+      secret: {},
     }
     const result = resolveConfig(config, tmpDir)
 
@@ -185,13 +185,13 @@ describe("resolveConfig", () => {
   })
 
   it("returns SecretNotInCatalog for unknown secret key", () => {
-    writeCatalog(`version = 1\n[meta.KEY]\nservice = "svc"\n`)
+    writeCatalog(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
 
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
       agent: { name: "test-agent", secrets: ["NONEXISTENT"] },
-      meta: {},
+      secret: {},
     }
     const result = resolveConfig(config, tmpDir)
 
@@ -208,36 +208,36 @@ describe("resolveConfig", () => {
 
   it("applies agent override with shallow merge", () => {
     writeCatalog(
-      `version = 1\n[meta.DB]\nservice = "postgres"\npurpose = "Database"\ncapabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]\n`,
+      `version = 1\n[secret.DB]\nservice = "postgres"\npurpose = "Database"\ncapabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]\n`,
     )
 
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
       agent: { name: "read-only-agent", secrets: ["DB"] },
-      meta: { DB: { capabilities: ["SELECT"] } },
+      secret: { DB: { capabilities: ["SELECT"] } },
     }
     const result = resolveConfig(config, tmpDir)
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
       (r) => {
-        expect(r.config.meta.DB?.capabilities).toEqual(["SELECT"])
-        expect(r.config.meta.DB?.service).toBe("postgres")
-        expect(r.config.meta.DB?.purpose).toBe("Database")
+        expect(r.config.secret.DB?.capabilities).toEqual(["SELECT"])
+        expect(r.config.secret.DB?.service).toBe("postgres")
+        expect(r.config.secret.DB?.purpose).toBe("Database")
         expect(r.overridden).toEqual(["DB"])
       },
     )
   })
 
   it("preserves lifecycle/callbacks/tools from agent config", () => {
-    writeCatalog(`version = 1\n[meta.KEY]\nservice = "svc"\n`)
+    writeCatalog(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
 
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
       agent: { name: "agent", secrets: ["KEY"] },
-      meta: {},
+      secret: {},
       lifecycle: { stale_warning_days: 30 },
       callbacks: { on_expired: "https://hooks.example.com/expired" },
       tools: { fnox: true },
@@ -259,7 +259,7 @@ describe("resolveConfig", () => {
       version: 1,
       catalog: "nonexistent.toml",
       agent: { name: "agent", secrets: ["KEY"] },
-      meta: {},
+      secret: {},
     }
     const result = resolveConfig(config, tmpDir)
 

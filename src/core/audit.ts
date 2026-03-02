@@ -1,7 +1,15 @@
 import { Cond, List, Option } from "functype"
 
 import type { EnvpktConfig } from "./schema.js"
-import type { AuditResult, HealthStatus, SecretHealth, SecretStatus } from "./types.js"
+import type {
+  AuditResult,
+  EnvAuditResult,
+  EnvDriftEntry,
+  EnvDriftStatus,
+  HealthStatus,
+  SecretHealth,
+  SecretStatus,
+} from "./types.js"
 
 const MS_PER_DAY = 86_400_000
 const WARN_BEFORE_DAYS = 30
@@ -15,7 +23,7 @@ const parseDate = (dateStr: string): Option<Date> => {
 
 const classifySecret = (
   key: string,
-  meta: EnvpktConfig["meta"][string],
+  meta: NonNullable<EnvpktConfig["secret"]>[string],
   fnoxKeys: ReadonlySet<string>,
   staleWarningDays: number,
   requireExpiration: boolean,
@@ -96,15 +104,16 @@ export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string
   const requireService = lifecycle.require_service ?? false
 
   const keys = fnoxKeys ?? new Set<string>()
-  const metaKeys = new Set(Object.keys(config.meta))
+  const secretEntries = config.secret ?? {}
+  const metaKeys = new Set(Object.keys(secretEntries))
 
   const secrets = List(
-    Object.entries(config.meta).map(([key, meta]) =>
+    Object.entries(secretEntries).map(([key, meta]) =>
       classifySecret(key, meta, keys, staleWarningDays, requireExpiration, requireService, now),
     ),
   )
 
-  // Count orphaned: meta entries that don't have a corresponding fnox key
+  // Count orphaned: secret entries that don't have a corresponding fnox key
   // Only count when fnox keys are available
   const orphaned = keys.size > 0 ? [...metaKeys].filter((k) => !keys.has(k)).length : 0
 
@@ -133,5 +142,37 @@ export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string
     missing_metadata,
     orphaned,
     agent: config.agent,
+  }
+}
+
+export const computeEnvAudit = (
+  config: EnvpktConfig,
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): EnvAuditResult => {
+  const envEntries = config.env ?? {}
+  const entries: EnvDriftEntry[] = []
+
+  for (const [key, entry] of Object.entries(envEntries)) {
+    const currentValue = env[key]
+    const status: EnvDriftStatus = Cond.of<EnvDriftStatus>()
+      .when(currentValue === undefined, "missing")
+      .elseWhen(currentValue !== entry.value, "overridden")
+      .else("default")
+
+    entries.push({
+      key,
+      defaultValue: entry.value,
+      currentValue,
+      status,
+      purpose: entry.purpose,
+    })
+  }
+
+  return {
+    entries,
+    total: entries.length,
+    defaults_applied: entries.filter((e) => e.status === "default").length,
+    overridden: entries.filter((e) => e.status === "overridden").length,
+    missing: entries.filter((e) => e.status === "missing").length,
   }
 }

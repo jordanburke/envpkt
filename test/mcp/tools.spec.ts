@@ -32,7 +32,7 @@ consumer = "agent"
 description = "Test processor agent"
 capabilities = ["read", "write"]
 
-[meta.API_KEY]
+[secret.API_KEY]
 service = "stripe"
 purpose = "Payment processing"
 created = "2026-01-01"
@@ -41,7 +41,7 @@ capabilities = ["charge", "refund"]
 source = "vault"
 rotation_url = "https://dashboard.stripe.com/apikeys"
 
-[meta.DB_PASS]
+[secret.DB_PASS]
 service = "postgres"
 purpose = "Main database access"
 created = "2026-01-01"
@@ -52,20 +52,21 @@ source = "manual"
 const expiredConfig = `
 version = 1
 
-[meta.OLD_KEY]
+[secret.OLD_KEY]
 service = "legacy"
 created = "2020-01-01"
 expires = "2022-01-01"
 `
 
 describe("toolDefinitions", () => {
-  it("exposes four tools", () => {
-    expect(toolDefinitions).toHaveLength(4)
+  it("exposes five tools", () => {
+    expect(toolDefinitions).toHaveLength(5)
     const names = toolDefinitions.map((t) => t.name)
     expect(names).toContain("getPacketHealth")
     expect(names).toContain("listCapabilities")
     expect(names).toContain("getSecretMeta")
     expect(names).toContain("checkExpiration")
+    expect(names).toContain("getEnvMeta")
   })
 
   it("all tools have valid inputSchema with type object", () => {
@@ -123,7 +124,7 @@ describe("callTool", () => {
     })
 
     it("returns null agent when no agent section", () => {
-      const configPath = writeConfig(tmpDir, `version = 1\n[meta.X]\nservice = "x"\n`)
+      const configPath = writeConfig(tmpDir, `version = 1\n[secret.X]\nservice = "x"\n`)
       const result = callTool("listCapabilities", { configPath })
       const data = JSON.parse((result.content[0] as { text: string }).text)
       expect(data.agent).toBeNull()
@@ -180,7 +181,7 @@ describe("callTool", () => {
     })
 
     it("returns null days_remaining when no expiration set", () => {
-      const configPath = writeConfig(tmpDir, `version = 1\n[meta.NO_EXP]\nservice = "x"\n`)
+      const configPath = writeConfig(tmpDir, `version = 1\n[secret.NO_EXP]\nservice = "x"\n`)
       const result = callTool("checkExpiration", { key: "NO_EXP", configPath })
       const data = JSON.parse((result.content[0] as { text: string }).text)
 

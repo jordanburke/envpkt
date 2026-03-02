@@ -46,14 +46,14 @@ const writeCatalog = (): void => {
     join(tmpDir, "catalog.toml"),
     `version = 1
 
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 service = "postgres"
 purpose = "Primary database"
 capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
 created = "2025-11-01"
 expires = "2026-11-01"
 
-[meta.REDIS_URL]
+[secret.REDIS_URL]
 service = "redis"
 purpose = "Cache"
 created = "2025-11-01"
@@ -102,7 +102,7 @@ secrets = ["DATABASE_URL"]
     const { stdout, status } = run(["resolve", "-c", agentPath, "--format", "json"])
     expect(status).toBe(0)
     const data = JSON.parse(stdout)
-    expect(data.meta.DATABASE_URL.service).toBe("postgres")
+    expect(data.secret.DATABASE_URL.service).toBe("postgres")
     expect(data.catalog).toBeUndefined()
   })
 
@@ -168,23 +168,23 @@ catalog = "catalog.toml"
 name = "readonly-agent"
 secrets = ["DATABASE_URL"]
 
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 capabilities = ["SELECT"]
 `)
 
     const { stdout, status } = run(["resolve", "-c", agentPath, "--format", "json"])
     expect(status).toBe(0)
     const data = JSON.parse(stdout)
-    expect(data.meta.DATABASE_URL.capabilities).toEqual(["SELECT"])
-    expect(data.meta.DATABASE_URL.service).toBe("postgres")
+    expect(data.secret.DATABASE_URL.capabilities).toEqual(["SELECT"])
+    expect(data.secret.DATABASE_URL.service).toBe("postgres")
   })
 
   it("works for config without catalog (passthrough)", () => {
-    writeFileSync(join(tmpDir, "simple.toml"), `version = 1\n[meta.KEY]\nservice = "svc"\n`)
+    writeFileSync(join(tmpDir, "simple.toml"), `version = 1\n[secret.KEY]\nservice = "svc"\n`)
 
     const { stdout, status } = run(["resolve", "-c", join(tmpDir, "simple.toml"), "--format", "json"])
     expect(status).toBe(0)
     const data = JSON.parse(stdout)
-    expect(data.meta.KEY.service).toBe("svc")
+    expect(data.secret.KEY.service).toBe("svc")
   })
 })

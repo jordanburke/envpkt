@@ -96,7 +96,7 @@
 | `recipient`    | `string`                                      | Age public key                |
 | `secrets`      | `string[]`                                    | Keys to pull from catalog     |
 
-### `[meta.*]`
+### `[secret.*]`
 
 | Field             | Tier   | Type                     | Description                          |
 | ----------------- | ------ | ------------------------ | ------------------------------------ |

@@ -5,6 +5,7 @@ export type {
   AgentIdentity,
   CallbackConfig,
   ConsumerType,
+  EnvMeta,
   EnvpktConfig,
   LifecycleConfig,
   SecretMeta,
@@ -43,6 +44,26 @@ export type AuditResult = {
   readonly missing_metadata: number
   readonly orphaned: number
   readonly agent?: import("./schema.js").AgentIdentity
+}
+
+// --- Env drift types ---
+
+export type EnvDriftStatus = "default" | "overridden" | "missing"
+
+export type EnvDriftEntry = {
+  readonly key: string
+  readonly defaultValue: string
+  readonly currentValue: string | undefined
+  readonly status: EnvDriftStatus
+  readonly purpose: string | undefined
+}
+
+export type EnvAuditResult = {
+  readonly entries: ReadonlyArray<EnvDriftEntry>
+  readonly total: number
+  readonly defaults_applied: number
+  readonly overridden: number
+  readonly missing: number
 }
 
 // --- Fleet types ---
@@ -125,6 +146,8 @@ export type BootResult = {
   readonly skipped: ReadonlyArray<string>
   readonly secrets: Readonly<Record<string, string>>
   readonly warnings: ReadonlyArray<string>
+  readonly envDefaults: Readonly<Record<string, string>>
+  readonly overridden: ReadonlyArray<string>
 }
 
 export type BootError =

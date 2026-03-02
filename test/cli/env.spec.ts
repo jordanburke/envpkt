@@ -67,7 +67,7 @@ describe("envpkt env scan", () => {
       env: { OPENAI_API_KEY: "sk-test123" },
     })
 
-    expect(result.stdout).toContain("[meta.OPENAI_API_KEY]")
+    expect(result.stdout).toContain("[secret.OPENAI_API_KEY]")
     expect(result.stdout).toContain('service = "openai"')
     expect(result.stdout).toContain("Preview")
   })
@@ -80,12 +80,12 @@ describe("envpkt env scan", () => {
 
     const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
     expect(content).toContain("version = 1")
-    expect(content).toContain("[meta.OPENAI_API_KEY]")
+    expect(content).toContain("[secret.OPENAI_API_KEY]")
     expect(content).toContain('service = "openai"')
   })
 
   it("appends to existing envpkt.toml with --write", () => {
-    const existingToml = `version = 1\n\n[meta.EXISTING_KEY]\nservice = "existing"\n`
+    const existingToml = `version = 1\n\n[secret.EXISTING_KEY]\nservice = "existing"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), existingToml)
 
     run(["env", "scan", "--write"], {
@@ -94,12 +94,12 @@ describe("envpkt env scan", () => {
     })
 
     const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
-    expect(content).toContain("[meta.EXISTING_KEY]")
-    expect(content).toContain("[meta.OPENAI_API_KEY]")
+    expect(content).toContain("[secret.EXISTING_KEY]")
+    expect(content).toContain("[secret.OPENAI_API_KEY]")
   })
 
   it("does not duplicate already-tracked entries on --write", () => {
-    const existingToml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\n`
+    const existingToml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), existingToml)
 
     run(["env", "scan", "--write"], {
@@ -108,15 +108,15 @@ describe("envpkt env scan", () => {
     })
 
     const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
-    // Count occurrences of [meta.OPENAI_API_KEY] — should be exactly 1 (not duplicated)
-    const matches = content.match(/\[meta\.OPENAI_API_KEY\]/g)
+    // Count occurrences of [secret.OPENAI_API_KEY] — should be exactly 1 (not duplicated)
+    const matches = content.match(/\[secret\.OPENAI_API_KEY\]/g)
     expect(matches).toHaveLength(1)
   })
 })
 
 describe("envpkt env check", () => {
   it("reports tracked keys present in env", () => {
-    const toml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\n`
+    const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["env", "check"], {
@@ -130,7 +130,7 @@ describe("envpkt env check", () => {
   })
 
   it("detects missing_from_env", () => {
-    const toml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\n[meta.STRIPE_SECRET_KEY]\nservice = "stripe"\n`
+    const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\n[secret.STRIPE_SECRET_KEY]\nservice = "stripe"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["env", "check"], {
@@ -143,7 +143,7 @@ describe("envpkt env check", () => {
   })
 
   it("outputs JSON with --format json", () => {
-    const toml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\n`
+    const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["env", "check", "--format", "json"], {
@@ -157,7 +157,7 @@ describe("envpkt env check", () => {
   })
 
   it("exits non-zero with --strict on drift", () => {
-    const toml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\n[meta.MISSING_KEY]\nservice = "x"\n`
+    const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\n[secret.MISSING_KEY]\nservice = "x"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["env", "check", "--strict"], {
@@ -201,7 +201,7 @@ const ageInstalled = (() => {
 
 describe("envpkt env export", () => {
   it("exits 0 with a valid config (no secrets source)", () => {
-    const toml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\n`
+    const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["env", "export"], { cwd: tmpDir })
@@ -235,7 +235,7 @@ describe("envpkt env export", () => {
       stdio: ["pipe", "pipe", "pipe"],
     })
 
-    const toml = `version = 1\n\n[agent]\nname = "test"\nrecipient = "${recipient}"\nidentity = "identity.txt"\n\n[meta.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
+    const toml = `version = 1\n\n[agent]\nname = "test"\nrecipient = "${recipient}"\nidentity = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["env", "export"], { cwd: tmpDir })
@@ -247,7 +247,7 @@ describe("envpkt env export", () => {
 
 describe("envpkt audit --format minimal", () => {
   it("outputs single-line status for healthy audit", () => {
-    const toml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\ncreated = "2026-01-01"\nexpires = "2027-01-01"\n`
+    const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\ncreated = "2026-01-01"\nexpires = "2027-01-01"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["audit", "--format", "minimal"], { cwd: tmpDir })
@@ -255,7 +255,7 @@ describe("envpkt audit --format minimal", () => {
   })
 
   it("outputs warnings for degraded audit", () => {
-    const toml = `version = 1\n\n[meta.OPENAI_API_KEY]\nservice = "openai"\ncreated = "2024-01-01"\n`
+    const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\ncreated = "2024-01-01"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["audit", "--format", "minimal"], { cwd: tmpDir })

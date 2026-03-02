@@ -16,7 +16,7 @@ services = ["github", "ghcr.io", "kubernetes"]
 stale_warning_days = 45
 require_expiration = true
 
-[meta.GITHUB_TOKEN]
+[secret.GITHUB_TOKEN]
 service = "github"
 purpose = "Clone repositories and create deployment status checks"
 capabilities = ["repo:read", "deployments:write", "statuses:write"]
@@ -25,7 +25,7 @@ expires = "2026-08-01"
 rotation_url = "https://github.com/settings/tokens"
 source = "ci"
 
-[meta.DOCKER_REGISTRY_TOKEN]
+[secret.DOCKER_REGISTRY_TOKEN]
 service = "ghcr.io"
 purpose = "Push built container images to GitHub Container Registry"
 capabilities = ["packages:write"]
@@ -34,7 +34,7 @@ expires = "2026-08-01"
 rotation_url = "https://github.com/settings/tokens"
 source = "ci"
 
-[meta.KUBE_CONFIG]
+[secret.KUBE_CONFIG]
 service = "kubernetes"
 purpose = "Apply manifests to staging and production clusters"
 capabilities = ["apply", "rollout", "get"]

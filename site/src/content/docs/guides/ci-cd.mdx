@@ -23,7 +23,7 @@ expires = "2026-12-31"
 stale_warning_days = 45
 require_expiration = true
 
-[meta.GITHUB_TOKEN]
+[secret.GITHUB_TOKEN]
 service = "github"
 purpose = "Clone repos and create deployment status checks"
 capabilities = ["repo:read", "deployments:write"]
@@ -31,7 +31,7 @@ created = "2026-02-01"
 expires = "2026-08-01"
 source = "ci"
 
-[meta.DOCKER_REGISTRY_TOKEN]
+[secret.DOCKER_REGISTRY_TOKEN]
 service = "ghcr.io"
 purpose = "Push container images"
 capabilities = ["packages:write"]

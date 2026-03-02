@@ -12,7 +12,7 @@ Every project gets one `envpkt.toml` that describes its credentials. The file an
 
 version = 1
 
-[meta.API_KEY]
+[secret.API_KEY]
 service = "stripe"
 ```
 
@@ -37,7 +37,7 @@ stale_warning_days = 90
 require_expiration = true
 require_service = true
 
-[meta.STRIPE_SECRET_KEY]
+[secret.STRIPE_SECRET_KEY]
 service = "stripe"
 purpose = "Process customer payments and manage subscriptions"
 capabilities = ["charges:write", "subscriptions:write"]
@@ -46,7 +46,7 @@ expires = "2027-01-15"
 rotation_url = "https://dashboard.stripe.com/apikeys"
 source = "vault"
 
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 service = "postgres"
 purpose = "Read/write access to the billing database"
 capabilities = ["SELECT", "INSERT", "UPDATE"]
@@ -58,7 +58,7 @@ source = "vault"
 
 ## Secret Metadata Field Tiers
 
-Each `[meta.<KEY>]` section describes a single secret. Fields are organized by importance:
+Each `[secret.<KEY>]` section describes a single secret. Fields are organized by importance:
 
 | Tier            | Fields                                          | Description                               |
 | --------------- | ----------------------------------------------- | ----------------------------------------- |

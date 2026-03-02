@@ -55,13 +55,18 @@ export const readConfigFile = (path: string): Either<ConfigError, string> => {
   )
 }
 
-/** Ensure required fields have defaults for valid configs (e.g. agent configs with catalog may omit meta) */
+/** Ensure required fields have defaults for valid configs (e.g. agent configs with catalog may omit secret) */
 const applyDefaults = (data: unknown): unknown => {
   if (data !== null && typeof data === "object" && !Array.isArray(data)) {
     const obj = data as Record<string, unknown>
-    if (!("meta" in obj)) {
-      return { ...obj, meta: {} }
+    const result = { ...obj }
+    if (!("secret" in result)) {
+      result.secret = {}
     }
+    if (!("env" in result)) {
+      result.env = {}
+    }
+    return result
   }
   return data
 }

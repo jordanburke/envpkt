@@ -67,8 +67,10 @@ export const resolveConfig = (
   const catalogPath = resolve(agentConfigDir, agentConfig.catalog)
   const agentSecrets = agentConfig.agent.secrets
 
+  const agentSecretEntries = agentConfig.secret ?? {}
+
   return loadCatalog(catalogPath).flatMap<ResolveResult>((catalogConfig) =>
-    resolveSecrets(agentConfig.meta, catalogConfig.meta, agentSecrets, catalogPath).map<ResolveResult>(
+    resolveSecrets(agentSecretEntries, catalogConfig.secret ?? {}, agentSecrets, catalogPath).map<ResolveResult>(
       (resolvedMeta) => {
         const merged: string[] = []
         const overridden: string[] = []
@@ -76,7 +78,7 @@ export const resolveConfig = (
 
         for (const key of agentSecrets) {
           merged.push(key)
-          if (agentConfig.meta[key]) {
+          if (agentSecretEntries[key]) {
             overridden.push(key)
           }
         }
@@ -92,7 +94,7 @@ export const resolveConfig = (
         const resolvedConfig: EnvpktConfig = {
           ...agentWithoutCatalog,
           agent: agentIdentity ? { ...agentIdentity, name: agentIdentity.name } : undefined,
-          meta: resolvedMeta,
+          secret: resolvedMeta,
         }
 
         return {

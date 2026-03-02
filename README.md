@@ -51,7 +51,7 @@ Every project gets one `envpkt.toml` that describes its credentials. Here's a mi
 
 version = 1
 
-[meta.API_KEY]
+[secret.API_KEY]
 service = "stripe"
 ```
 
@@ -74,7 +74,7 @@ stale_warning_days = 90
 require_expiration = true
 require_service = true
 
-[meta.STRIPE_SECRET_KEY]
+[secret.STRIPE_SECRET_KEY]
 service = "stripe"
 purpose = "Process customer payments and manage subscriptions"
 capabilities = ["charges:write", "subscriptions:write"]
@@ -83,7 +83,7 @@ expires = "2027-01-15"
 rotation_url = "https://dashboard.stripe.com/apikeys"
 source = "vault"
 
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 service = "postgres"
 purpose = "Read/write access to the billing database"
 capabilities = ["SELECT", "INSERT", "UPDATE"]
@@ -108,7 +108,7 @@ version = 1
 stale_warning_days = 90
 require_expiration = true
 
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 service = "postgres"
 purpose = "Primary application database"
 capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
@@ -117,7 +117,7 @@ source = "vault"
 created = "2025-11-01"
 expires = "2026-11-01"
 
-[meta.REDIS_URL]
+[secret.REDIS_URL]
 service = "redis"
 purpose = "Caching and session storage"
 created = "2025-11-01"
@@ -136,7 +136,7 @@ consumer = "agent"
 secrets = ["DATABASE_URL", "REDIS_URL"]
 
 # Optional: narrow the catalog definition for this agent
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 capabilities = ["SELECT"]
 ```
 
@@ -150,7 +150,7 @@ This produces a self-contained config with catalog metadata merged in and agent 
 
 ### Merge rules
 
-- Each field in the agent's `[meta.KEY]` override **replaces** the catalog field (shallow merge)
+- Each field in the agent's `[secret.KEY]` override **replaces** the catalog field (shallow merge)
 - Omitted fields keep the catalog value
 - `agent.secrets` is the source of truth for which keys the agent needs
 
@@ -410,7 +410,7 @@ The schema is published at:
 
 ### Secret Metadata Fields
 
-Each `[meta.<KEY>]` section describes a secret:
+Each `[secret.<KEY>]` section describes a secret:
 
 | Tier            | Fields                                          | Description                                 |
 | --------------- | ----------------------------------------------- | ------------------------------------------- |
@@ -597,7 +597,7 @@ loadConfig(configPath).fold(
 
 envpkt integrates with [fnox](https://github.com/jordanburke/fnox) for secret resolution:
 
-- `envpkt init --from-fnox` scaffolds `[meta.*]` entries from `fnox.toml`
+- `envpkt init --from-fnox` scaffolds `[secret.*]` entries from `fnox.toml`
 - `envpkt audit` detects orphaned keys (in envpkt but not in fnox, or vice versa)
 - `envpkt exec` injects fnox secrets into the subprocess environment
 

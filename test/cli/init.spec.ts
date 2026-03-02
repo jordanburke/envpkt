@@ -22,7 +22,7 @@ describe("envpkt init", () => {
     const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
     expect(content).toContain("version = 1")
     expect(content).toContain("#:schema")
-    expect(content).toContain("[meta.EXAMPLE_API_KEY]")
+    expect(content).toContain("[secret.EXAMPLE_API_KEY]")
     expect(content).toContain("[lifecycle]")
     expect(content).toContain("stale_warning_days = 90")
   })
@@ -60,9 +60,9 @@ describe("envpkt init", () => {
     runInit(tmpDir, { fromFnox: join(tmpDir, "fnox.toml") })
 
     const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
-    expect(content).toContain("[meta.OPENAI_KEY]")
-    expect(content).toContain("[meta.DB_PASSWORD]")
-    expect(content).not.toContain("[meta.EXAMPLE_API_KEY]")
+    expect(content).toContain("[secret.OPENAI_KEY]")
+    expect(content).toContain("[secret.DB_PASSWORD]")
+    expect(content).not.toContain("[secret.EXAMPLE_API_KEY]")
   })
 
   it("includes v5 comment fields in generated secrets", () => {
@@ -81,7 +81,7 @@ describe("envpkt init", () => {
       (err) => expect.unreachable(`Generated config should be valid, got: ${err._tag}`),
       (config) => {
         expect(config.version).toBe(1)
-        expect(config.meta["EXAMPLE_API_KEY"]).toBeDefined()
+        expect(config.secret["EXAMPLE_API_KEY"]).toBeDefined()
       },
     )
   })

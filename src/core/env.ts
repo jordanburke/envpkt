@@ -60,12 +60,13 @@ export const envScan = (env: Readonly<Record<string, string | undefined>>, optio
 /** Bidirectional drift detection between config and live environment */
 export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, string | undefined>>): CheckResult => {
   const entries: DriftEntry[] = []
-  const metaKeys = Object.keys(config.meta)
+  const secretEntries = config.secret ?? {}
+  const metaKeys = Object.keys(secretEntries)
   const trackedSet = new Set(metaKeys)
 
   // Direction 1: TOML keys → check if present in env
   for (const key of metaKeys) {
-    const meta = config.meta[key]
+    const meta = secretEntries[key]
     const present = env[key] !== undefined && env[key] !== ""
     entries.push({
       envVar: key,
@@ -73,6 +74,21 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
       status: present ? "tracked" : "missing_from_env",
       confidence: Option<ConfidenceLevel>(undefined),
     })
+  }
+
+  // Direction 1b: [env.*] keys → check if present (non-secret defaults)
+  const envDefaults = config.env ?? {}
+  for (const key of Object.keys(envDefaults)) {
+    if (!trackedSet.has(key)) {
+      trackedSet.add(key)
+      const present = env[key] !== undefined && env[key] !== ""
+      entries.push({
+        envVar: key,
+        service: Option<string>(undefined),
+        status: present ? "tracked" : "missing_from_env",
+        confidence: Option<ConfidenceLevel>(undefined),
+      })
+    }
   }
 
   // Direction 2: env vars → find credential-shaped vars not in TOML
@@ -103,7 +119,7 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
 
 const todayIso = (): string => new Date().toISOString().split("T")[0]!
 
-/** Generate TOML [meta.*] blocks from scan results, mirroring init.ts pattern */
+/** Generate TOML [secret.*] blocks from scan results, mirroring init.ts pattern */
 export const generateTomlFromScan = (matches: ReadonlyArray<MatchResult>): string => {
   const blocks: string[] = []
 
@@ -112,7 +128,7 @@ export const generateTomlFromScan = (matches: ReadonlyArray<MatchResult>): strin
       () => match.envVar.toLowerCase().replace(/_/g, "-"),
       (s) => s,
     )
-    blocks.push(`[meta.${match.envVar}]
+    blocks.push(`[secret.${match.envVar}]
 service = "${svc}"
 # purpose = ""               # Why: what this secret enables
 # capabilities = []          # What operations this grants

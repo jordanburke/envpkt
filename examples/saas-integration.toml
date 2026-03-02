@@ -13,7 +13,7 @@ capabilities = ["charge", "refund", "subscription-management"]
 [lifecycle]
 stale_warning_days = 90
 
-[meta.STRIPE_SECRET_KEY]
+[secret.STRIPE_SECRET_KEY]
 service = "stripe"
 purpose = "Process customer payments and manage subscriptions"
 capabilities = ["charges:write", "subscriptions:write", "customers:read"]
@@ -23,14 +23,14 @@ rotation_url = "https://dashboard.stripe.com/apikeys"
 source = "manual"
 rate_limit = "100/sec"
 
-[meta.STRIPE_WEBHOOK_SECRET]
+[secret.STRIPE_WEBHOOK_SECRET]
 service = "stripe"
 purpose = "Verify incoming Stripe webhook signatures"
 capabilities = ["webhook-verification"]
 created = "2026-01-15"
 source = "manual"
 
-[meta.SENDGRID_API_KEY]
+[secret.SENDGRID_API_KEY]
 service = "sendgrid"
 purpose = "Send transactional emails (receipts, invoices, password resets)"
 capabilities = ["mail.send"]
@@ -38,7 +38,7 @@ created = "2025-12-01"
 rotation_url = "https://app.sendgrid.com/settings/api_keys"
 source = "manual"
 
-[meta.REDIS_URL]
+[secret.REDIS_URL]
 service = "redis"
 purpose = "Rate limiting and idempotency key cache"
 capabilities = ["read", "write"]

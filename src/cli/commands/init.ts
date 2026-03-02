@@ -24,7 +24,7 @@ const todayIso = (): string => new Date().toISOString().split("T")[0]!
 
 const generateSecretBlock = (key: string, service?: string): string => {
   const svc = service ?? key
-  return `[meta.${key}]
+  return `[secret.${key}]
 service = "${svc}"
 # purpose = ""               # Why: what this secret enables
 # capabilities = []          # What operations this grants
@@ -79,6 +79,16 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
     lines.push(`# require_service = false`)
     lines.push(``)
 
+    // Environment defaults section
+    lines.push(`# Plaintext environment defaults (non-secret, safe to commit)`)
+    lines.push(`# [env.PORT]`)
+    lines.push(`# value = "3000"`)
+    lines.push(`# purpose = "Application port"`)
+    lines.push(`# [env.NODE_ENV]`)
+    lines.push(`# value = "production"`)
+    lines.push(`# purpose = "Runtime environment"`)
+    lines.push(``)
+
     if (fnoxKeys && fnoxKeys.length > 0) {
       lines.push(`# Secrets detected from fnox.toml`)
       for (const key of fnoxKeys) {
@@ -86,13 +96,13 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
       }
     } else {
       lines.push(`# Add your secret metadata below.`)
-      lines.push(`# Each [meta.<key>] describes a secret your agent needs.`)
+      lines.push(`# Each [secret.<key>] describes a secret your agent needs.`)
       lines.push(``)
       lines.push(generateSecretBlock("EXAMPLE_API_KEY", "example-service"))
     }
   } else {
     lines.push(`# Optional: override catalog metadata for specific secrets`)
-    lines.push(`# [meta.KEY_NAME]`)
+    lines.push(`# [secret.KEY_NAME]`)
     lines.push(`# capabilities = ["read"]  # narrows catalog's broader definition`)
   }
 

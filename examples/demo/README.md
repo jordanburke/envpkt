@@ -132,7 +132,7 @@ envpkt seal -c examples/sealed-agent.toml
 After sealing, each secret gets an `encrypted_value` field:
 
 ```toml
-[meta.OPENAI_API_KEY]
+[secret.OPENAI_API_KEY]
 service = "openai"
 encrypted_value = """
 -----BEGIN AGE ENCRYPTED FILE-----

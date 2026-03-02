@@ -96,7 +96,7 @@ identity = "./keys/agent.age"       # Path to encrypted age key
 recipient = "age1..."               # Public key for encryption
 secrets = ["OPENAI_API_KEY"]        # Keys to pull from catalog
 
-[meta.OPENAI_API_KEY]               # Per-secret metadata
+[secret.OPENAI_API_KEY]               # Per-secret metadata
 service = "openai"
 expires = "2025-06-30"
 rotation_url = "https://platform.openai.com/api-keys"
@@ -534,7 +534,7 @@ All tools accept an optional `configPath` argument.
 ## Debugging Tips
 
 - **Config not found**: envpkt searches up from cwd. Use `-c <path>` to specify explicitly.
-- **Audit shows "missing"**: The secret key is in `[meta.*]` but not in the environment. Check `envpkt env check`.
+- **Audit shows "missing"**: The secret key is in `[secret.*]` but not in the environment. Check `envpkt env check`.
 - **Sealed values fail**: Ensure `age` CLI is installed and the identity file path in `[agent].identity` is correct.
 - **fnox errors**: Check `fnox` is installed and configured. Use `envpkt inspect --resolved` to see what the config looks like after catalog merge.
 - **Boot skips secrets**: Check `bootSafe()` result's `skipped` array and `warnings` for details.

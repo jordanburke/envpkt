@@ -90,7 +90,8 @@ const readCapabilities = (): ReadResourceResult => {
   const agentCapabilities = config.agent?.capabilities ?? []
   const secretCapabilities: Record<string, readonly string[]> = {}
 
-  for (const [key, meta] of Object.entries(config.meta)) {
+  const secretEntries = config.secret ?? {}
+  for (const [key, meta] of Object.entries(secretEntries)) {
     if (meta.capabilities && meta.capabilities.length > 0) {
       secretCapabilities[key] = meta.capabilities
     }

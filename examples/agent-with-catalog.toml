@@ -12,5 +12,5 @@ consumer = "agent"
 secrets = ["DATABASE_URL", "REDIS_URL"]
 
 # Override: narrow catalog's full CRUD to read-only for this agent
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 capabilities = ["SELECT"]

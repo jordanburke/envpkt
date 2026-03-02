@@ -28,11 +28,21 @@ stale_warning_days = 90
 require_expiration = true
 require_service = true
 
+# --- Environment Defaults (non-secret, safe to commit) ---
+
+[env.MODEL_TEMPERATURE]
+value = "0.7"
+purpose = "Default inference temperature"
+
+[env.MAX_TOKENS]
+value = "4096"
+purpose = "Default max output tokens"
+
 # --- Secrets ---
 # After running `envpkt seal`, each secret will get an `encrypted_value`
 # field containing age-armored ciphertext. That ciphertext is safe to commit.
 
-[meta.OPENAI_API_KEY]
+[secret.OPENAI_API_KEY]
 service = "openai"
 purpose = "GPT-4 chat completions and embeddings"
 capabilities = ["chat:completions", "embeddings:create"]
@@ -51,7 +61,7 @@ bVpRM1QrOUxLdUNKaTY2c2VVRWV1Rk0KXiBqrRNxJjhpLABxlNFLf62WzCywc0H3
 pHpfTdy9JgbL1t7fKh5+D7Izv2c+pYUyRMmLYC5akfGbnvBZS+KH7c8jHA==
 -----END AGE ENCRYPTED FILE-----
 """
-[meta.ANTHROPIC_API_KEY]
+[secret.ANTHROPIC_API_KEY]
 service = "anthropic"
 purpose = "Claude inference via Messages API"
 capabilities = ["messages:create"]
@@ -71,7 +81,7 @@ MjhNQ29kTnlyK2x1RkxocE12bENGOE0KLMPXiUwOvRJ3uwNj3JB/aRjrWnoXpYUU
 iLM=
 -----END AGE ENCRYPTED FILE-----
 """
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 service = "postgres"
 purpose = "Conversation history and embedding cache"
 capabilities = ["SELECT", "INSERT"]

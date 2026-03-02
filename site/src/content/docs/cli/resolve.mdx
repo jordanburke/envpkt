@@ -38,7 +38,7 @@ envpkt resolve -c agent.toml --dry-run
 
 ## Merge Rules
 
-- Each field in the agent's `[meta.KEY]` override **replaces** the catalog field (shallow merge)
+- Each field in the agent's `[secret.KEY]` override **replaces** the catalog field (shallow merge)
 - Omitted fields keep the catalog value
 - `agent.secrets` is the source of truth for which keys the agent needs
 - Configs without a `catalog` field pass through unchanged

@@ -22,8 +22,8 @@ const writeEnvpkt = (dir: string, content: string): void => {
 
 describe("scanFleet", () => {
   it("finds envpkt.toml files in subdirectories", () => {
-    writeEnvpkt(join(tmpDir, "agent-a"), `version = 1\n[meta.KEY_A]\nservice = "svc-a"\n`)
-    writeEnvpkt(join(tmpDir, "agent-b"), `version = 1\n[meta.KEY_B]\nservice = "svc-b"\n`)
+    writeEnvpkt(join(tmpDir, "agent-a"), `version = 1\n[secret.KEY_A]\nservice = "svc-a"\n`)
+    writeEnvpkt(join(tmpDir, "agent-b"), `version = 1\n[secret.KEY_B]\nservice = "svc-b"\n`)
 
     const fleet = scanFleet(tmpDir)
     expect(fleet.total_agents).toBe(2)
@@ -34,7 +34,7 @@ describe("scanFleet", () => {
   it("detects critical fleet status when agent has expired secrets", () => {
     writeEnvpkt(
       join(tmpDir, "bad-agent"),
-      `version = 1\n[meta.OLD_KEY]\nservice = "legacy"\ncreated = "2020-01-01"\nexpires = "2022-01-01"\n`,
+      `version = 1\n[secret.OLD_KEY]\nservice = "legacy"\ncreated = "2020-01-01"\nexpires = "2022-01-01"\n`,
     )
 
     const fleet = scanFleet(tmpDir)
@@ -43,17 +43,17 @@ describe("scanFleet", () => {
   })
 
   it("skips node_modules and .git directories", () => {
-    writeEnvpkt(join(tmpDir, "node_modules", "pkg"), `version = 1\n[meta.X]\nservice = "x"\n`)
-    writeEnvpkt(join(tmpDir, ".git", "hooks"), `version = 1\n[meta.Y]\nservice = "y"\n`)
-    writeEnvpkt(join(tmpDir, "real-agent"), `version = 1\n[meta.Z]\nservice = "z"\n`)
+    writeEnvpkt(join(tmpDir, "node_modules", "pkg"), `version = 1\n[secret.X]\nservice = "x"\n`)
+    writeEnvpkt(join(tmpDir, ".git", "hooks"), `version = 1\n[secret.Y]\nservice = "y"\n`)
+    writeEnvpkt(join(tmpDir, "real-agent"), `version = 1\n[secret.Z]\nservice = "z"\n`)
 
     const fleet = scanFleet(tmpDir)
     expect(fleet.total_agents).toBe(1)
   })
 
   it("respects maxDepth option", () => {
-    writeEnvpkt(join(tmpDir, "a"), `version = 1\n[meta.X]\nservice = "x"\n`)
-    writeEnvpkt(join(tmpDir, "a", "b", "c", "d"), `version = 1\n[meta.Y]\nservice = "y"\n`)
+    writeEnvpkt(join(tmpDir, "a"), `version = 1\n[secret.X]\nservice = "x"\n`)
+    writeEnvpkt(join(tmpDir, "a", "b", "c", "d"), `version = 1\n[secret.Y]\nservice = "y"\n`)
 
     const shallow = scanFleet(tmpDir, { maxDepth: 1 })
     expect(shallow.total_agents).toBe(1)
@@ -70,7 +70,7 @@ describe("scanFleet", () => {
   })
 
   it("finds envpkt.toml in root directory itself", () => {
-    writeEnvpkt(tmpDir, `version = 1\n[meta.ROOT]\nservice = "root-svc"\n`)
+    writeEnvpkt(tmpDir, `version = 1\n[secret.ROOT]\nservice = "root-svc"\n`)
 
     const fleet = scanFleet(tmpDir)
     expect(fleet.total_agents).toBe(1)
@@ -79,7 +79,7 @@ describe("scanFleet", () => {
   it("reads agent identity from config", () => {
     writeEnvpkt(
       join(tmpDir, "named-agent"),
-      `version = 1\n[agent]\nname = "my-agent"\nconsumer = "agent"\ndescription = "Test agent"\n[meta.K]\nservice = "s"\n`,
+      `version = 1\n[agent]\nname = "my-agent"\nconsumer = "agent"\ndescription = "Test agent"\n[secret.K]\nservice = "s"\n`,
     )
 
     const fleet = scanFleet(tmpDir)
@@ -97,9 +97,9 @@ describe("scanFleet", () => {
   it("tracks expired and expiring_soon counts", () => {
     writeEnvpkt(
       join(tmpDir, "exp-agent"),
-      `version = 1\n[meta.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2022-01-01"\n`,
+      `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2022-01-01"\n`,
     )
-    writeEnvpkt(join(tmpDir, "ok-agent"), `version = 1\n[meta.OK]\nservice = "y"\n`)
+    writeEnvpkt(join(tmpDir, "ok-agent"), `version = 1\n[secret.OK]\nservice = "y"\n`)
 
     const fleet = scanFleet(tmpDir)
     expect(fleet.expired).toBeGreaterThan(0)
@@ -108,7 +108,7 @@ describe("scanFleet", () => {
   it("computes min_expiry_days for agents", () => {
     writeEnvpkt(
       join(tmpDir, "expiry-agent"),
-      `version = 1\n[meta.K1]\nservice = "a"\nexpires = "2030-01-01"\n[meta.K2]\nservice = "b"\nexpires = "2028-06-01"\n`,
+      `version = 1\n[secret.K1]\nservice = "a"\nexpires = "2030-01-01"\n[secret.K2]\nservice = "b"\nexpires = "2028-06-01"\n`,
     )
 
     const fleet = scanFleet(tmpDir)

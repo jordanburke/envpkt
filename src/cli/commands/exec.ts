@@ -1,12 +1,6 @@
 import { execFileSync } from "node:child_process"
-import { dirname, resolve } from "node:path"
 
-import { Try } from "functype"
-
-import { computeAudit } from "../../core/audit.js"
-import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
-import { fnoxAvailable } from "../../fnox/detect.js"
-import { unwrapAgentKey } from "../../fnox/identity.js"
+import { bootSafe } from "../../core/boot.js"
 import { BOLD, exitCodeForAudit, formatAudit, formatError, RED, RESET, YELLOW } from "../output.js"
 
 type ExecOptions = {
@@ -27,100 +21,71 @@ export const runExec = (args: ReadonlyArray<string>, options: ExecOptions): void
 
   const skipAudit = options.skipAudit || options.check === false
 
-  // 1. Resolve config
-  const configResult = resolveConfigPath(options.config)
-  const configData = configResult.fold(
+  const result = bootSafe({
+    inject: false,
+    configPath: options.config,
+    profile: options.profile,
+    failOnExpired: false,
+    warnOnly: true,
+  })
+
+  const boot = result.fold(
     (err) => {
       console.error(formatError(err))
       process.exit(2)
       return undefined
     },
-    (path) =>
-      loadConfig(path).fold(
-        (err) => {
-          console.error(formatError(err))
-          process.exit(2)
-          return undefined
-        },
-        (config) => ({ config, path }),
-      ),
+    (b) => b,
   )
 
-  if (!configData) return
-  const { config, path } = configData
-  const configDir = dirname(path)
+  if (!boot) return
 
-  // 2. Pre-flight audit (unless --skip-audit / --no-check)
+  // Pre-flight audit display (unless --skip-audit / --no-check)
   if (!skipAudit) {
-    const audit = computeAudit(config)
-    console.error(`${BOLD}envpkt${RESET} pre-flight audit ${path}`)
-    console.error(formatAudit(audit))
+    console.error(`${BOLD}envpkt${RESET} pre-flight audit`)
+    console.error(formatAudit(boot.audit))
     console.error("")
 
-    if (options.strict && audit.status !== "healthy") {
-      console.error(`${RED}Aborting:${RESET} --strict mode and audit status is ${audit.status}`)
-      process.exit(exitCodeForAudit(audit))
+    if (options.strict && boot.audit.status !== "healthy") {
+      console.error(`${RED}Aborting:${RESET} --strict mode and audit status is ${boot.audit.status}`)
+      process.exit(exitCodeForAudit(boot.audit))
       return
     }
 
-    if (audit.status === "critical" && !options.warnOnly) {
+    if (boot.audit.status === "critical" && !options.warnOnly) {
       console.error(`${RED}Aborting:${RESET} audit status is critical (use --warn-only to proceed)`)
-      process.exit(exitCodeForAudit(audit))
+      process.exit(exitCodeForAudit(boot.audit))
       return
     }
 
-    if (audit.status === "critical" && options.warnOnly) {
+    if (boot.audit.status === "critical" && options.warnOnly) {
       console.error(`${YELLOW}Warning:${RESET} Proceeding despite critical audit status (--warn-only)`)
     }
   }
 
-  // 3. Unwrap agent key if identity configured
-  let agentKey: string | undefined
-  if (config.agent?.identity) {
-    const identityPath = resolve(configDir, expandPath(config.agent.identity))
-    const keyResult = unwrapAgentKey(identityPath)
-    keyResult.fold(
-      (err) => {
-        console.error(`${YELLOW}Warning:${RESET} Agent key unwrap failed: ${err._tag}`)
-      },
-      (key) => {
-        agentKey = key
-      },
-    )
+  for (const warning of boot.warnings) {
+    console.error(`${YELLOW}Warning:${RESET} ${warning}`)
   }
 
-  // 4. Check fnox availability
-  if (!fnoxAvailable()) {
-    console.error(`${YELLOW}Warning:${RESET} fnox not available — running command without secret injection`)
-  }
-
-  // 5. Build environment: current env + fnox secrets (if available)
+  // Build environment: current env + env defaults + resolved secrets
   const env = { ...process.env }
 
-  if (fnoxAvailable()) {
-    const fnoxArgs = options.profile ? ["export", "--profile", options.profile] : ["export"]
-    const fnoxEnv = agentKey ? { ...process.env, FNOX_AGE_KEY: agentKey } : undefined
-    Try(() => execFileSync("fnox", fnoxArgs, { stdio: "pipe", encoding: "utf-8", env: fnoxEnv })).fold(
-      (err) => {
-        console.error(`${YELLOW}Warning:${RESET} fnox export failed: ${err}`)
-      },
-      (output) => {
-        for (const line of output.split("\n")) {
-          const eq = line.indexOf("=")
-          if (eq > 0) {
-            const key = line.slice(0, eq).trim()
-            const value = line.slice(eq + 1).trim()
-            env[key] = value
-          }
-        }
-      },
-    )
+  // Apply env defaults (only if key not already set)
+  for (const [key, value] of Object.entries(boot.envDefaults)) {
+    if (!(key in env)) {
+      env[key] = value
+    }
   }
 
-  // 6. Execute the command
+  // Apply secrets (always override)
+  for (const [key, value] of Object.entries(boot.secrets)) {
+    env[key] = value
+  }
+
+  // Execute the command
   const [cmd, ...cmdArgs] = args
   try {
-    execFileSync(cmd, cmdArgs, { env, stdio: "inherit" })
+    execFileSync(cmd!, cmdArgs, { env, stdio: "inherit" })
   } catch (err: unknown) {
     const exitCode = (err as { status?: number }).status ?? 1
     process.exit(exitCode)

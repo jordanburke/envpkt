@@ -9,5 +9,5 @@ capabilities = ["extract", "transform", "load"]
 secrets = ["DATABASE_URL", "REDIS_URL"]
 
 # Override: narrow DB to read-only for this agent
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 capabilities = ["SELECT"]

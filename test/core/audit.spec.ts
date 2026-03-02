@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest"
 
-import { computeAudit } from "../../src/core/audit.js"
+import { computeAudit, computeEnvAudit } from "../../src/core/audit.js"
 import type { EnvpktConfig } from "../../src/core/types.js"
 
 const today = new Date("2025-06-15T00:00:00Z")
 
-const makeConfig = (meta: EnvpktConfig["meta"], lifecycle?: EnvpktConfig["lifecycle"]): EnvpktConfig => ({
+const makeConfig = (secret: EnvpktConfig["secret"], lifecycle?: EnvpktConfig["lifecycle"]): EnvpktConfig => ({
   version: 1,
-  meta,
+  secret,
   lifecycle,
 })
 
@@ -147,7 +147,7 @@ describe("computeAudit", () => {
     expect(result.expiring_soon).toBe(1)
   })
 
-  it("returns healthy for empty meta", () => {
+  it("returns healthy for empty secret", () => {
     const config = makeConfig({})
     const result = computeAudit(config, undefined, today)
     expect(result.status).toBe("healthy")
@@ -263,7 +263,7 @@ describe("computeAudit", () => {
     const config: EnvpktConfig = {
       version: 1,
       agent: { name: "test-agent", consumer: "agent" },
-      meta: { KEY: { service: "svc" } },
+      secret: { KEY: { service: "svc" } },
     }
 
     const result = computeAudit(config, undefined, today)
@@ -293,5 +293,68 @@ describe("computeAudit", () => {
           (svc) => expect(svc).toBe("postgres"),
         ),
     )
+  })
+})
+
+describe("computeEnvAudit", () => {
+  it("detects env defaults using default value", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      env: {
+        PORT: { value: "3000", purpose: "App port" },
+      },
+    }
+
+    const result = computeEnvAudit(config, { PORT: "3000" })
+    expect(result.total).toBe(1)
+    expect(result.defaults_applied).toBe(1)
+    expect(result.entries[0]!.status).toBe("default")
+  })
+
+  it("detects overridden env defaults", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      env: {
+        PORT: { value: "3000" },
+      },
+    }
+
+    const result = computeEnvAudit(config, { PORT: "8080" })
+    expect(result.overridden).toBe(1)
+    expect(result.entries[0]!.status).toBe("overridden")
+    expect(result.entries[0]!.currentValue).toBe("8080")
+  })
+
+  it("detects missing env vars", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      env: {
+        PORT: { value: "3000" },
+      },
+    }
+
+    const result = computeEnvAudit(config, {})
+    expect(result.missing).toBe(1)
+    expect(result.entries[0]!.status).toBe("missing")
+  })
+
+  it("handles empty env config", () => {
+    const config: EnvpktConfig = { version: 1 }
+
+    const result = computeEnvAudit(config, {})
+    expect(result.total).toBe(0)
+    expect(result.entries).toEqual([])
+  })
+
+  it("reports purpose in drift entries", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      env: {
+        NODE_ENV: { value: "production", purpose: "Runtime environment" },
+      },
+    }
+
+    const result = computeEnvAudit(config, { NODE_ENV: "production" })
+    expect(result.entries[0]!.purpose).toBe("Runtime environment")
   })
 })

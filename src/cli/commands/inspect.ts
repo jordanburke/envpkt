@@ -5,7 +5,7 @@ import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import type { SecretDisplay } from "../../core/format.js"
 import { maskValue } from "../../core/format.js"
 import type { EnvpktConfig, ResolveResult, SecretMeta } from "../../core/types.js"
-import { BOLD, CYAN, DIM, formatError, RESET, YELLOW } from "../output.js"
+import { BOLD, CYAN, DIM, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 
 type InspectOptions = {
   readonly config?: string
@@ -65,8 +65,9 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
     console.log("")
   }
 
-  console.log(`${BOLD}Secrets:${RESET} ${Object.keys(config.meta).length}`)
-  for (const [key, meta] of Object.entries(config.meta)) {
+  const secretEntries = config.secret ?? {}
+  console.log(`${BOLD}Secrets:${RESET} ${Object.keys(secretEntries).length}`)
+  for (const [key, meta] of Object.entries(secretEntries)) {
     const secretValue = opts?.secrets?.[key]
     const valueSuffix =
       secretValue !== undefined
@@ -75,6 +76,31 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
     const sealedTag = meta.encrypted_value ? ` ${CYAN}[sealed]${RESET}` : ""
     console.log(`  ${BOLD}${key}${RESET} → ${meta.service ?? key}${sealedTag}${valueSuffix}`)
     printSecretMeta(meta, "    ")
+  }
+
+  // Environment Defaults
+  const envEntries = config.env ?? {}
+  const envKeys = Object.keys(envEntries)
+  if (envKeys.length > 0) {
+    console.log("")
+    console.log(`${BOLD}Environment Defaults:${RESET} ${envKeys.length}`)
+    for (const [key, entry] of Object.entries(envEntries)) {
+      const currentValue = process.env[key]
+      const statusIcon =
+        currentValue === undefined
+          ? `${RED}!${RESET}`
+          : currentValue === entry.value
+            ? `${GREEN}=${RESET}`
+            : `${YELLOW}~${RESET}`
+      const statusLabel =
+        currentValue === undefined
+          ? `${DIM}not set${RESET}`
+          : currentValue === entry.value
+            ? `${DIM}using default${RESET}`
+            : `${YELLOW}overridden${RESET}`
+      console.log(`  ${statusIcon} ${BOLD}${key}${RESET} = "${entry.value}" ${statusLabel}`)
+      if (entry.purpose) console.log(`    purpose: ${entry.purpose}`)
+    }
   }
 
   if (config.lifecycle) {
@@ -138,10 +164,11 @@ export const runInspect = (options: InspectOptions): void => {
                 return
               }
 
+              const showSecrets = showConfig.secret ?? {}
               const printOpts: PrintOptions | undefined = options.secrets
                 ? {
                     secrets: Object.fromEntries(
-                      Object.keys(showConfig.meta)
+                      Object.keys(showSecrets)
                         .filter((key) => process.env[key] !== undefined)
                         .map((key) => [key, process.env[key] as string]),
                     ),

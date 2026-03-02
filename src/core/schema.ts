@@ -111,6 +111,20 @@ export const ToolsConfigSchema = Type.Record(Type.String(), Type.Unknown(), {
 })
 export type ToolsConfig = Static<typeof ToolsConfigSchema>
 
+// --- Env Metadata (plaintext defaults, committed) ---
+
+export const EnvMetaSchema = Type.Object(
+  {
+    value: Type.String({ description: "Default value for this environment variable" }),
+    purpose: Type.Optional(Type.String({ description: "Why this env var exists" })),
+    tags: Type.Optional(
+      Type.Record(Type.String(), Type.String(), { description: "Key-value tags for grouping and filtering" }),
+    ),
+  },
+  { description: "Metadata for a plaintext environment default (non-secret)" },
+)
+export type EnvMeta = Static<typeof EnvMetaSchema>
+
 // --- Top-level EnvpktConfig ---
 
 export const EnvpktConfigSchema = Type.Object(
@@ -120,9 +134,16 @@ export const EnvpktConfigSchema = Type.Object(
       Type.String({ description: "Path to shared secret catalog (relative to this config file)" }),
     ),
     agent: Type.Optional(AgentIdentitySchema),
-    meta: Type.Record(Type.String(), SecretMetaSchema, {
-      description: "Per-secret metadata keyed by secret name",
-    }),
+    secret: Type.Optional(
+      Type.Record(Type.String(), SecretMetaSchema, {
+        description: "Per-secret metadata keyed by secret name",
+      }),
+    ),
+    env: Type.Optional(
+      Type.Record(Type.String(), EnvMetaSchema, {
+        description: "Plaintext environment defaults keyed by variable name",
+      }),
+    ),
     lifecycle: Type.Optional(LifecycleConfigSchema),
     callbacks: Type.Optional(CallbackConfigSchema),
     tools: Type.Optional(ToolsConfigSchema),

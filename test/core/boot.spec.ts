@@ -34,7 +34,7 @@ const writeConfig = (content: string): string => {
 
 describe("bootSafe", () => {
   it("returns Right for valid config", () => {
-    const configPath = writeConfig(`version = 1\n[meta.KEY]\nservice = "svc"\n`)
+    const configPath = writeConfig(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
     const result = bootSafe({ configPath, inject: false })
 
     result.fold(
@@ -68,7 +68,7 @@ describe("bootSafe", () => {
 
   it("returns Left AuditFailed when failOnExpired + expired secrets", () => {
     const configPath = writeConfig(
-      `version = 1\n[meta.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
+      `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
     )
     const result = bootSafe({ configPath, inject: false, failOnExpired: true })
 
@@ -85,7 +85,7 @@ describe("bootSafe", () => {
 
   it("succeeds with failOnExpired=false even with expired secrets", () => {
     const configPath = writeConfig(
-      `version = 1\n[meta.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
+      `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
     )
     const result = bootSafe({ configPath, inject: false, failOnExpired: false })
 
@@ -99,7 +99,7 @@ describe("bootSafe", () => {
 
   it("succeeds with warnOnly=true even with expired secrets", () => {
     const configPath = writeConfig(
-      `version = 1\n[meta.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
+      `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
     )
     const result = bootSafe({ configPath, inject: false, warnOnly: true })
 
@@ -113,7 +113,7 @@ describe("bootSafe", () => {
   })
 
   it("injects secrets into process.env when inject=true", () => {
-    const configPath = writeConfig(`version = 1\n[meta.BOOT_TEST_KEY]\nservice = "svc"\n`)
+    const configPath = writeConfig(`version = 1\n[secret.BOOT_TEST_KEY]\nservice = "svc"\n`)
 
     // Clean up env before test
     delete process.env["BOOT_TEST_KEY"]
@@ -135,7 +135,7 @@ describe("bootSafe", () => {
   })
 
   it("does not inject when inject=false", () => {
-    const configPath = writeConfig(`version = 1\n[meta.NO_INJECT_KEY]\nservice = "svc"\n`)
+    const configPath = writeConfig(`version = 1\n[secret.NO_INJECT_KEY]\nservice = "svc"\n`)
 
     delete process.env["NO_INJECT_KEY"]
 
@@ -146,7 +146,7 @@ describe("bootSafe", () => {
   })
 
   it("reports fnox unavailable as warning", () => {
-    const configPath = writeConfig(`version = 1\n[meta.KEY]\nservice = "svc"\n`)
+    const configPath = writeConfig(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
     const result = bootSafe({ configPath, inject: false })
 
     result.fold(
@@ -159,9 +159,87 @@ describe("bootSafe", () => {
   })
 })
 
+describe("bootSafe with env defaults", () => {
+  it("applies env defaults when env var is not set", () => {
+    const configPath = writeConfig(`version = 1\n[env.MY_PORT]\nvalue = "3000"\npurpose = "App port"\n`)
+
+    delete process.env["MY_PORT"]
+
+    const result = bootSafe({ configPath, inject: true })
+
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      (boot) => {
+        expect(boot.envDefaults).toEqual({ MY_PORT: "3000" })
+        expect(boot.overridden).toEqual([])
+        expect(process.env["MY_PORT"]).toBe("3000")
+      },
+    )
+
+    delete process.env["MY_PORT"]
+  })
+
+  it("does not override existing env var", () => {
+    const configPath = writeConfig(`version = 1\n[env.MY_PORT]\nvalue = "3000"\n`)
+
+    process.env["MY_PORT"] = "8080"
+
+    const result = bootSafe({ configPath, inject: true })
+
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      (boot) => {
+        expect(boot.envDefaults).toEqual({})
+        expect(boot.overridden).toContain("MY_PORT")
+        expect(process.env["MY_PORT"]).toBe("8080")
+      },
+    )
+
+    delete process.env["MY_PORT"]
+  })
+
+  it("does not inject env defaults when inject=false", () => {
+    const configPath = writeConfig(`version = 1\n[env.NO_INJECT_PORT]\nvalue = "4000"\n`)
+
+    delete process.env["NO_INJECT_PORT"]
+
+    const result = bootSafe({ configPath, inject: false })
+
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      (boot) => {
+        expect(boot.envDefaults).toEqual({ NO_INJECT_PORT: "4000" })
+        expect(process.env["NO_INJECT_PORT"]).toBeUndefined()
+      },
+    )
+  })
+
+  it("secrets always override env defaults", () => {
+    const configPath = writeConfig(
+      [`version = 1`, `[env.SHARED_KEY]`, `value = "default-value"`, `[secret.SHARED_KEY]`, `service = "svc"`].join(
+        "\n",
+      ),
+    )
+
+    delete process.env["SHARED_KEY"]
+
+    const result = bootSafe({ configPath, inject: false })
+
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      (boot) => {
+        // env default is applied first (key not in env)
+        expect(boot.envDefaults).toEqual({ SHARED_KEY: "default-value" })
+        // secret is skipped because fnox unavailable, but env default was collected
+        expect(boot.skipped).toContain("SHARED_KEY")
+      },
+    )
+  })
+})
+
 describe("boot", () => {
   it("returns BootResult for valid config", () => {
-    const configPath = writeConfig(`version = 1\n[meta.KEY]\nservice = "svc"\n`)
+    const configPath = writeConfig(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
     const result = boot({ configPath, inject: false })
 
     expect(result.audit.status).toBe("healthy")
@@ -173,7 +251,7 @@ describe("boot", () => {
 
   it("throws EnvpktBootError for expired secrets with failOnExpired", () => {
     const configPath = writeConfig(
-      `version = 1\n[meta.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
+      `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
     )
     expect(() => boot({ configPath, inject: false, failOnExpired: true })).toThrow(EnvpktBootError)
 
@@ -188,7 +266,7 @@ describe("boot", () => {
 
 describe("boot with catalog", () => {
   it("resolves catalog before audit", () => {
-    writeFileSync(join(tmpDir, "catalog.toml"), `version = 1\n[meta.DB]\nservice = "postgres"\n`)
+    writeFileSync(join(tmpDir, "catalog.toml"), `version = 1\n[secret.DB]\nservice = "postgres"\n`)
     const configPath = writeConfig(`version = 1\ncatalog = "catalog.toml"\n[agent]\nname = "test"\nsecrets = ["DB"]\n`)
     const result = bootSafe({ configPath, inject: false })
 
@@ -243,7 +321,7 @@ describe("boot with sealed values", () => {
         `name = "test-sealed"`,
         `recipient = "${recipient}"`,
         `identity = "identity.txt"`,
-        `[meta.SEALED_KEY]`,
+        `[secret.SEALED_KEY]`,
         `service = "test"`,
         `encrypted_value = """`,
         ciphertext,
@@ -291,12 +369,12 @@ describe("boot with sealed values", () => {
         `name = "mixed"`,
         `recipient = "${recipient}"`,
         `identity = "identity.txt"`,
-        `[meta.SEALED_KEY]`,
+        `[secret.SEALED_KEY]`,
         `service = "test"`,
         `encrypted_value = """`,
         ciphertext,
         `"""`,
-        `[meta.FNOX_KEY]`,
+        `[secret.FNOX_KEY]`,
         `service = "other"`,
       ].join("\n"),
     )

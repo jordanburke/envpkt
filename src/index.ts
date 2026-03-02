@@ -3,6 +3,7 @@ export {
   AgentIdentitySchema,
   CallbackConfigSchema,
   ConsumerType,
+  EnvMetaSchema,
   EnvpktConfigSchema,
   LifecycleConfigSchema,
   SecretMetaSchema,
@@ -19,6 +20,10 @@ export type {
   CallbackConfig,
   CatalogError,
   ConfigError,
+  EnvAuditResult,
+  EnvDriftEntry,
+  EnvDriftStatus,
+  EnvMeta,
   EnvpktConfig,
   FleetAgent,
   FleetHealth,
@@ -56,7 +61,7 @@ export type { FormatPacketOptions, SecretDisplay } from "./core/format.js"
 export { formatPacket, maskValue } from "./core/format.js"
 
 // Audit engine
-export { computeAudit } from "./core/audit.js"
+export { computeAudit, computeEnvAudit } from "./core/audit.js"
 
 // Pattern registry
 export type { ConfidenceLevel, CredentialPattern, MatchResult } from "./core/patterns.js"

@@ -5,7 +5,7 @@ stale_warning_days = 90
 require_expiration = true
 require_service = true
 
-[meta.DATABASE_URL]
+[secret.DATABASE_URL]
 service = "postgres"
 purpose = "Primary application database"
 capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
@@ -15,7 +15,7 @@ created = "2026-01-15"
 expires = "2027-01-15"
 rotates = "90d"
 
-[meta.REDIS_URL]
+[secret.REDIS_URL]
 service = "redis"
 purpose = "Caching and session storage"
 capabilities = ["GET", "SET", "DEL"]
@@ -23,7 +23,7 @@ created = "2026-01-15"
 expires = "2027-01-15"
 source = "vault"
 
-[meta.STRIPE_SECRET_KEY]
+[secret.STRIPE_SECRET_KEY]
 service = "stripe"
 purpose = "Payment processing"
 capabilities = ["charges:write", "subscriptions:read"]
@@ -33,7 +33,7 @@ expires = "2027-02-01"
 rate_limit = "100/sec"
 source = "vault"
 
-[meta.SLACK_WEBHOOK_URL]
+[secret.SLACK_WEBHOOK_URL]
 service = "slack"
 purpose = "Alert notifications"
 capabilities = ["post:messages"]

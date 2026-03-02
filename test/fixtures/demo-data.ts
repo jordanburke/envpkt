@@ -37,7 +37,7 @@ export const apiGatewayResult: ResolveResult = {
       description: "REST API — handles payments and database writes",
       capabilities: ["http:serve", "payments:process"],
     },
-    meta: {
+    secret: {
       DATABASE_URL: {
         service: "postgres",
         purpose: "Primary application database",
@@ -79,7 +79,7 @@ export const dataPipelineResult: ResolveResult = {
       description: "ETL pipeline — reads from Postgres, caches in Redis",
       capabilities: ["extract", "transform", "load"],
     },
-    meta: {
+    secret: {
       DATABASE_URL: {
         service: "postgres",
         purpose: "Primary application database",
@@ -121,7 +121,7 @@ export const sealedAgentResult: ResolveResult = {
       recipient: "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p",
       identity: "identity.age",
     },
-    meta: {
+    secret: {
       OPENAI_API_KEY: {
         service: "openai",
         purpose: "LLM inference",
@@ -158,7 +158,7 @@ export const monitoringResult: ResolveResult = {
       description: "Infrastructure health checks and alerting",
       capabilities: ["monitor", "alert"],
     },
-    meta: {
+    secret: {
       DATADOG_API_KEY: {
         service: "datadog",
         purpose: "Infrastructure monitoring metrics",

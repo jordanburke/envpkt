@@ -30,7 +30,7 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
     }
   }
 
-  const metaSectionRe = /^\[meta\.(.+)\]\s*$/
+  const metaSectionRe = /^\[secret\.(.+)\]\s*$/
   const encryptedValueRe = /^encrypted_value\s*=/
   const newSectionRe = /^\[/
 
@@ -139,6 +139,16 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   const recipient = config.agent.recipient
   const configDir = dirname(configPath)
 
+  // Guard: refuse to seal keys that exist in [env.*]
+  const envEntries = config.env ?? {}
+  const secretEntries0 = config.secret ?? {}
+  const envConflicts = Object.keys(secretEntries0).filter((k) => k in envEntries)
+  if (envConflicts.length > 0) {
+    console.error(`${RED}Error:${RESET} Cannot seal keys that are also defined in [env.*]: ${envConflicts.join(", ")}`)
+    console.error(`${DIM}Move these to [secret.*] only, or remove from [env.*] before sealing.${RESET}`)
+    process.exit(2)
+  }
+
   // Resolve agent key if identity is configured
   let agentKey: string | undefined
   if (config.agent.identity) {
@@ -155,7 +165,8 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   }
 
   // Resolve values via cascade
-  const metaKeys = Object.keys(config.meta)
+  const secretEntries = config.secret ?? {}
+  const metaKeys = Object.keys(secretEntries)
   console.log(
     `${BOLD}Sealing ${metaKeys.length} secret(s)${RESET} with recipient ${CYAN}${recipient.slice(0, 20)}...${RESET}`,
   )
@@ -176,7 +187,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   }
 
   // Encrypt
-  const sealResult = sealSecrets(config.meta, values, recipient)
+  const sealResult = sealSecrets(secretEntries, values, recipient)
 
   sealResult.fold(
     (err) => {

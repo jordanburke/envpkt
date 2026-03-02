@@ -67,7 +67,8 @@ export const formatPacket = (result: ResolveResult, options?: FormatPacketOption
   }
 
   // Secrets block
-  const metaEntries = Object.entries(config.meta)
+  const secretConfig = config.secret ?? {}
+  const metaEntries = Object.entries(secretConfig)
   const secretHeader = `secrets: ${metaEntries.length}`
   const secretLines = metaEntries.map(([key, meta]) => {
     const service = meta.service ?? key

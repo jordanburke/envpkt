@@ -77,6 +77,34 @@ const checkExpiration = (
   return Right(warnings)
 }
 
+const SECRET_PATTERNS = [
+  /^sk-/,
+  /^ghp_/,
+  /^ghu_/,
+  /^AKIA[0-9A-Z]{16}/,
+  /^xox[bpras]-/,
+  /:\/\/[^:]+:[^@]+@/,
+  /^ey[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,}/,
+]
+
+const looksLikeSecret = (value: string): boolean => {
+  if (SECRET_PATTERNS.some((p) => p.test(value))) return true
+  // Base64 strings > 40 chars are suspicious
+  if (value.length > 40 && /^[A-Za-z0-9+/=]+$/.test(value)) return true
+  return false
+}
+
+const checkEnvMisclassification = (config: EnvpktConfig): string[] => {
+  const warnings: string[] = []
+  const envEntries = config.env ?? {}
+  for (const [key, entry] of Object.entries(envEntries)) {
+    if (looksLikeSecret(entry.value)) {
+      warnings.push(`[env.${key}] value looks like a secret — consider moving to [secret.${key}]`)
+    }
+  }
+  return warnings
+}
+
 /** Programmatic boot — returns Either<BootError, BootResult> */
 export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> => {
   const opts = options ?? {}
@@ -85,8 +113,9 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
   const warnOnly = opts.warnOnly ?? false
 
   return resolveAndLoad(opts).flatMap(({ config, configDir }) => {
-    const metaKeys = Object.keys(config.meta)
-    const hasSealedValues = metaKeys.some((k) => !!config.meta[k]?.encrypted_value)
+    const secretEntries = config.secret ?? {}
+    const metaKeys = Object.keys(secretEntries)
+    const hasSealedValues = metaKeys.some((k) => !!secretEntries[k]?.encrypted_value)
 
     // Resolve agent key — non-fatal when sealed values exist (identity may be a plain age identity)
     const agentKeyResult = resolveAgentKey(config, configDir)
@@ -112,12 +141,30 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
       const injected: string[] = []
       const skipped: string[] = []
 
+      // Phase 0: apply env defaults + misclassification check
+      warnings.push(...checkEnvMisclassification(config))
+
+      const envEntries = config.env ?? {}
+      const envDefaults: Record<string, string> = {}
+      const overridden: string[] = []
+
+      for (const [key, entry] of Object.entries(envEntries)) {
+        if (process.env[key] === undefined) {
+          envDefaults[key] = entry.value
+          if (inject) {
+            process.env[key] = entry.value
+          }
+        } else {
+          overridden.push(key)
+        }
+      }
+
       // Phase 1: try sealed values (encrypted_value in meta)
       const sealedKeys = new Set<string>()
 
       if (hasSealedValues && config.agent?.identity) {
         const identityPath = resolve(configDir, expandPath(config.agent.identity))
-        unsealSecrets(config.meta, identityPath).fold(
+        unsealSecrets(secretEntries, identityPath).fold(
           (err) => {
             warnings.push(`Sealed value decryption failed: ${err.message}`)
           },
@@ -176,6 +223,8 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
         skipped: skipped as ReadonlyArray<string>,
         secrets: secrets as Readonly<Record<string, string>>,
         warnings: warnings as ReadonlyArray<string>,
+        envDefaults: envDefaults as Readonly<Record<string, string>>,
+        overridden: overridden as ReadonlyArray<string>,
       }
     })
   })

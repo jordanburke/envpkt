@@ -23,10 +23,10 @@ recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"  # 
 secrets = ["OPENAI_API_KEY", "DB_PASSWORD"] # Keys to pull from catalog
 
 # --- Per-Secret Metadata ---
-# Each [meta.KEY_NAME] declares metadata about a secret.
+# Each [secret.KEY_NAME] declares metadata about a secret.
 # Secret values can be stored as age-encrypted sealed packets (encrypted_value).
 
-[meta.OPENAI_API_KEY]
+[secret.OPENAI_API_KEY]
 # Tier 1: Scan-first (auto-discovered by `envpkt env scan`)
 service = "openai"
 expires = "2025-06-30"
@@ -47,7 +47,7 @@ source = "vault"
 required = true
 tags = { team = "ml", env = "prod" }
 
-[meta.DB_PASSWORD]
+[secret.DB_PASSWORD]
 service = "postgres"
 expires = "2025-09-30"
 rotation_url = "https://console.aws.amazon.com/rds"
@@ -57,7 +57,7 @@ created = "2025-01-01"
 rotates = "quarterly"
 required = true
 
-[meta.AWS_SECRET_ACCESS_KEY]
+[secret.AWS_SECRET_ACCESS_KEY]
 service = "aws"
 expires = "2025-12-31"
 purpose = "S3 bucket access for data storage"
@@ -92,7 +92,7 @@ on_audit_fail = "./scripts/audit-alert.sh"   # Runs when audit fails
 ```toml
 version = 1
 
-[meta.MY_API_KEY]
+[secret.MY_API_KEY]
 service = "my-service"
 ```
 
@@ -105,11 +105,11 @@ version = 1
 name = "ci-runner"
 consumer = "ci"
 
-[meta.NPM_TOKEN]
+[secret.NPM_TOKEN]
 service = "npm"
 required = true
 
-[meta.GITHUB_TOKEN]
+[secret.GITHUB_TOKEN]
 service = "github"
 required = true
 
@@ -128,7 +128,7 @@ consumer = "agent"
 identity = "./keys/agent.age"
 recipient = "age1..."
 
-[meta.ANTHROPIC_API_KEY]
+[secret.ANTHROPIC_API_KEY]
 service = "anthropic"
 purpose = "LLM inference"
 encrypted_value = "-----BEGIN AGE ENCRYPTED FILE-----\n..."
@@ -150,10 +150,10 @@ secrets = ["OPENAI_API_KEY", "SLACK_TOKEN"]
 
 When `catalog` is set and `[agent].secrets` lists key names:
 
-1. envpkt loads the catalog file (another `envpkt.toml` with `[meta.*]` entries)
-2. For each key in `secrets`, it looks up `[meta.KEY]` in the catalog
+1. envpkt loads the catalog file (another `envpkt.toml` with `[secret.*]` entries)
+2. For each key in `secrets`, it looks up `[secret.KEY]` in the catalog
 3. Catalog metadata is merged into the local config
-4. Local `[meta.KEY]` fields override catalog fields (local wins)
+4. Local `[secret.KEY]` fields override catalog fields (local wins)
 5. If a key in `secrets` is not found in the catalog, a `SecretNotInCatalog` error is returned
 
 ## Schema Validation
