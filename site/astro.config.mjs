@@ -1,11 +1,11 @@
-import { defineConfig } from "astro/config"
 import starlight from "@astrojs/starlight"
+import { defineConfig } from "astro/config"
 
 export default defineConfig({
   integrations: [
     starlight({
-      title: "envpkt",
-      description: "Credential lifecycle and fleet management for AI agents",
+      title: "envpacket / envpkt",
+      description: "Credential lifecycle and fleet management for General Env and AI agents",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/jordanburke/envpkt" }],
       sidebar: [
         {

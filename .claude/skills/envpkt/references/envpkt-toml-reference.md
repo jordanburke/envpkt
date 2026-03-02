@@ -24,7 +24,7 @@ secrets = ["OPENAI_API_KEY", "DB_PASSWORD"] # Keys to pull from catalog
 
 # --- Per-Secret Metadata ---
 # Each [meta.KEY_NAME] declares metadata about a secret.
-# The secret VALUE is never stored here — only metadata.
+# Secret values can be stored as age-encrypted sealed packets (encrypted_value).
 
 [meta.OPENAI_API_KEY]
 # Tier 1: Scan-first (auto-discovered by `envpkt env scan`)

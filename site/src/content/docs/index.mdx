@@ -1,5 +1,5 @@
 ---
-title: envpkt
+title: envpacket
 description: Credential lifecycle and fleet management for AI agents
 template: splash
 hero:
@@ -18,9 +18,9 @@ hero:
 import { Card, CardGrid } from "@astrojs/starlight/components"
 
 <CardGrid stagger>
-  <Card title="Awareness, Not Access" icon="information">
-    envpkt stores _metadata about_ secrets — what service each credential authenticates to, when it expires, how to
-    rotate it — never the values themselves.
+  <Card title="Metadata + Sealed Secrets" icon="information">
+    envpkt stores metadata about secrets — what service each credential authenticates to, when it expires, how to rotate
+    it — and can optionally store age-encrypted values as sealed packets, safe to commit.
   </Card>
   <Card title="Environment Scanning" icon="magnifier">
     Auto-discover credentials from your shell with `envpkt env scan`. Matches ~45 known services, ~13 suffix patterns,
@@ -35,8 +35,8 @@ import { Card, CardGrid } from "@astrojs/starlight/components"
     deployment with `envpkt resolve`.
   </Card>
   <Card title="MCP Integration" icon="puzzle">
-    Built-in MCP server exposes credential metadata to AI agents. Four tools and two resources — no secret values ever
-    exposed.
+    Built-in MCP server exposes credential metadata to AI agents. Four tools and two resources for health monitoring and
+    capability discovery.
   </Card>
   <Card title="Functional API" icon="seti:typescript">
     TypeScript library built on functype. All functions return `Either` or `Option` — no thrown exceptions. Use

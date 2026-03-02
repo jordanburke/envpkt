@@ -14,7 +14,7 @@ envpkt is a credential lifecycle and fleet management tool for AI agents. It pro
 - **MCP Server** — Expose credential health and capabilities to LLM agents via Model Context Protocol
 - **Configuration** — `envpkt.toml` declares per-secret metadata across 5 tiers with lifecycle policies
 
-envpkt does NOT store secret values in config. It stores metadata _about_ secrets (service, expiration, purpose, capabilities) and resolves actual values from fnox, sealed packets, or environment variables at runtime.
+envpkt stores metadata about secrets (service, expiration, purpose, capabilities) and can optionally store age-encrypted secret values as sealed packets (safe to commit). At runtime, values are resolved from sealed packets, fnox, or environment variables.
 
 ## When to Use This Skill
 
