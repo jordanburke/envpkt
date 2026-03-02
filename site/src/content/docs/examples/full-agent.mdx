@@ -40,6 +40,17 @@ on_audit_fail = "https://hooks.slack.com/services/T00/B00/zzz"
 fnox = true
 mcp = true
 
+# --- Environment Defaults (non-secret, safe to commit) ---
+
+[env.NODE_ENV]
+value = "production"
+purpose = "Runtime environment mode"
+comment = "Override to 'development' for local testing"
+
+[env.LOG_LEVEL]
+value = "info"
+purpose = "Application log verbosity"
+
 # --- Secret Metadata ---
 
 [secret.AWS_ACCESS_KEY_ID]
@@ -63,6 +74,7 @@ source = "vault"
 [secret.DATABASE_URL]
 service = "postgres"
 purpose = "Write processed data to the analytics database"
+comment = "Shared with the reporting service — coordinate rotation"
 capabilities = ["SELECT", "INSERT", "UPDATE"]
 created = "2025-10-15"
 expires = "2026-10-15"
@@ -84,4 +96,5 @@ source = "manual"
 - **`[lifecycle]`** — configures audit policies (stale warnings, required fields)
 - **`[callbacks]`** — Slack webhooks triggered on lifecycle events
 - **`[tools]`** — enables fnox and MCP integrations
-- **`[secret.*]`** — per-secret metadata with service, purpose, capabilities, dates, and source
+- **`[env.*]`** — plaintext environment defaults (non-secret, safe to commit)
+- **`[secret.*]`** — per-secret metadata with service, purpose, comment, capabilities, dates, and source

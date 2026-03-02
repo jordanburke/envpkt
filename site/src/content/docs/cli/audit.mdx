@@ -20,6 +20,10 @@ envpkt audit [options]
 | `--expiring <days>`   | Show secrets expiring within N days                                         | —             |
 | `--status <status>`   | Filter by status: `healthy`, `expiring_soon`, `expired`, `stale`, `missing` | —             |
 | `--strict`            | Exit non-zero on any non-healthy secret                                     | `false`       |
+| `--all`               | Show both secrets and `[env.*]` defaults drift                              | `false`       |
+| `--env-only`          | Show only `[env.*]` defaults (drift detection)                              | `false`       |
+| `--sealed`            | Show only secrets with `encrypted_value` (sealed packets)                   | `false`       |
+| `--external`          | Show only secrets without `encrypted_value` (externally managed)            | `false`       |
 
 ## Examples
 
@@ -41,6 +45,18 @@ envpkt audit --strict
 
 # Specify config path
 envpkt audit -c path/to/envpkt.toml
+
+# Include env defaults drift alongside secrets
+envpkt audit --all
+
+# Show only env defaults drift
+envpkt audit --env-only
+
+# Show only sealed (encrypted) secrets
+envpkt audit --sealed
+
+# Show only externally-managed secrets
+envpkt audit --external
 ```
 
 ## Exit Codes

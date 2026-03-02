@@ -139,6 +139,41 @@ audit.secrets.forEach((s) => {
 })
 ```
 
+### `computeEnvAudit(config)`
+
+Compute drift results for `[env.*]` entries. Returns `EnvAuditResult`.
+
+```typescript
+const envAudit = computeEnvAudit(config)
+console.log(`${envAudit.total} env defaults, ${envAudit.defaults_applied} using default`)
+envAudit.entries.forEach((e) => {
+  console.log(`${e.key}: ${e.status}`) // "default" | "overridden" | "not_set"
+})
+```
+
+### `EnvAuditResult`
+
+```typescript
+type EnvAuditResult = {
+  readonly entries: ReadonlyArray<EnvDriftEntry>
+  readonly total: number
+  readonly defaults_applied: number
+  readonly overridden: number
+  readonly not_set: number
+}
+```
+
+### `EnvMeta`
+
+```typescript
+type EnvMeta = {
+  readonly value: string
+  readonly purpose?: string
+  readonly comment?: string
+  readonly tags?: Record<string, string>
+}
+```
+
 ## Fleet Scanner
 
 ### `scanFleet(dir, options?)`

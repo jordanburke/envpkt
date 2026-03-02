@@ -115,6 +115,10 @@
               "description": "Why this secret exists and what it enables",
               "type": "string"
             },
+            "comment": {
+              "description": "Free-form annotation or note",
+              "type": "string"
+            },
             "capabilities": {
               "description": "What operations this secret grants (e.g. read, write, admin)",
               "type": "array",
@@ -181,6 +185,10 @@
             },
             "purpose": {
               "description": "Why this env var exists",
+              "type": "string"
+            },
+            "comment": {
+              "description": "Free-form annotation or note",
               "type": "string"
             },
             "tags": {

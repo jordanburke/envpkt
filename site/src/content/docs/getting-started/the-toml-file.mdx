@@ -63,9 +63,11 @@ Each `[secret.<KEY>]` section describes a single secret. Fields are organized by
 | Tier            | Fields                                          | Description                               |
 | --------------- | ----------------------------------------------- | ----------------------------------------- |
 | **Scan-first**  | `service`, `expires`, `rotation_url`            | Key health indicators for audit           |
-| **Context**     | `purpose`, `capabilities`, `created`            | Why this secret exists and what it grants |
+| **Context**     | `purpose`, `comment`, `capabilities`, `created` | Why this secret exists and what it grants |
 | **Operational** | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime and provisioning info             |
 | **Enforcement** | `required`, `tags`                              | Filtering, grouping, and policy           |
+
+The `comment` field is a free-form annotation — use it for ad-hoc notes distinct from `purpose` (e.g., "Shared with reporting service — coordinate rotation").
 
 ## Agent Identity
 
@@ -105,6 +107,30 @@ on_expiring = "https://hooks.slack.com/services/T00/B00/xxx"
 on_expired = "https://hooks.slack.com/services/T00/B00/yyy"
 on_audit_fail = "https://hooks.slack.com/services/T00/B00/zzz"
 ```
+
+## Environment Defaults
+
+The optional `[env.*]` section declares plaintext environment defaults — non-secret values that are safe to commit. Use these for configuration like runtime mode, log levels, and feature flags.
+
+```toml
+[env.NODE_ENV]
+value = "production"
+purpose = "Runtime environment mode"
+comment = "Override to 'development' for local testing"
+
+[env.LOG_LEVEL]
+value = "info"
+purpose = "Application log verbosity"
+```
+
+| Field     | Type     | Required | Description                           |
+| --------- | -------- | -------- | ------------------------------------- |
+| `value`   | `string` | Yes      | Default value for this env variable   |
+| `purpose` | `string` | No       | Why this env var exists               |
+| `comment` | `string` | No       | Free-form annotation or note          |
+| `tags`    | `object` | No       | Key-value tags for grouping/filtering |
+
+`envpkt audit --all` shows env default drift alongside secret health. `envpkt audit --env-only` shows only env defaults.
 
 ## Catalog Reference
 

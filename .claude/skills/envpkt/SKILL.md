@@ -12,7 +12,7 @@ envpkt is a credential lifecycle and fleet management tool for AI agents. It pro
 - **CLI** (`envpkt`) — 12 commands for credential setup, auditing, sealing, fleet scanning, and environment management
 - **Library API** — Programmatic access via `import { boot, bootSafe, computeAudit, ... } from "envpkt"`
 - **MCP Server** — Expose credential health and capabilities to LLM agents via Model Context Protocol
-- **Configuration** — `envpkt.toml` declares per-secret metadata across 5 tiers with lifecycle policies
+- **Configuration** — `envpkt.toml` declares per-secret metadata across 5 tiers with lifecycle policies, plus `[env.*]` for plaintext environment defaults
 
 envpkt stores metadata about secrets (service, expiration, purpose, capabilities) and can optionally store age-encrypted secret values as sealed packets (safe to commit). At runtime, values are resolved from sealed packets, fnox, or environment variables.
 
@@ -96,11 +96,17 @@ identity = "./keys/agent.age"       # Path to encrypted age key
 recipient = "age1..."               # Public key for encryption
 secrets = ["OPENAI_API_KEY"]        # Keys to pull from catalog
 
+[env.NODE_ENV]                          # Non-secret environment defaults
+value = "production"
+purpose = "Runtime environment mode"
+comment = "Override to 'development' for local testing"
+
 [secret.OPENAI_API_KEY]               # Per-secret metadata
 service = "openai"
 expires = "2025-06-30"
 rotation_url = "https://platform.openai.com/api-keys"
 purpose = "LLM inference for data processing"
+comment = "Shared across all ML agents"
 capabilities = ["chat", "embeddings"]
 created = "2025-01-15"
 rotates = "90d"
@@ -129,7 +135,7 @@ on_audit_fail = "pagerduty-alert.sh"
 | Tier            | Fields                                          | Purpose                            |
 | --------------- | ----------------------------------------------- | ---------------------------------- |
 | 1 — Scan-first  | `service`, `expires`, `rotation_url`            | Auto-discovered by `env scan`      |
-| 2 — Context     | `purpose`, `capabilities`, `created`            | Human-annotated context            |
+| 2 — Context     | `purpose`, `comment`, `capabilities`, `created` | Human-annotated context            |
 | 3 — Operational | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime operational data           |
 | 4 — Enforcement | `required`, `tags`                              | Policy enforcement and filtering   |
 | Sealed          | `encrypted_value`                               | Age-encrypted value safe to commit |
@@ -158,7 +164,7 @@ See `references/quick-reference.md` for a compact cheat sheet.
 | `envpkt inspect`   | Display structured view of config                 |
 | `envpkt env check` | Bidirectional drift detection vs live environment |
 
-**audit options**: `-c <path>`, `--format table|json|minimal`, `--expiring <days>`, `--status <status>`, `--strict`
+**audit options**: `-c <path>`, `--format table|json|minimal`, `--expiring <days>`, `--status <status>`, `--strict`, `--all`, `--env-only`, `--sealed`, `--external`
 
 **inspect options**: `-c <path>`, `--format table|json`, `--resolved`, `--secrets`, `--plaintext`
 

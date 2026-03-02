@@ -93,6 +93,19 @@ rotation_url = "https://wiki.internal/runbooks/rotate-db-creds"
 source = "vault"
 ```
 
+For non-secret configuration defaults (runtime mode, log levels, etc.), use `[env.*]`:
+
+```toml
+[env.NODE_ENV]
+value = "production"
+purpose = "Runtime environment mode"
+comment = "Override to 'development' for local testing"
+
+[env.LOG_LEVEL]
+value = "info"
+purpose = "Application log verbosity"
+```
+
 See [`examples/`](./examples/) for more configurations.
 
 ## Shared Secret Catalog
@@ -415,7 +428,7 @@ Each `[secret.<KEY>]` section describes a secret:
 | Tier            | Fields                                          | Description                                 |
 | --------------- | ----------------------------------------------- | ------------------------------------------- |
 | **Scan-first**  | `service`, `expires`, `rotation_url`            | Key health indicators for audit             |
-| **Context**     | `purpose`, `capabilities`, `created`            | Why this secret exists and what it grants   |
+| **Context**     | `purpose`, `comment`, `capabilities`, `created` | Why this secret exists and what it grants   |
 | **Operational** | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime and provisioning info               |
 | **Sealed**      | `encrypted_value`                               | Age-encrypted secret value (safe to commit) |
 | **Enforcement** | `required`, `tags`                              | Filtering, grouping, and policy             |

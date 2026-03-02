@@ -53,6 +53,7 @@ export const SecretMetaSchema = Type.Object(
     ),
     // Tier 2: context
     purpose: Type.Optional(Type.String({ description: "Why this secret exists and what it enables" })),
+    comment: Type.Optional(Type.String({ description: "Free-form annotation or note" })),
     capabilities: Type.Optional(
       Type.Array(Type.String(), { description: "What operations this secret grants (e.g. read, write, admin)" }),
     ),
@@ -117,6 +118,7 @@ export const EnvMetaSchema = Type.Object(
   {
     value: Type.String({ description: "Default value for this environment variable" }),
     purpose: Type.Optional(Type.String({ description: "Why this env var exists" })),
+    comment: Type.Optional(Type.String({ description: "Free-form annotation or note" })),
     tags: Type.Optional(
       Type.Record(Type.String(), Type.String(), { description: "Key-value tags for grouping and filtering" }),
     ),

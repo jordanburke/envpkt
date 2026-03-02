@@ -104,6 +104,7 @@
 | `expires`         | 1      | `YYYY-MM-DD`             | Secret expiration date               |
 | `rotation_url`    | 1      | `URL`                    | Where to rotate                      |
 | `purpose`         | 2      | `string`                 | Why this secret exists               |
+| `comment`         | 2      | `string`                 | Free-form annotation or note         |
 | `capabilities`    | 2      | `string[]`               | What operations it grants            |
 | `created`         | 2      | `YYYY-MM-DD`             | Provisioning date                    |
 | `rotates`         | 3      | `string`                 | Rotation schedule (e.g. `"90d"`)     |
@@ -113,6 +114,15 @@
 | `encrypted_value` | sealed | `string`                 | Age-encrypted ciphertext             |
 | `required`        | 4      | `boolean`                | Whether required for operation       |
 | `tags`            | 4      | `Record<string, string>` | Key-value tags                       |
+
+### `[env.*]`
+
+| Field     | Type                     | Description                           |
+| --------- | ------------------------ | ------------------------------------- |
+| `value`   | `string`                 | Default value (required)              |
+| `purpose` | `string`                 | Why this env var exists               |
+| `comment` | `string`                 | Free-form annotation or note          |
+| `tags`    | `Record<string, string>` | Key-value tags for grouping/filtering |
 
 ### `[lifecycle]`
 

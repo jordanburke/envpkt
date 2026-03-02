@@ -41,6 +41,7 @@ mcp = true
 [env.NODE_ENV]
 value = "production"
 purpose = "Runtime environment mode"
+comment = "Override to 'development' for local testing"
 
 [env.LOG_LEVEL]
 value = "info"
@@ -69,6 +70,7 @@ source = "vault"
 [secret.DATABASE_URL]
 service = "postgres"
 purpose = "Write processed data to the analytics database"
+comment = "Shared with the reporting service — coordinate rotation"
 capabilities = ["SELECT", "INSERT", "UPDATE"]
 created = "2026-06-15"
 expires = "2027-06-15"

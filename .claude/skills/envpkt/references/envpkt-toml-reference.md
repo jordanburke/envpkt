@@ -34,6 +34,7 @@ rotation_url = "https://platform.openai.com/api-keys"
 
 # Tier 2: Context (human-annotated)
 purpose = "LLM inference for data processing pipeline"
+comment = "Shared across all ML agents"
 capabilities = ["chat", "embeddings"]
 created = "2025-01-15"
 
@@ -66,6 +67,17 @@ source = "iam"
 required = true
 # Sealed value — age-encrypted, safe to commit
 encrypted_value = "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24..."
+
+# --- Environment Defaults (non-secret, safe to commit) ---
+
+[env.NODE_ENV]
+value = "production"
+purpose = "Runtime environment mode"
+comment = "Override to 'development' for local testing"
+
+[env.LOG_LEVEL]
+value = "info"
+purpose = "Application log verbosity"
 
 # --- Lifecycle Policy (optional) ---
 [lifecycle]

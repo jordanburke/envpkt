@@ -17,6 +17,7 @@ type InspectOptions = {
 
 const printSecretMeta = (meta: SecretMeta, indent: string): void => {
   if (meta.purpose) console.log(`${indent}purpose: ${meta.purpose}`)
+  if (meta.comment) console.log(`${indent}comment: ${DIM}${meta.comment}${RESET}`)
   if (meta.capabilities) console.log(`${indent}capabilities: ${DIM}${meta.capabilities.join(", ")}${RESET}`)
 
   const dateParts: string[] = []
@@ -100,6 +101,7 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
             : `${YELLOW}overridden${RESET}`
       console.log(`  ${statusIcon} ${BOLD}${key}${RESET} = "${entry.value}" ${statusLabel}`)
       if (entry.purpose) console.log(`    purpose: ${entry.purpose}`)
+      if (entry.comment) console.log(`    comment: ${DIM}${entry.comment}${RESET}`)
     }
   }
 

@@ -47,6 +47,7 @@ Per-secret metadata. Each key corresponds to an environment variable name.
 | `expires`      | `string` (date) | No       | Scan-first  | Expiration date (`YYYY-MM-DD`)                |
 | `rotation_url` | `string` (URI)  | No       | Scan-first  | URL for rotation procedure                    |
 | `purpose`      | `string`        | No       | Context     | Why this secret exists                        |
+| `comment`      | `string`        | No       | Context     | Free-form annotation or note                  |
 | `capabilities` | `string[]`      | No       | Context     | Operations this secret grants                 |
 | `created`      | `string` (date) | No       | Context     | Provisioning date (`YYYY-MM-DD`)              |
 | `rotates`      | `string`        | No       | Operational | Rotation schedule (e.g., `90d`, `quarterly`)  |
@@ -55,6 +56,30 @@ Per-secret metadata. Each key corresponds to an environment variable name.
 | `source`       | `string`        | No       | Operational | Secret origin (e.g., `vault`, `ci`, `manual`) |
 | `required`     | `boolean`       | No       | Enforcement | Whether secret is required for operation      |
 | `tags`         | `object`        | No       | Enforcement | Key-value tags for grouping/filtering         |
+
+## `[env.<KEY>]` Sections
+
+Plaintext environment defaults. Each key corresponds to an environment variable. These are non-secret values that are safe to commit — use `[secret.*]` for sensitive credentials.
+
+| Field     | Type     | Required                 | Description                           |
+| --------- | -------- | ------------------------ | ------------------------------------- |
+| `value`   | `string` | Yes (if section present) | Default value for this env variable   |
+| `purpose` | `string` | No                       | Why this env var exists               |
+| `comment` | `string` | No                       | Free-form annotation or note          |
+| `tags`    | `object` | No                       | Key-value tags for grouping/filtering |
+
+```toml
+[env.NODE_ENV]
+value = "production"
+purpose = "Runtime environment mode"
+comment = "Override to 'development' for local testing"
+
+[env.LOG_LEVEL]
+value = "info"
+purpose = "Application log verbosity"
+```
+
+`envpkt audit --all` includes env default drift alongside secret health. Use `envpkt audit --env-only` to see only env defaults.
 
 ## `[lifecycle]` Section
 

@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest"
 import { TypeCompiler } from "@sinclair/typebox/compiler"
-import { EnvpktConfigSchema, SecretMetaSchema, AgentIdentitySchema } from "../../src/core/schema.js"
+import { EnvpktConfigSchema, SecretMetaSchema, AgentIdentitySchema, EnvMetaSchema } from "../../src/core/schema.js"
 
 const configChecker = TypeCompiler.Compile(EnvpktConfigSchema)
 const secretMetaChecker = TypeCompiler.Compile(SecretMetaSchema)
 const agentChecker = TypeCompiler.Compile(AgentIdentitySchema)
+const envMetaChecker = TypeCompiler.Compile(EnvMetaSchema)
 
 describe("EnvpktConfigSchema", () => {
   it("validates a minimal config", () => {
@@ -114,6 +115,32 @@ describe("SecretMetaSchema", () => {
   it("rejects tags as array (now must be Record<string,string>)", () => {
     const meta = { tags: ["billing"] }
     expect(secretMetaChecker.Check(meta)).toBe(false)
+  })
+
+  it("accepts comment field", () => {
+    const meta = { service: "stripe", comment: "Rotated by ops team on Mondays" }
+    expect(secretMetaChecker.Check(meta)).toBe(true)
+  })
+})
+
+describe("EnvMetaSchema", () => {
+  it("validates minimal env meta", () => {
+    expect(envMetaChecker.Check({ value: "production" })).toBe(true)
+  })
+
+  it("accepts comment field", () => {
+    const meta = { value: "info", purpose: "Log level", comment: "Set to debug for troubleshooting" }
+    expect(envMetaChecker.Check(meta)).toBe(true)
+  })
+
+  it("validates full env meta with tags and comment", () => {
+    const meta = {
+      value: "production",
+      purpose: "Runtime mode",
+      comment: "Override in staging",
+      tags: { env: "prod" },
+    }
+    expect(envMetaChecker.Check(meta)).toBe(true)
   })
 })
 
