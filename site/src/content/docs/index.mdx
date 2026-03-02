@@ -1,9 +1,9 @@
 ---
 title: envpacket
-description: Credential lifecycle and fleet management for AI agents
+description: Credentials your agents actually understand
 template: splash
 hero:
-  tagline: One file answers five questions per credential — What / Where / Why / When / How
+  tagline: Structured metadata for every secret — capabilities, constraints, expiration, and fleet health — so agents operate within their boundaries instead of flying blind.
   actions:
     - text: Get Started
       link: /getting-started/installation/
@@ -18,9 +18,17 @@ hero:
 import { Card, CardGrid } from "@astrojs/starlight/components"
 
 <CardGrid stagger>
+  <Card title="MCP Integration" icon="puzzle">
+    Built-in MCP server gives AI agents structured awareness of their credentials — capabilities, constraints,
+    expiration, rotation — without exposing secret values. Works with Claude, Cursor, VS Code, and any MCP client.
+  </Card>
+  <Card title="Three-Tier Security" icon="approve-check">
+    Architecturally enforced trust boundaries. The MCP server never has access to secret values. Runtime injection stays
+    outside the LLM context. Fleet-wide audit trails for full visibility.
+  </Card>
   <Card title="Metadata + Sealed Secrets" icon="information">
-    envpkt stores metadata about secrets — what service each credential authenticates to, when it expires, how to rotate
-    it — and can optionally store age-encrypted values as sealed packets, safe to commit.
+    Every credential gets structured metadata — service, purpose, capabilities, expiration, rotation URL — plus optional
+    age-encrypted sealed packets, safe to commit to git.
   </Card>
   <Card title="Environment Scanning" icon="magnifier">
     Auto-discover credentials from your shell with `envpkt env scan`. Matches ~45 known services, ~13 suffix patterns,
@@ -29,14 +37,6 @@ import { Card, CardGrid } from "@astrojs/starlight/components"
   <Card title="Fleet Health" icon="heart">
     Scan an entire directory tree of agents with `envpkt fleet`. Get aggregated health status, expiration warnings, and
     stale credential detection across your fleet.
-  </Card>
-  <Card title="Shared Catalog" icon="open-book">
-    Define secret metadata once in a central catalog, then have each agent reference it. Resolve to flat configs for
-    deployment with `envpkt resolve`.
-  </Card>
-  <Card title="MCP Integration" icon="puzzle">
-    Built-in MCP server exposes credential metadata to AI agents. Four tools and two resources for health monitoring and
-    capability discovery.
   </Card>
   <Card title="Functional API" icon="seti:typescript">
     TypeScript library built on functype. All functions return `Either` or `Option` — no thrown exceptions. Use

@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**envpkt** is a credential lifecycle and fleet management library/CLI for AI agents. It stores _metadata about_ secrets (not the secrets themselves) in `envpkt.toml` files — answering What/Where/Why/When/How for each credential. It optionally embeds age-encrypted secret values via "sealed packets."
+**envpkt** — Credentials your agents actually understand. A metadata sidecar library/CLI that gives AI agents structured awareness of their secrets — capabilities, constraints, expiration, rotation — without exposing raw values. Stores metadata in `envpkt.toml` files with optional age-encrypted sealed packets for self-contained deployments.
 
-Key capabilities: audit credential health, detect drift between config and environment, scan for credentials in process.env, manage shared catalogs across agent fleets, encrypt/decrypt secrets with age, and expose metadata to AI agents via MCP.
+Key capabilities: MCP server for agent-facing credential awareness (metadata only, no secret values), audit credential health, detect drift between config and environment, scan for credentials in process.env, manage shared catalogs across agent fleets, encrypt/decrypt secrets with age. Three-tier trust model: MCP layer (no access to secrets), boot() runtime injection (outside LLM context), and audit trails for shell-level agents.
 
 ## Development Commands
 
@@ -56,7 +56,7 @@ Commander-based CLI. Each command in `src/cli/commands/` maps 1:1 to a subcomman
 
 ### MCP Layer (`src/mcp/`)
 
-MCP server using `@modelcontextprotocol/sdk` with stdio transport. Exposes 4 tools (`getPacketHealth`, `listCapabilities`, `getSecretMeta`, `checkExpiration`) and 2 resources (`envpkt://health`, `envpkt://capabilities`). No secret values exposed.
+MCP server using `@modelcontextprotocol/sdk` with stdio transport. Exposes 5 tools (`getPacketHealth`, `listCapabilities`, `getSecretMeta`, `checkExpiration`, `getEnvMeta`) and 2 resources (`envpkt://health`, `envpkt://capabilities`). The MCP server does not have access to secret values — it reads `envpkt.toml` which contains metadata only, and `encrypted_value` ciphertext is stripped from responses.
 
 ### fnox Integration (`src/fnox/`)
 

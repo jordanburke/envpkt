@@ -3,7 +3,7 @@ title: MCP Server
 description: Expose credential metadata to AI agents via Model Context Protocol
 ---
 
-envpkt ships an [MCP](https://modelcontextprotocol.io/) server that exposes credential metadata to AI agents. No secret values are ever exposed.
+envpkt ships an [MCP](https://modelcontextprotocol.io/) server that gives AI agents structured awareness of their credentials. The server reads `envpkt.toml` which contains metadata — never plaintext secret values.
 
 ## Configuration
 
@@ -36,6 +36,7 @@ Uses stdio transport. The server reads `envpkt.toml` from the current directory 
 | `listCapabilities` | List agent and per-secret capabilities                  |
 | `getSecretMeta`    | Get metadata for a specific secret by key               |
 | `checkExpiration`  | Check expiration status and days remaining              |
+| `getEnvMeta`       | Get metadata for environment defaults and drift status  |
 
 ### `getPacketHealth`
 
@@ -53,6 +54,10 @@ Takes a secret key and returns its metadata (service, purpose, capabilities, exp
 
 Returns expiration status for all secrets, including days remaining and expired flags.
 
+### `getEnvMeta`
+
+Returns metadata for configured environment defaults (`[env.*]` entries) and their current drift status.
+
 ## Resources
 
 | URI                     | Description                       |
@@ -62,13 +67,14 @@ Returns expiration status for all secrets, including days remaining and expired 
 
 ## Security Model
 
-The MCP server:
+The MCP server does not have access to secret values — this is an architectural constraint, not a policy choice:
 
-- Never exposes secret **values**
-- Only shares **metadata** (service names, expiration dates, capabilities, rotation URLs)
-- Reads from `envpkt.toml` which itself contains no secret values
+- The server reads from `envpkt.toml`, which contains metadata but never plaintext secret values
+- It never calls `boot()`, `unsealSecrets()`, or reads `process.env` for secret values
+- Encrypted ciphertext (`encrypted_value` fields) is excluded from tool responses
+- Only **metadata** is shared: service names, expiration dates, capabilities, rotation URLs
 
-This follows envpkt's core principle: **awareness, not access**.
+This means prompt injection attacks against the MCP layer cannot leak secret values — there are no secret values to leak. See the [Security Model](https://github.com/jordanburke/envpkt#security-model) in the README for the full three-tier trust model.
 
 ## Library API
 

@@ -202,7 +202,8 @@ const handleGetSecretMeta = (args: Record<string, unknown>): CallToolResult => {
   const meta = secretEntries[key]
   if (!meta) return errorResult(`Secret not found: ${key}`)
 
-  return textResult(JSON.stringify({ key, ...meta }, null, 2))
+  const { encrypted_value: _, ...safeMeta } = meta
+  return textResult(JSON.stringify({ key, ...safeMeta }, null, 2))
 }
 
 const handleCheckExpiration = (args: Record<string, unknown>): CallToolResult => {

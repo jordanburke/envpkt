@@ -3,24 +3,59 @@
 [![Node.js CI](https://github.com/jordanburke/envpkt/actions/workflows/node.js.yml/badge.svg)](https://github.com/jordanburke/envpkt/actions/workflows/node.js.yml)
 [![npm version](https://img.shields.io/npm/v/envpkt.svg)](https://www.npmjs.com/package/envpkt)
 
-Credential lifecycle and fleet management for AI agents.
+**Credentials your agents actually understand.**
 
-**fnox handles access. envpkt handles awareness.** One file (`envpkt.toml`) answers five questions per credential: **What / Where / Why / When / How**.
+Structured metadata for every secret — capabilities, constraints, expiration, and fleet health — so agents operate within their boundaries instead of flying blind.
 
-## Why envpkt?
+Every credential in your system gets an `envpkt.toml` entry describing _what service it authenticates to_, _what it's allowed to do_, _when it expires_, and _how to rotate it_. Your agents query this metadata via MCP to understand their operating constraints. Your operators audit credential health across entire agent fleets. The secrets themselves stay where they belong — in your secrets manager, encrypted at rest, or injected at runtime — never in the agent's conversation context.
 
-Secrets managers store values. envpkt stores _metadata about_ those values — what service each credential authenticates to, when it expires, how to rotate it, and why it exists. This gives AI agents (and their operators) a structured way to:
+## MCP Integration
 
-- Audit credential health across a fleet of agents
-- Get warnings before secrets expire
-- Detect stale or orphaned credentials
-- Understand what capabilities each secret grants
-- Automate rotation workflows
-- Share secret metadata across agents via a central catalog
+envpkt ships an [MCP](https://modelcontextprotocol.io/) server that gives AI agents structured awareness of their credentials. Add it to Claude, Cursor, VS Code, or any MCP-compatible client:
 
-envpkt works alongside your existing secrets manager (Vault, fnox, CI variables, etc.). Optionally, you can embed age-encrypted secret values directly in the TOML via **sealed packets** — making configs fully self-contained and safe to commit to git.
+```json
+{
+  "mcpServers": {
+    "envpkt": {
+      "command": "envpkt",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### Tools
+
+| Tool               | Description                                             |
+| ------------------ | ------------------------------------------------------- |
+| `getPacketHealth`  | Get overall health status with per-secret audit results |
+| `listCapabilities` | List agent and per-secret capabilities                  |
+| `getSecretMeta`    | Get metadata for a specific secret by key               |
+| `checkExpiration`  | Check expiration status and days remaining              |
+| `getEnvMeta`       | Get metadata for environment defaults and drift status  |
+
+### Resources
+
+| URI                     | Description                       |
+| ----------------------- | --------------------------------- |
+| `envpkt://health`       | Current credential health summary |
+| `envpkt://capabilities` | Agent and secret capabilities     |
+
+The MCP server exposes metadata only — it does not have access to secret values. See [Security Model](#security-model) for details.
+
+## Security Model
+
+envpkt operates a three-tier trust model. Each tier has different guarantees, and we're explicit about what each one protects against.
+
+**Tier 1: MCP metadata (agent-facing)** — The MCP server never returns raw credential values. This isn't a policy choice — architecturally, the server reads `envpkt.toml` which contains metadata (service names, capabilities, expiration dates, rotation URLs) but never plaintext secrets. The agent gets structured awareness of its constraints without any secret material entering the LLM context window. Prompt injection attacks cannot leak what isn't there.
+
+**Tier 2: Runtime injection (process-facing)** — `boot()` resolves secrets (from sealed packets, fnox, or environment variables) and injects them into `process.env` at startup, outside the LLM context. This is the same trust model as every Node.js application that reads from `.env`, except now secrets are encrypted at rest, scoped per-agent, and auditable. This is defense-in-depth against prompt injection — the most common attack vector — but it is not a hard boundary against agents with code execution capabilities.
+
+**Tier 3: Shell-level agents** — Agents with shell access (Claude Code, Devin, etc.) can read environment variables directly. Prevention isn't possible at this tier. envpkt provides encrypted storage, scoped access, and audit trails — because when prevention isn't possible, visibility is what matters.
 
 ## Quick Start
+
+Start where your credentials already are — environment variables — and graduate to encrypted, per-agent-scoped metadata.
 
 ```bash
 # Install
@@ -108,65 +143,6 @@ purpose = "Application log verbosity"
 
 See [`examples/`](./examples/) for more configurations.
 
-## Shared Secret Catalog
-
-When multiple agents consume the same secrets, a **shared catalog** prevents metadata duplication. Define secret metadata once in a central file, then have each agent reference it.
-
-### Catalog file (`infra/envpkt.toml`)
-
-```toml
-version = 1
-
-[lifecycle]
-stale_warning_days = 90
-require_expiration = true
-
-[secret.DATABASE_URL]
-service = "postgres"
-purpose = "Primary application database"
-capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
-rotation_url = "https://wiki.internal/runbooks/rotate-db"
-source = "vault"
-created = "2025-11-01"
-expires = "2026-11-01"
-
-[secret.REDIS_URL]
-service = "redis"
-purpose = "Caching and session storage"
-created = "2025-11-01"
-expires = "2026-11-01"
-```
-
-### Agent file (`agents/pipeline/envpkt.toml`)
-
-```toml
-version = 1
-catalog = "../../infra/envpkt.toml"
-
-[agent]
-name = "data-pipeline"
-consumer = "agent"
-secrets = ["DATABASE_URL", "REDIS_URL"]
-
-# Optional: narrow the catalog definition for this agent
-[secret.DATABASE_URL]
-capabilities = ["SELECT"]
-```
-
-### Resolve to a flat config
-
-```bash
-envpkt resolve -c agents/pipeline/envpkt.toml
-```
-
-This produces a self-contained config with catalog metadata merged in and agent overrides applied. The resolved output has no `catalog` reference — it's ready for deployment.
-
-### Merge rules
-
-- Each field in the agent's `[secret.KEY]` override **replaces** the catalog field (shallow merge)
-- Omitted fields keep the catalog value
-- `agent.secrets` is the source of truth for which keys the agent needs
-
 ## Sealed Packets
 
 Sealed packets embed age-encrypted secret values directly in `envpkt.toml`. This makes your config fully self-contained — no external secrets backend needed at runtime.
@@ -210,7 +186,97 @@ const result = boot() // decrypts sealed values, injects into process.env
 
 Mixed mode is supported — sealed values take priority, with fnox as fallback for keys without `encrypted_value`.
 
-## CLI Commands
+## Fleet Management
+
+When you're running multiple agents, `envpkt fleet` scans a directory tree for `envpkt.toml` files and aggregates credential health across your entire fleet.
+
+```bash
+envpkt fleet                    # Scan current directory (depth 3)
+envpkt fleet -d /opt/agents     # Scan specific directory
+envpkt fleet --depth 5          # Increase scan depth
+envpkt fleet --format json      # JSON output
+envpkt fleet --status critical  # Filter agents by health status
+```
+
+### Shared Catalog
+
+When multiple agents consume the same secrets, a **shared catalog** prevents metadata duplication. Define secret metadata once in a central file, then have each agent reference it.
+
+#### Catalog file (`infra/envpkt.toml`)
+
+```toml
+version = 1
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+
+[secret.DATABASE_URL]
+service = "postgres"
+purpose = "Primary application database"
+capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
+rotation_url = "https://wiki.internal/runbooks/rotate-db"
+source = "vault"
+created = "2025-11-01"
+expires = "2026-11-01"
+
+[secret.REDIS_URL]
+service = "redis"
+purpose = "Caching and session storage"
+created = "2025-11-01"
+expires = "2026-11-01"
+```
+
+#### Agent file (`agents/pipeline/envpkt.toml`)
+
+```toml
+version = 1
+catalog = "../../infra/envpkt.toml"
+
+[agent]
+name = "data-pipeline"
+consumer = "agent"
+secrets = ["DATABASE_URL", "REDIS_URL"]
+
+# Optional: narrow the catalog definition for this agent
+[secret.DATABASE_URL]
+capabilities = ["SELECT"]
+```
+
+#### Resolve to a flat config
+
+```bash
+envpkt resolve -c agents/pipeline/envpkt.toml
+```
+
+This produces a self-contained config with catalog metadata merged in and agent overrides applied. The resolved output has no `catalog` reference — it's ready for deployment.
+
+#### Merge rules
+
+- Each field in the agent's `[secret.KEY]` override **replaces** the catalog field (shallow merge)
+- Omitted fields keep the catalog value
+- `agent.secrets` is the source of truth for which keys the agent needs
+
+## How envpkt Compares
+
+The agentic credential space is splitting into approaches. Here's where envpkt fits:
+
+|                             | envpkt                                                      | agent-vault                 | AgentSecrets               | 1Password Agentic             | Infisical            |
+| --------------------------- | ----------------------------------------------------------- | --------------------------- | -------------------------- | ----------------------------- | -------------------- |
+| **Core approach**           | Metadata sidecar                                            | Git-based secret storage    | Proxy injection            | Browser autofill              | Secret retrieval API |
+| **What agents see**         | Structured metadata (capabilities, constraints, expiration) | Raw secret values           | Nothing (proxy handles it) | Nothing (autofill handles it) | Raw secret values    |
+| **MCP server**              | Yes                                                         | Yes                         | No                         | No                            | Yes                  |
+| **Encryption at rest**      | age sealed packets                                          | Git-crypt                   | N/A (proxy model)          | Vault encryption              | Vault encryption     |
+| **Per-agent scoping**       | Yes (agent.secrets, capabilities)                           | Yes (policies)              | Yes (proxy rules)          | No                            | Yes (policies)       |
+| **Fleet health monitoring** | Yes (fleet scan, aggregated audit)                          | No                          | No                         | No                            | No                   |
+| **Credential metadata**     | Rich (purpose, capabilities, rotation, lifecycle)           | Minimal                     | Minimal                    | Minimal                       | Moderate             |
+| **Adoption path**           | Scan existing env vars, add metadata incrementally          | New secret storage workflow | Proxy configuration        | Browser extension             | API integration      |
+
+**envpkt's angle**: Competitors are fighting over how secrets move — retrieval vs. proxy vs. autofill. envpkt owns what secrets _mean_. Rate limits, expiration policies, capability scopes, rotation runbooks — structured semantics that travel with the credential. That's the layer the others don't have.
+
+> **Note**: This comparison reflects publicly available information. Verify current feature sets before making procurement decisions.
+
+## CLI Reference
 
 ### `envpkt init`
 
@@ -251,18 +317,6 @@ envpkt resolve -c agent.toml --dry-run      # Preview without writing
 ```
 
 Configs without a `catalog` field pass through unchanged.
-
-### `envpkt fleet`
-
-Scan a directory tree for `envpkt.toml` files and aggregate health.
-
-```bash
-envpkt fleet                    # Scan current directory (depth 3)
-envpkt fleet -d /opt/agents     # Scan specific directory
-envpkt fleet --depth 5          # Increase scan depth
-envpkt fleet --format json      # JSON output
-envpkt fleet --status critical  # Filter agents by health status
-```
 
 ### `envpkt inspect`
 
@@ -379,86 +433,6 @@ Start the envpkt MCP server (stdio transport) for AI agent integration.
 envpkt mcp
 ```
 
-## MCP Server
-
-envpkt ships an [MCP](https://modelcontextprotocol.io/) server that exposes credential metadata to AI agents. Add it to your MCP client config:
-
-```json
-{
-  "mcpServers": {
-    "envpkt": {
-      "command": "envpkt",
-      "args": ["mcp"]
-    }
-  }
-}
-```
-
-### Tools
-
-| Tool               | Description                                             |
-| ------------------ | ------------------------------------------------------- |
-| `getPacketHealth`  | Get overall health status with per-secret audit results |
-| `listCapabilities` | List agent and per-secret capabilities                  |
-| `getSecretMeta`    | Get metadata for a specific secret by key               |
-| `checkExpiration`  | Check expiration status and days remaining              |
-
-### Resources
-
-| URI                     | Description                       |
-| ----------------------- | --------------------------------- |
-| `envpkt://health`       | Current credential health summary |
-| `envpkt://capabilities` | Agent and secret capabilities     |
-
-No secret values are ever exposed through the MCP server.
-
-## Schema
-
-envpkt.toml is validated against a JSON Schema. Editors with TOML + JSON Schema support will provide autocompletion and validation when the `#:schema` directive is present on line 1.
-
-The schema is published at:
-
-- npm: `envpkt/schema` (importable via package exports)
-- GitHub: `schemas/envpkt.schema.json`
-
-### Secret Metadata Fields
-
-Each `[secret.<KEY>]` section describes a secret:
-
-| Tier            | Fields                                          | Description                                 |
-| --------------- | ----------------------------------------------- | ------------------------------------------- |
-| **Scan-first**  | `service`, `expires`, `rotation_url`            | Key health indicators for audit             |
-| **Context**     | `purpose`, `comment`, `capabilities`, `created` | Why this secret exists and what it grants   |
-| **Operational** | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime and provisioning info               |
-| **Sealed**      | `encrypted_value`                               | Age-encrypted secret value (safe to commit) |
-| **Enforcement** | `required`, `tags`                              | Filtering, grouping, and policy             |
-
-### Agent Identity
-
-The optional `[agent]` section identifies the AI agent:
-
-```toml
-[agent]
-name = "data-pipeline-agent"
-consumer = "agent"                     # agent | service | developer | ci
-description = "ETL pipeline processor"
-capabilities = ["read-s3", "write-postgres"]
-expires = "2027-01-01"
-services = ["aws", "postgres"]
-secrets = ["DATABASE_URL", "AWS_KEY"]  # When using a catalog
-```
-
-### Lifecycle Policy
-
-The optional `[lifecycle]` section configures audit behavior:
-
-```toml
-[lifecycle]
-stale_warning_days = 90       # Flag secrets older than N days without updates
-require_expiration = true     # Require expires on all secrets
-require_service = true        # Require service on all secrets
-```
-
 ## Library API
 
 envpkt is also available as a TypeScript library with a functional programming API built on [functype](https://github.com/jordanburke/functype). All functions return `Either<Error, Result>` or `Option<T>` — no thrown exceptions.
@@ -495,6 +469,21 @@ config.fold(
 // Fleet scan
 const fleet = scanFleet("/opt/agents", { maxDepth: 3 })
 console.log(`${fleet.total_agents} agents, ${fleet.total_secrets} secrets`)
+```
+
+### Framework Integration
+
+`boot()` runs before your agent framework initializes, making it compatible with any framework:
+
+```typescript
+import { boot } from "envpkt"
+
+// Resolve and inject credentials before agent startup
+const result = boot({ configPath: "envpkt.toml", inject: true })
+console.log(`${result.audit.status} — ${result.injected.length} secrets loaded`)
+
+// Now start your agent framework — process.env is populated
+// Works with LangChain, CrewAI, AutoGen, or any framework that reads from process.env
 ```
 
 ### Packet Formatting API
@@ -604,6 +593,53 @@ loadConfig(configPath).fold(
     )
   },
 )
+```
+
+## Schema
+
+envpkt.toml is validated against a JSON Schema. Editors with TOML + JSON Schema support will provide autocompletion and validation when the `#:schema` directive is present on line 1.
+
+The schema is published at:
+
+- npm: `envpkt/schema` (importable via package exports)
+- GitHub: `schemas/envpkt.schema.json`
+
+### Secret Metadata Fields
+
+Each `[secret.<KEY>]` section describes a secret:
+
+| Tier            | Fields                                          | Description                                 |
+| --------------- | ----------------------------------------------- | ------------------------------------------- |
+| **Scan-first**  | `service`, `expires`, `rotation_url`            | Key health indicators for audit             |
+| **Context**     | `purpose`, `comment`, `capabilities`, `created` | Why this secret exists and what it grants   |
+| **Operational** | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime and provisioning info               |
+| **Sealed**      | `encrypted_value`                               | Age-encrypted secret value (safe to commit) |
+| **Enforcement** | `required`, `tags`                              | Filtering, grouping, and policy             |
+
+### Agent Identity
+
+The optional `[agent]` section identifies the AI agent:
+
+```toml
+[agent]
+name = "data-pipeline-agent"
+consumer = "agent"                     # agent | service | developer | ci
+description = "ETL pipeline processor"
+capabilities = ["read-s3", "write-postgres"]
+expires = "2027-01-01"
+services = ["aws", "postgres"]
+secrets = ["DATABASE_URL", "AWS_KEY"]  # When using a catalog
+```
+
+### Lifecycle Policy
+
+The optional `[lifecycle]` section configures audit behavior:
+
+```toml
+[lifecycle]
+stale_warning_days = 90       # Flag secrets older than N days without updates
+require_expiration = true     # Require expires on all secrets
+require_service = true        # Require service on all secrets
 ```
 
 ## fnox Integration
