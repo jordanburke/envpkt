@@ -1,6 +1,7 @@
 import { execFileSync } from "node:child_process"
 
-import { Either, Left, Right, Try } from "functype"
+import type { Either } from "functype"
+import { Left, Right, Try } from "functype"
 
 import type { FnoxError } from "../core/types.js"
 

@@ -158,7 +158,7 @@ export const runInspect = (options: InspectOptions): void => {
               process.exit(2)
             },
             (resolveResult) => {
-              const showResolved = options.resolved || !!resolveResult.catalogPath
+              const showResolved = options.resolved ?? !!resolveResult.catalogPath
               const showConfig = showResolved ? resolveResult.config : config
 
               if (options.format === "json") {

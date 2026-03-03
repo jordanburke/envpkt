@@ -3,7 +3,8 @@ import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
 import { TypeCompiler } from "@sinclair/typebox/compiler"
-import { Either, Left, List, Option, Right, Try } from "functype"
+import type { Either } from "functype"
+import { Left, List, Option, Right, Try } from "functype"
 import { parse, TomlDate } from "smol-toml"
 
 import { EnvpktConfigSchema } from "./schema.js"
@@ -30,12 +31,11 @@ const normalizeDates = (obj: unknown): unknown => {
 
 /** Expand ~ and $ENV_VAR / ${ENV_VAR} in a path string */
 export const expandPath = (p: string): string => {
-  let expanded = p.startsWith("~/") || p === "~" ? join(homedir(), p.slice(1)) : p
-  expanded = expanded.replace(/\$\{(\w+)\}|\$(\w+)/g, (_, braced: string | undefined, bare: string | undefined) => {
+  const homExpanded = p.startsWith("~/") || p === "~" ? join(homedir(), p.slice(1)) : p
+  return homExpanded.replace(/\$\{(\w+)\}|\$(\w+)/g, (_, braced: string | undefined, bare: string | undefined) => {
     const name = braced ?? bare ?? ""
     return process.env[name] ?? ""
   })
-  return expanded
 }
 
 /** Find envpkt.toml in the given directory */

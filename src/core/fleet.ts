@@ -1,3 +1,4 @@
+import type { Dirent } from "node:fs"
 import { readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 
@@ -48,12 +49,9 @@ function* findEnvpktFiles(dir: string, maxDepth: number, currentDepth = 0): Gene
 
   if (currentDepth >= maxDepth) return
 
-  let entries: import("node:fs").Dirent[] = []
-  Try(() => readdirSync(dir, { withFileTypes: true })).fold(
-    () => {},
-    (e) => {
-      entries = e
-    },
+  const entries: ReadonlyArray<Dirent> = Try(() => readdirSync(dir, { withFileTypes: true })).fold(
+    () => [] as ReadonlyArray<Dirent>,
+    (e) => e,
   )
 
   for (const entry of entries) {

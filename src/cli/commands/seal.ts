@@ -10,8 +10,10 @@ import { BOLD, CYAN, DIM, formatError, GREEN, RED, RESET, YELLOW } from "../outp
 type SealOptions = {
   readonly config?: string
   readonly profile?: string
+  readonly reseal?: boolean
 }
 
+/* eslint-disable functional/no-let -- stateful line-by-line TOML parser */
 /** Write sealed values back into the TOML file, preserving structure */
 const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encrypted_value?: string }>): void => {
   const raw = readFileSync(configPath, "utf-8")
@@ -107,6 +109,7 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
 
   writeFileSync(configPath, output.join("\n"))
 }
+/* eslint-enable functional/no-let */
 
 export const runSeal = async (options: SealOptions): Promise<void> => {
   const configResult = resolveConfigPath(options.config)
@@ -136,7 +139,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     process.exit(2)
   }
 
-  const recipient = config.agent.recipient
+  const { recipient } = config.agent
   const configDir = dirname(configPath)
 
   // Guard: refuse to seal keys that exist in [env.*]
@@ -150,23 +153,44 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   }
 
   // Resolve agent key if identity is configured
-  let agentKey: string | undefined
-  if (config.agent.identity) {
-    const identityPath = resolve(configDir, expandPath(config.agent.identity))
-    const keyResult = unwrapAgentKey(identityPath)
-    agentKey = keyResult.fold(
-      (err) => {
-        const msg = err._tag === "IdentityNotFound" ? `not found: ${err.path}` : err.message
-        console.error(`${YELLOW}Warning:${RESET} Could not unwrap agent key: ${msg}`)
-        return undefined
-      },
-      (k) => k,
+  const agentKey: string | undefined = config.agent.identity
+    ? (() => {
+        const identityPath = resolve(configDir, expandPath(config.agent.identity))
+        return unwrapAgentKey(identityPath).fold(
+          (err) => {
+            const msg = err._tag === "IdentityNotFound" ? `not found: ${err.path}` : err.message
+            console.error(`${YELLOW}Warning:${RESET} Could not unwrap agent key: ${msg}`)
+            return undefined
+          },
+          (k) => k,
+        )
+      })()
+    : undefined
+
+  // Partition secrets into already-sealed and unsealed
+  const allSecretEntries = config.secret ?? {}
+  const allKeys = Object.keys(allSecretEntries)
+  const alreadySealed = allKeys.filter((k) => allSecretEntries[k]?.encrypted_value)
+  const unsealed = allKeys.filter((k) => !allSecretEntries[k]?.encrypted_value)
+
+  // Skip already-sealed unless --reseal
+  if (!options.reseal && alreadySealed.length > 0) {
+    if (unsealed.length === 0) {
+      console.log(
+        `${GREEN}✓${RESET} All ${BOLD}${alreadySealed.length}${RESET} secret(s) already sealed. Use ${CYAN}--reseal${RESET} to re-encrypt.`,
+      )
+      process.exit(0)
+    }
+    console.log(
+      `${DIM}Skipping ${alreadySealed.length} already-sealed secret(s). Use --reseal to re-encrypt all.${RESET}`,
     )
   }
 
+  const targetKeys = options.reseal ? allKeys : unsealed
+  const secretEntries = Object.fromEntries(targetKeys.map((k) => [k, allSecretEntries[k]!]))
+
   // Resolve values via cascade
-  const secretEntries = config.secret ?? {}
-  const metaKeys = Object.keys(secretEntries)
+  const metaKeys = targetKeys
   console.log(
     `${BOLD}Sealing ${metaKeys.length} secret(s)${RESET} with recipient ${CYAN}${recipient.slice(0, 20)}...${RESET}`,
   )
@@ -196,7 +220,10 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     },
     (sealedMeta) => {
       writeSealedToml(configPath, sealedMeta)
-      console.log(`${GREEN}Sealed${RESET} ${resolved} secret(s) into ${DIM}${configPath}${RESET}`)
+      const sealedCount = resolved
+      const prevSealed = options.reseal ? 0 : alreadySealed.length
+      const summary = prevSealed > 0 ? ` (${prevSealed} previously sealed kept)` : ""
+      console.log(`${GREEN}Sealed${RESET} ${sealedCount} secret(s) into ${DIM}${configPath}${RESET}${summary}`)
     },
   )
 }

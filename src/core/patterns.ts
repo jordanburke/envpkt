@@ -496,13 +496,8 @@ export const deriveServiceFromName = (name: string): string => {
     "_URI",
   ]
 
-  let stripped = name
-  for (const suffix of suffixes) {
-    if (stripped.endsWith(suffix)) {
-      stripped = stripped.slice(0, -suffix.length)
-      break
-    }
-  }
+  const matchedSuffix = suffixes.find((s) => name.endsWith(s))
+  const stripped = matchedSuffix ? name.slice(0, -matchedSuffix.length) : name
 
   return stripped.toLowerCase().replace(/_/g, "-")
 }

@@ -98,6 +98,7 @@ program
   .description("Encrypt secret values into envpkt.toml using age (sealed packets)")
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--profile <profile>", "fnox profile to use for value resolution")
+  .option("--reseal", "Re-encrypt all secrets, including already sealed (for key rotation)")
   .action(async (options) => {
     await runSeal(options)
   })
@@ -115,6 +116,7 @@ const env = program.command("env").description("Discover and check credentials i
 env
   .command("scan")
   .description("Auto-discover credentials from process.env and scaffold TOML entries")
+  .option("-c, --config <path>", "Path to envpkt.toml (write target for --write)")
   .option("--format <format>", "Output format: table | json", "table")
   .option("--write", "Write discovered credentials to envpkt.toml")
   .option("--dry-run", "Preview TOML that would be written (implies --write)")

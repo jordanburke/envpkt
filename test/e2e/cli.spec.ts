@@ -53,6 +53,82 @@ describe("envpkt CLI e2e", () => {
     expect(stdout).toContain("mcp")
   })
 
+  describe("subcommand help surfaces options", () => {
+    it("audit --help shows -c, --config", () => {
+      const { stdout, status } = run(["audit", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("--strict")
+      expect(stdout).toContain("--format <format>")
+    })
+
+    it("inspect --help shows -c, --config", () => {
+      const { stdout, status } = run(["inspect", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("--resolved")
+      expect(stdout).toContain("--secrets")
+    })
+
+    it("exec --help shows -c, --config", () => {
+      const { stdout, status } = run(["exec", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("--skip-audit")
+      expect(stdout).toContain("--strict")
+    })
+
+    it("resolve --help shows -c, --config", () => {
+      const { stdout, status } = run(["resolve", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("-o, --output <path>")
+      expect(stdout).toContain("--dry-run")
+    })
+
+    it("seal --help shows -c, --config and --reseal", () => {
+      const { stdout, status } = run(["seal", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("--reseal")
+    })
+
+    it("mcp --help shows -c, --config", () => {
+      const { stdout, status } = run(["mcp", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+    })
+
+    it("env scan --help shows -c, --config, --write, --dry-run", () => {
+      const { stdout, status } = run(["env", "scan", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("--write")
+      expect(stdout).toContain("--dry-run")
+    })
+
+    it("env check --help shows -c, --config", () => {
+      const { stdout, status } = run(["env", "check", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("--strict")
+    })
+
+    it("env export --help shows -c, --config", () => {
+      const { stdout, status } = run(["env", "export", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("--profile <profile>")
+    })
+
+    it("fleet --help shows -d, --dir", () => {
+      const { stdout, status } = run(["fleet", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-d, --dir <path>")
+      expect(stdout).toContain("--depth <n>")
+    })
+  })
+
   it("shows version with --version", () => {
     const { stdout, status } = run(["--version"])
     expect(status).toBe(0)

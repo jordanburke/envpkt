@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs"
 
-import { Either, Left, Right, Try } from "functype"
+import type { Either } from "functype"
+import { Left, Right, Try } from "functype"
 import { Option } from "functype"
 import { parse } from "smol-toml"
 

@@ -23,7 +23,7 @@ export const createServer = (): Server => {
     },
   )
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  server.setRequestHandler(ListToolsRequestSchema, () => ({
     tools: toolDefinitions.map((t) => ({
       name: t.name,
       description: t.description,
@@ -31,16 +31,16 @@ export const createServer = (): Server => {
     })),
   }))
 
-  server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, (request) => {
     const { name, arguments: args } = request.params
     return callTool(name, (args ?? {}) as Record<string, unknown>)
   })
 
-  server.setRequestHandler(ListResourcesRequestSchema, async () => ({
+  server.setRequestHandler(ListResourcesRequestSchema, () => ({
     resources: [...resourceDefinitions],
   }))
 
-  server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
+  server.setRequestHandler(ReadResourceRequestSchema, (request) => {
     const { uri } = request.params
     const result = readResource(uri)
     if (!result) {

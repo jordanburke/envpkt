@@ -19,7 +19,7 @@ export const runExec = (args: ReadonlyArray<string>, options: ExecOptions): void
     return
   }
 
-  const skipAudit = options.skipAudit || options.check === false
+  const skipAudit = options.skipAudit ?? options.check === false
 
   const result = bootSafe({
     inject: false,

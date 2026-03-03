@@ -1,7 +1,8 @@
 import { execFileSync } from "node:child_process"
 import { existsSync } from "node:fs"
 
-import { Either, Left, Right, Try } from "functype"
+import type { Either } from "functype"
+import { Left, Right, Try } from "functype"
 
 import type { IdentityError } from "../core/types.js"
 

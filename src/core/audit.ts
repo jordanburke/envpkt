@@ -17,7 +17,7 @@ const WARN_BEFORE_DAYS = 30
 const daysBetween = (from: Date, to: Date): number => Math.floor((to.getTime() - from.getTime()) / MS_PER_DAY)
 
 const parseDate = (dateStr: string): Option<Date> => {
-  const d = new Date(dateStr + "T00:00:00Z")
+  const d = new Date(`${dateStr}T00:00:00Z`)
   return Number.isNaN(d.getTime()) ? Option<Date>(undefined) : Option(d)
 }
 

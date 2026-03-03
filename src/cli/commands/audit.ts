@@ -115,37 +115,42 @@ const runAuditOnConfig = (config: EnvpktConfig, options: AuditOptions): void => 
 
   const audit = computeAudit(config)
 
-  let filtered = audit
+  const afterSealed = options.sealed
+    ? (() => {
+        const secretEntries = config.secret ?? {}
+        return { ...audit, secrets: audit.secrets.filter((s) => !!secretEntries[s.key]?.encrypted_value) }
+      })()
+    : audit
 
-  // --sealed: filter to secrets with encrypted_value
-  if (options.sealed) {
-    const secretEntries = config.secret ?? {}
-    const filteredSecrets = audit.secrets.filter((s) => !!secretEntries[s.key]?.encrypted_value)
-    filtered = { ...audit, secrets: filteredSecrets }
-  }
+  const afterExternal = options.external
+    ? (() => {
+        const secretEntries = config.secret ?? {}
+        return {
+          ...afterSealed,
+          secrets: afterSealed.secrets.filter((s) => !secretEntries[s.key]?.encrypted_value),
+        }
+      })()
+    : afterSealed
 
-  // --external: filter to secrets without encrypted_value
-  if (options.external) {
-    const secretEntries = config.secret ?? {}
-    const filteredSecrets = audit.secrets.filter((s) => !secretEntries[s.key]?.encrypted_value)
-    filtered = { ...audit, secrets: filteredSecrets }
-  }
+  const afterStatus = options.status
+    ? {
+        ...afterExternal,
+        secrets: afterExternal.secrets.filter((s) => s.status === (options.status as SecretStatus)),
+      }
+    : afterExternal
 
-  if (options.status) {
-    const statusFilter = options.status as SecretStatus
-    const filteredSecrets = filtered.secrets.filter((s) => s.status === statusFilter)
-    filtered = { ...filtered, secrets: filteredSecrets }
-  }
-  if (options.expiring !== undefined) {
-    const days = options.expiring
-    const filteredSecrets = filtered.secrets.filter((s) =>
-      s.days_remaining.fold(
-        () => false,
-        (d) => d >= 0 && d <= days,
-      ),
-    )
-    filtered = { ...filtered, secrets: filteredSecrets }
-  }
+  const filtered =
+    options.expiring !== undefined
+      ? {
+          ...afterStatus,
+          secrets: afterStatus.secrets.filter((s) =>
+            s.days_remaining.fold(
+              () => false,
+              (d) => d >= 0 && d <= options.expiring!,
+            ),
+          ),
+        }
+      : afterStatus
 
   if (options.format === "json") {
     console.log(formatAuditJson(filtered))

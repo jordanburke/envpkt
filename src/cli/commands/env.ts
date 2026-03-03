@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
-import { dirname, join } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import { Try } from "functype"
 
@@ -23,6 +23,7 @@ import {
 } from "../output.js"
 
 type ScanOptions = {
+  readonly config?: string
   readonly format?: string
   readonly write?: boolean
   readonly dryRun?: boolean
@@ -64,7 +65,7 @@ export const runEnvScan = (options: ScanOptions): void => {
       return
     }
 
-    const configPath = join(process.cwd(), "envpkt.toml")
+    const configPath = resolve(options.config ?? join(process.cwd(), "envpkt.toml"))
     if (existsSync(configPath)) {
       // Append only new entries not already in the file
       const existing = Try(() => readFileSync(configPath, "utf-8")).fold(
@@ -75,12 +76,12 @@ export const runEnvScan = (options: ScanOptions): void => {
       const newEntries = scan.discovered.toArray().filter((m) => !existing.includes(`[secret.${m.envVar}]`))
 
       if (newEntries.length === 0) {
-        console.log(`\n${GREEN}✓${RESET} All discovered credentials already tracked in envpkt.toml`)
+        console.log(`\n${GREEN}✓${RESET} All discovered credentials already tracked in ${CYAN}${configPath}${RESET}`)
         return
       }
 
       const newToml = generateTomlFromScan(newEntries)
-      const writeResult = Try(() => writeFileSync(configPath, existing.trimEnd() + "\n\n" + newToml, "utf-8"))
+      const writeResult = Try(() => writeFileSync(configPath, `${existing.trimEnd()}\n\n${newToml}`, "utf-8"))
       writeResult.fold(
         (err) => {
           console.error(`\n${RED}Error:${RESET} Failed to write: ${err}`)
@@ -103,7 +104,7 @@ export const runEnvScan = (options: ScanOptions): void => {
         },
         () => {
           console.log(
-            `\n${GREEN}✓${RESET} Created ${BOLD}envpkt.toml${RESET} with ${CYAN}${scan.discovered.size}${RESET} credential(s)`,
+            `\n${GREEN}✓${RESET} Created ${CYAN}${configPath}${RESET} with ${BOLD}${scan.discovered.size}${RESET} credential(s)`,
           )
         },
       )

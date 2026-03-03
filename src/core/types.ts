@@ -1,5 +1,7 @@
 import type { List, Option } from "functype"
 
+import type { AgentIdentity, EnvpktConfig } from "./schema.js"
+
 // Re-export schema-derived types
 export type {
   AgentIdentity,
@@ -43,7 +45,7 @@ export type AuditResult = {
   readonly missing: number
   readonly missing_metadata: number
   readonly orphaned: number
-  readonly agent?: import("./schema.js").AgentIdentity
+  readonly agent?: AgentIdentity
 }
 
 // --- Env drift types ---
@@ -70,7 +72,7 @@ export type EnvAuditResult = {
 
 export type FleetAgent = {
   readonly path: string
-  readonly agent?: import("./schema.js").AgentIdentity
+  readonly agent?: AgentIdentity
   readonly min_expiry_days?: number
   readonly audit: AuditResult
 }
@@ -117,7 +119,7 @@ export type ResolveOptions = {
 }
 
 export type ResolveResult = {
-  readonly config: import("./schema.js").EnvpktConfig
+  readonly config: EnvpktConfig
   readonly catalogPath?: string
   readonly merged: ReadonlyArray<string>
   readonly overridden: ReadonlyArray<string>

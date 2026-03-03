@@ -140,27 +140,26 @@ export const runInit = (dir: string, options: InitOptions): void => {
     process.exit(1)
   }
 
-  let fnoxKeys: ReadonlyArray<string> | undefined
+  const fnoxKeys: ReadonlyArray<string> | undefined = options.fromFnox
+    ? (() => {
+        const fnoxPath =
+          options.fromFnox === "true" || options.fromFnox === "" ? join(dir, "fnox.toml") : options.fromFnox
 
-  if (options.fromFnox) {
-    const fnoxPath = options.fromFnox === "true" || options.fromFnox === "" ? join(dir, "fnox.toml") : options.fromFnox
+        if (!existsSync(fnoxPath)) {
+          console.error(`${RED}Error:${RESET} fnox.toml not found at ${fnoxPath}`)
+          process.exit(1)
+        }
 
-    if (!existsSync(fnoxPath)) {
-      console.error(`${RED}Error:${RESET} fnox.toml not found at ${fnoxPath}`)
-      process.exit(1)
-    }
-
-    const result = readFnoxKeys(fnoxPath)
-    result.fold(
-      (err) => {
-        console.error(`${RED}Error:${RESET} Failed to read fnox.toml: ${formatConfigError(err)}`)
-        process.exit(1)
-      },
-      (keys) => {
-        fnoxKeys = keys
-      },
-    )
-  }
+        return readFnoxKeys(fnoxPath).fold(
+          (err) => {
+            console.error(`${RED}Error:${RESET} Failed to read fnox.toml: ${formatConfigError(err)}`)
+            process.exit(1)
+            return undefined // unreachable
+          },
+          (keys) => keys,
+        )
+      })()
+    : undefined
 
   const content = generateTemplate(options, fnoxKeys)
 
