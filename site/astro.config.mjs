@@ -28,6 +28,7 @@ export default defineConfig({
             { slug: "cli/exec" },
             { slug: "cli/env-scan" },
             { slug: "cli/env-check" },
+            { slug: "cli/env-export" },
             { slug: "cli/shell-hook" },
             { slug: "cli/mcp" },
           ],
@@ -35,6 +36,8 @@ export default defineConfig({
         {
           label: "Guides",
           items: [
+            { slug: "guides/developer-workflow" },
+            { slug: "guides/agent-ci-workflow" },
             { slug: "guides/catalog-system" },
             { slug: "guides/fleet-management" },
             { slug: "guides/environment-scanning" },

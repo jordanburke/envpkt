@@ -18,6 +18,14 @@ hero:
 import { Card, CardGrid } from "@astrojs/starlight/components"
 
 <CardGrid stagger>
+  <Card title="Developer Workflow" icon="laptop">
+    Scan your environment, build a catalog, sync via cloud drive, and load secrets per terminal with `eval "$(envpkt env
+    export)"`. [Get started →](/guides/developer-workflow/)
+  </Card>
+  <Card title="Agent & CI Deployment" icon="rocket">
+    Gate deployments with `audit --strict`, encrypt with `seal`, deploy with `exec --strict`, and monitor with `fleet`.
+    [Get started →](/guides/agent-ci-workflow/)
+  </Card>
   <Card title="MCP Integration" icon="puzzle">
     Built-in MCP server gives AI agents structured awareness of their credentials — capabilities, constraints,
     expiration, rotation — without exposing secret values. Works with Claude, Cursor, VS Code, and any MCP client.

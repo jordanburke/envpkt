@@ -1,0 +1,162 @@
+---
+title: Developer Workflow
+description: Scan credentials, build a catalog, sync via cloud drive, and load secrets per terminal
+---
+
+The developer workflow gives you structured credential awareness across every project and terminal session — without changing how you store secrets.
+
+## The Flow
+
+```
+env scan → catalog.toml → cloud-synced folder → ENVPKT_CONFIG → eval "$(envpkt env export)"
+```
+
+1. **Discover** what's in your environment with `env scan`
+2. **Catalog** the secrets with metadata (service, expiration, rotation)
+3. **Sync** the catalog via iCloud Drive, OneDrive, or a private git repo
+4. **Pick up** secrets per-terminal with `env export` + shell hook
+
+## Step 1: Discover Your Secrets
+
+Start by scanning your current environment:
+
+```bash
+# See what envpkt detects
+envpkt env scan
+
+# Write discovered credentials to envpkt.toml
+envpkt env scan --write
+
+# Preview what would be written without creating a file
+envpkt env scan --dry-run
+```
+
+Example output:
+
+```
+  Variable               Service     Confidence
+  ─────────────────────────────────────────────
+  STRIPE_SECRET_KEY      stripe      high (exact match)
+  OPENAI_API_KEY         openai      high (exact match)
+  DATABASE_URL           postgres    medium (suffix pattern)
+  MY_CUSTOM_TOKEN        unknown     low (value shape)
+
+✓ Created envpkt.toml with 4 credential(s)
+```
+
+## Step 2: Build a Catalog
+
+Promote your scanned output into a proper catalog with lifecycle metadata:
+
+```toml
+# catalog.toml
+version = 1
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+require_service = true
+
+[secret.STRIPE_SECRET_KEY]
+service = "stripe"
+purpose = "Payment processing"
+capabilities = ["charges:write", "subscriptions:read"]
+rotation_url = "https://dashboard.stripe.com/apikeys"
+created = "2026-02-01"
+expires = "2027-02-01"
+rate_limit = "100/sec"
+
+[secret.OPENAI_API_KEY]
+service = "openai"
+purpose = "LLM API access"
+capabilities = ["chat:completions", "embeddings"]
+rotation_url = "https://platform.openai.com/api-keys"
+created = "2026-01-15"
+expires = "2027-01-15"
+
+[secret.DATABASE_URL]
+service = "postgres"
+purpose = "Application database"
+capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
+rotation_url = "https://wiki.internal/runbooks/rotate-db"
+created = "2026-01-15"
+expires = "2027-01-15"
+source = "vault"
+```
+
+The catalog is a standard `envpkt.toml` — there's no special format. It becomes a catalog when other configs reference it.
+
+## Step 3: Cloud Sync Setup
+
+Put your catalog in a cloud-synced folder so every machine picks it up. envpkt is a reader — it never writes to or manages the sync folder.
+
+**iCloud Drive (macOS)**:
+
+```bash
+export ENVPKT_CONFIG="$HOME/Library/Mobile Documents/com~apple~CloudDocs/envpkt/catalog.toml"
+```
+
+**OneDrive**:
+
+```bash
+export ENVPKT_CONFIG="$HOME/OneDrive/envpkt/catalog.toml"
+```
+
+**Private git repo**:
+
+```bash
+export ENVPKT_CONFIG="$HOME/IdeaProjects/secrets/catalog.toml"
+```
+
+The catalog contains metadata only — no secret values — so cloud sync and private git are both safe.
+
+## Step 4: Shell Pickup
+
+Add to your `.zshrc` or `.bashrc` to load secrets on every new terminal:
+
+```bash
+# Point to your synced catalog
+export ENVPKT_CONFIG="$HOME/Library/Mobile Documents/com~apple~CloudDocs/envpkt/catalog.toml"
+
+# Load secrets into the shell (resolves sealed → fnox → env cascade)
+eval "$(envpkt env export 2>/dev/null)"
+
+# Optional: install shell hook for ambient warnings on cd
+eval "$(envpkt shell-hook zsh)"
+```
+
+The `env export` command resolves values through the cascade (sealed packets → fnox → environment) and outputs `export KEY='VALUE'` lines. The `eval` wrapping injects them into your current shell.
+
+The shell hook runs a lightweight `audit --format minimal` whenever you `cd` into a directory with an `envpkt.toml`, warning you about expiring or stale credentials.
+
+## Step 5: Ongoing Maintenance
+
+```bash
+# Check health of your catalog
+envpkt audit
+
+# Detect drift between config and live environment
+envpkt env check
+
+# Re-scan to find new credentials
+envpkt env scan
+
+# See what changed since last scan
+envpkt env scan --dry-run
+```
+
+## Per-Project Agent Configs
+
+For projects that need a subset of catalog secrets, create a local `envpkt.toml` that references the synced catalog:
+
+```toml
+# my-project/envpkt.toml
+version = 1
+catalog = "../../Library/Mobile Documents/com~apple~CloudDocs/envpkt/catalog.toml"
+
+[agent]
+name = "my-project"
+secrets = ["DATABASE_URL", "STRIPE_SECRET_KEY"]
+```
+
+This narrows the catalog to only the secrets this project needs. The agent config inherits all metadata from the catalog — you don't repeat it.

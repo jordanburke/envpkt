@@ -13,7 +13,14 @@ import { runShellHook } from "./commands/shell-hook.js"
 
 const program = new Command()
 
-program.name("envpkt").description("Credential lifecycle and fleet management for AI agents").version("0.1.0")
+program
+  .name("envpkt")
+  .description(
+    "Credential lifecycle and fleet management for AI agents\n\n" +
+      "  Developer workflow:  env scan → catalog → cloud-synced folder → eval $(envpkt env export)\n" +
+      "  Agent / CI workflow: catalog → audit --strict → seal → exec --strict → fleet",
+  )
+  .version("0.1.0")
 
 program
   .command("init")
@@ -31,7 +38,7 @@ program
 
 program
   .command("audit")
-  .description("Audit credential health from envpkt.toml")
+  .description("Audit credential health from envpkt.toml (use --strict in CI pipelines to gate deploys)")
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--format <format>", "Output format: table | json | minimal", "table")
   .option("--expiring <days>", "Show secrets expiring within N days", parseInt)
@@ -47,7 +54,7 @@ program
 
 program
   .command("fleet")
-  .description("Scan directory tree for envpkt.toml files and aggregate health")
+  .description("Scan directory tree for envpkt.toml files and aggregate health (use in CI for fleet-wide monitoring)")
   .option("-d, --dir <path>", "Root directory to scan", ".")
   .option("--depth <n>", "Max directory depth", parseInt)
   .option("--format <format>", "Output format: table | json", "table")
@@ -70,7 +77,7 @@ program
 
 program
   .command("exec")
-  .description("Run pre-flight audit then execute a command with fnox-injected env")
+  .description("Run pre-flight audit then execute a command with injected secrets (sealed → fnox → env cascade)")
   .argument("<command...>", "Command to execute")
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--profile <profile>", "fnox profile to use")
@@ -95,7 +102,7 @@ program
 
 program
   .command("seal")
-  .description("Encrypt secret values into envpkt.toml using age (sealed packets)")
+  .description("Encrypt secret values into envpkt.toml using age — sealed packets are safe to commit to git")
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--profile <profile>", "fnox profile to use for value resolution")
   .option("--reseal", "Re-encrypt all secrets, including already sealed (for key rotation)")
@@ -115,7 +122,9 @@ const env = program.command("env").description("Discover and check credentials i
 
 env
   .command("scan")
-  .description("Auto-discover credentials from process.env and scaffold TOML entries")
+  .description(
+    "Auto-discover credentials from process.env and scaffold TOML entries — first step in the developer workflow",
+  )
   .option("-c, --config <path>", "Path to envpkt.toml (write target for --write)")
   .option("--format <format>", "Output format: table | json", "table")
   .option("--write", "Write discovered credentials to envpkt.toml")
@@ -137,7 +146,9 @@ env
 
 env
   .command("export")
-  .description("Output export statements for eval-ing secrets into the current shell")
+  .description(
+    'Output export statements for eval-ing secrets into the current shell. Usage: eval "$(envpkt env export)"',
+  )
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--profile <profile>", "fnox profile to use")
   .option("--skip-audit", "Skip the pre-flight audit")
@@ -147,7 +158,7 @@ env
 
 program
   .command("shell-hook")
-  .description("Output shell function for ambient credential warnings on cd")
+  .description("Output shell function for ambient credential warnings on cd — combine with env export for full setup")
   .argument("<shell>", "Shell type: zsh | bash")
   .action((shell: string) => {
     runShellHook(shell)

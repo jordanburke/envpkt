@@ -1,0 +1,246 @@
+---
+title: Agent & CI Deployment
+description: Gate deployments with audit, encrypt secrets with seal, deploy with exec, and monitor with fleet
+---
+
+The agent and CI/CD workflow gives you a credential lifecycle pipeline — from shared catalog through audit gates, sealed secrets, and fleet-wide monitoring.
+
+## The Flow
+
+```
+catalog → agent configs → audit --strict gate → seal → exec --strict deploy → fleet monitoring
+```
+
+1. **Catalog** defines shared secret metadata once
+2. **Agent configs** reference the catalog and narrow to needed secrets
+3. **Audit gate** blocks deploys on expired or missing credentials
+4. **Seal** encrypts values for safe git storage
+5. **Exec** runs commands with injected secrets after a pre-flight audit
+6. **Fleet** monitors health across all agents
+
+## Step 1: Shared Catalog
+
+Create a central catalog with your team's secrets:
+
+```toml
+# infra/catalog.toml
+version = 1
+
+[lifecycle]
+stale_warning_days = 90
+require_expiration = true
+require_service = true
+
+[secret.DATABASE_URL]
+service = "postgres"
+purpose = "Primary application database"
+capabilities = ["SELECT", "INSERT", "UPDATE", "DELETE"]
+rotation_url = "https://wiki.internal/runbooks/rotate-db"
+source = "vault"
+created = "2026-01-15"
+expires = "2027-01-15"
+
+[secret.STRIPE_SECRET_KEY]
+service = "stripe"
+purpose = "Payment processing"
+capabilities = ["charges:write", "subscriptions:read"]
+rotation_url = "https://dashboard.stripe.com/apikeys"
+created = "2026-02-01"
+expires = "2027-02-01"
+
+[secret.REDIS_URL]
+service = "redis"
+purpose = "Cache and session storage"
+created = "2026-01-15"
+expires = "2027-01-15"
+
+[secret.SLACK_WEBHOOK_URL]
+service = "slack"
+purpose = "Deployment notifications"
+capabilities = ["post:messages"]
+created = "2026-01-15"
+expires = "2027-01-15"
+```
+
+## Step 2: Agent Configs
+
+Each service creates a config referencing the catalog and listing only its needed secrets:
+
+```toml
+# agents/api-gateway/envpkt.toml
+version = 1
+catalog = "../../infra/catalog.toml"
+
+[agent]
+name = "api-gateway"
+consumer = "service"
+description = "REST API — handles payments and database writes"
+capabilities = ["http:serve", "payments:process"]
+secrets = ["DATABASE_URL", "STRIPE_SECRET_KEY"]
+```
+
+```toml
+# agents/worker/envpkt.toml
+version = 1
+catalog = "../../infra/catalog.toml"
+
+[agent]
+name = "worker"
+consumer = "service"
+description = "Background job processor"
+secrets = ["DATABASE_URL", "REDIS_URL", "SLACK_WEBHOOK_URL"]
+
+# Narrow DB access to read-only for this agent
+[secret.DATABASE_URL]
+capabilities = ["SELECT"]
+```
+
+## Step 3: CI Audit Gate
+
+Use `audit --strict` in CI to block deployments when credentials are unhealthy:
+
+```bash
+# Fail the build on any non-healthy secret
+envpkt audit --strict -c agents/api-gateway/envpkt.toml
+
+# Machine-readable output for CI parsing
+envpkt audit --strict --format json -c agents/api-gateway/envpkt.toml
+```
+
+Exit codes:
+
+- `0` — all secrets healthy, pipeline continues
+- `1` — degraded (expiring soon, stale)
+- `2` — critical (expired or missing secrets)
+
+## Step 4: Sealed Secrets
+
+Encrypt secret values into the config file using [age](https://github.com/FiloSottile/age). Sealed packets are safe to commit to git.
+
+```bash
+# Generate an age identity (one-time setup)
+age-keygen -o key.txt
+# Store the public key in your config or CI secrets
+
+# Seal all secrets in a config
+envpkt seal -c agents/api-gateway/envpkt.toml
+
+# Re-seal for key rotation
+envpkt seal -c agents/api-gateway/envpkt.toml --reseal
+```
+
+After sealing, each secret gets an `encrypted_value` field:
+
+```toml
+[secret.STRIPE_SECRET_KEY]
+service = "stripe"
+purpose = "Payment processing"
+encrypted_value = "age1..."
+```
+
+The `encrypted_value` is an age-encrypted ciphertext. The raw secret value is never stored in plaintext.
+
+## Step 5: Exec with Injected Env
+
+Use `exec` to run a command with secrets injected after a pre-flight audit:
+
+```bash
+# Run deploy script with audit gate
+envpkt exec --strict -c agents/api-gateway/envpkt.toml -- ./deploy.sh
+
+# Skip audit for trusted local dev
+envpkt exec --skip-audit -c agents/api-gateway/envpkt.toml -- npm start
+```
+
+The exec command resolves values through a 3-phase cascade:
+
+1. **Sealed packets** — decrypted from `encrypted_value` in the config
+2. **fnox** — resolved from the fnox credential store (if available)
+3. **Environment** — falls back to existing `process.env` values
+
+Secrets are injected into the child process environment. The parent shell is not modified.
+
+## Step 6: Fleet Monitoring
+
+Monitor credential health across all agents:
+
+```bash
+# Scan all agents under a directory
+envpkt fleet -d agents/
+
+# JSON output for CI dashboards
+envpkt fleet -d agents/ --format json
+
+# Filter to only unhealthy agents
+envpkt fleet -d agents/ --status critical
+```
+
+Fleet scanning discovers all `envpkt.toml` files in the tree, runs audit on each, and aggregates the results.
+
+## Complete GitHub Actions Workflow
+
+```yaml
+name: Credential Lifecycle
+on:
+  push:
+    paths:
+      - "infra/catalog.toml"
+      - "agents/*/envpkt.toml"
+  schedule:
+    - cron: "0 9 * * 1" # Weekly Monday 9am
+
+jobs:
+  audit-gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install -g envpkt
+
+      - name: Audit all agents
+        run: envpkt fleet -d agents/ --format json
+
+      - name: Strict audit per agent
+        run: |
+          for config in agents/*/envpkt.toml; do
+            echo "Auditing $config..."
+            envpkt audit --strict -c "$config" --format json
+          done
+
+      - name: Check for drift
+        run: envpkt env check --strict -c infra/catalog.toml
+
+  deploy:
+    needs: audit-gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install -g envpkt
+
+      - name: Deploy with credential injection
+        run: envpkt exec --strict -c agents/api-gateway/envpkt.toml -- ./deploy.sh
+
+  fleet-report:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install -g envpkt
+
+      - name: Fleet health report
+        run: envpkt fleet -d agents/ --format json > fleet-report.json
+
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: fleet-health
+          path: fleet-report.json
+```
