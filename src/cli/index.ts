@@ -1,4 +1,6 @@
-import { createRequire } from "node:module"
+import { existsSync, readFileSync } from "node:fs"
+import { dirname, join } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { Command } from "commander"
 
@@ -22,7 +24,17 @@ program
       "  Developer workflow:  env scan → catalog → cloud-synced folder → eval $(envpkt env export)\n" +
       "  Agent / CI workflow: catalog → audit --strict → seal → exec --strict → fleet",
   )
-  .version((createRequire(import.meta.url)("../../package.json") as { version: string }).version)
+  .version(
+    (() => {
+      const findPkgJson = (dir: string): string => {
+        if (existsSync(join(dir, "package.json"))) return join(dir, "package.json")
+        const parent = dirname(dir)
+        return parent === dir ? "" : findPkgJson(parent)
+      }
+      const pkgPath = findPkgJson(dirname(fileURLToPath(import.meta.url)))
+      return pkgPath ? (JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string }).version : "0.0.0"
+    })(),
+  )
 
 program
   .command("init")
