@@ -5,6 +5,7 @@ import { tmpdir } from "node:os"
 import { homedir } from "node:os"
 import {
   discoverConfig,
+  expandGlobPath,
   expandPath,
   findConfigPath,
   readConfigFile,
@@ -453,6 +454,111 @@ describe("resolveConfigPath", () => {
       )
     } finally {
       process.env.HOME = originalHome
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("expandGlobPath", () => {
+  it("returns matching path for non-glob that exists", () => {
+    const filePath = join(tmpDir, "envpkt.toml")
+    writeFileSync(filePath, "version = 1\n")
+    const results = expandGlobPath(filePath)
+    expect(results).toHaveLength(1)
+    expect(results[0]).toBe(filePath)
+  })
+
+  it("returns empty array for non-glob that does not exist", () => {
+    const results = expandGlobPath(join(tmpDir, "nonexistent.toml"))
+    expect(results).toHaveLength(0)
+  })
+
+  it("matches glob patterns in directory names", () => {
+    // Create CloudStorage/OneDrive-Personal/.envpkt/envpkt.toml
+    const cloudDir = join(tmpDir, "CloudStorage")
+    const onedriveDir = join(cloudDir, "OneDrive-Personal", ".envpkt")
+    mkdirSync(onedriveDir, { recursive: true })
+    writeFileSync(join(onedriveDir, "envpkt.toml"), "version = 1\n")
+
+    const pattern = join(cloudDir, "OneDrive-*", ".envpkt", "envpkt.toml")
+    const results = expandGlobPath(pattern)
+    expect(results).toHaveLength(1)
+    expect(results[0]).toBe(join(onedriveDir, "envpkt.toml"))
+  })
+
+  it("matches multiple glob results", () => {
+    const cloudDir = join(tmpDir, "CloudStorage2")
+    for (const name of ["GoogleDrive-user1@gmail.com", "GoogleDrive-user2@work.com"]) {
+      const dir = join(cloudDir, name, ".envpkt")
+      mkdirSync(dir, { recursive: true })
+      writeFileSync(join(dir, "envpkt.toml"), "version = 1\n")
+    }
+
+    const pattern = join(cloudDir, "GoogleDrive-*", ".envpkt", "envpkt.toml")
+    const results = expandGlobPath(pattern)
+    expect(results).toHaveLength(2)
+  })
+
+  it("returns empty array when parent directory does not exist", () => {
+    const pattern = join(tmpDir, "nonexistent", "OneDrive-*", ".envpkt", "envpkt.toml")
+    const results = expandGlobPath(pattern)
+    expect(results).toHaveLength(0)
+  })
+
+  it("returns empty array when glob matches dirs but target file is missing", () => {
+    const cloudDir = join(tmpDir, "CloudStorage3")
+    mkdirSync(join(cloudDir, "OneDrive-Personal"), { recursive: true })
+    // No .envpkt/envpkt.toml inside
+
+    const pattern = join(cloudDir, "OneDrive-*", ".envpkt", "envpkt.toml")
+    const results = expandGlobPath(pattern)
+    expect(results).toHaveLength(0)
+  })
+
+  it("only matches directories starting with the prefix", () => {
+    const cloudDir = join(tmpDir, "CloudStorage4")
+    mkdirSync(join(cloudDir, "OneDrive-Personal", ".envpkt"), { recursive: true })
+    mkdirSync(join(cloudDir, "Dropbox", ".envpkt"), { recursive: true })
+    writeFileSync(join(cloudDir, "OneDrive-Personal", ".envpkt", "envpkt.toml"), "version = 1\n")
+    writeFileSync(join(cloudDir, "Dropbox", ".envpkt", "envpkt.toml"), "version = 1\n")
+
+    const pattern = join(cloudDir, "OneDrive-*", ".envpkt", "envpkt.toml")
+    const results = expandGlobPath(pattern)
+    expect(results).toHaveLength(1)
+    expect(results[0]).toContain("OneDrive-Personal")
+  })
+})
+
+describe("discoverConfig with glob paths", () => {
+  it("finds config via glob pattern in ENVPKT_SEARCH_PATH", () => {
+    const cloudDir = join(tmpDir, "CloudStorage5")
+    const envpktDir = join(cloudDir, "GoogleDrive-test@example.com", ".envpkt")
+    mkdirSync(envpktDir, { recursive: true })
+    writeFileSync(join(envpktDir, "envpkt.toml"), "version = 1\n[secret]\n")
+
+    const emptyDir = mkdtempSync(join(tmpdir(), "envpkt-glob-"))
+    const originalHome = process.env.HOME
+    const originalSearch = process.env.ENVPKT_SEARCH_PATH
+    process.env.HOME = emptyDir
+    process.env.ENVPKT_SEARCH_PATH = join(cloudDir, "GoogleDrive-*", ".envpkt", "envpkt.toml")
+
+    try {
+      const result = discoverConfig(emptyDir)
+      expect(result.isSome()).toBe(true)
+      result.fold(
+        () => expect.unreachable("Expected Some"),
+        ({ path, source }) => {
+          expect(path).toContain("GoogleDrive-test@example.com")
+          expect(source).toBe("search")
+        },
+      )
+    } finally {
+      process.env.HOME = originalHome
+      if (originalSearch !== undefined) {
+        process.env.ENVPKT_SEARCH_PATH = originalSearch
+      } else {
+        delete process.env.ENVPKT_SEARCH_PATH
+      }
       rmSync(emptyDir, { recursive: true, force: true })
     }
   })

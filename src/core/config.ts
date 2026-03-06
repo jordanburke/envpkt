@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
@@ -44,15 +44,66 @@ export const findConfigPath = (dir: string): Option<string> => {
   return existsSync(candidate) ? Option(candidate) : Option<string>(undefined)
 }
 
+/**
+ * Expand a path template that may contain a single `*` glob segment.
+ * Returns all matching paths (or empty array if parent doesn't exist).
+ * Non-glob paths return a single-element array if they exist.
+ */
+export const expandGlobPath = (expanded: string): ReadonlyArray<string> => {
+  if (!expanded.includes("*")) {
+    return existsSync(expanded) ? [expanded] : []
+  }
+  // Split into segments to find the one containing *
+  const segments = expanded.split("/")
+  const globIdx = segments.findIndex((s) => s.includes("*"))
+  if (globIdx < 0) return []
+
+  const parentDir = segments.slice(0, globIdx).join("/")
+  const globSegment = segments[globIdx]!
+  const suffix = segments.slice(globIdx + 1).join("/")
+
+  if (!existsSync(parentDir)) return []
+
+  const prefix = globSegment.replace(/\*.*$/, "")
+  return readdirSync(parentDir)
+    .filter((entry) => entry.startsWith(prefix))
+    .map((entry) => join(parentDir, entry, suffix))
+    .filter((p) => existsSync(p))
+}
+
 /** Ordered candidate paths for config discovery beyond CWD */
 const CONFIG_SEARCH_PATHS: ReadonlyArray<string> = [
+  // Home directory
   "~/.envpkt/envpkt.toml",
+
+  // macOS OneDrive
+  "~/OneDrive/.envpkt/envpkt.toml",
+  "~/Library/CloudStorage/OneDrive-Personal/.envpkt/envpkt.toml",
+  "~/Library/CloudStorage/OneDrive-SharedLibraries-*/.envpkt/envpkt.toml",
+
+  // Windows OneDrive
   "$WINHOME/OneDrive/.envpkt/envpkt.toml",
   "$USERPROFILE/OneDrive/.envpkt/envpkt.toml",
+  "$OneDrive/.envpkt/envpkt.toml",
+  "$OneDriveConsumer/.envpkt/envpkt.toml",
+  "$OneDriveCommercial/.envpkt/envpkt.toml",
+
+  // WSL → Windows OneDrive
+  "/mnt/c/Users/$USER/OneDrive/.envpkt/envpkt.toml",
+
+  // iCloud
   "~/Library/Mobile Documents/com~apple~CloudDocs/.envpkt/envpkt.toml",
+
+  // Dropbox
   "~/Dropbox/.envpkt/envpkt.toml",
   "$DROPBOX_PATH/.envpkt/envpkt.toml",
+
+  // Google Drive
+  "~/Google Drive/My Drive/.envpkt/envpkt.toml",
+  "~/Library/CloudStorage/GoogleDrive-*/.envpkt/envpkt.toml",
   "$GOOGLE_DRIVE/.envpkt/envpkt.toml",
+
+  // Windows fallback (no cloud)
   "$WINHOME/.envpkt/envpkt.toml",
   "$USERPROFILE/.envpkt/envpkt.toml",
 ]
@@ -72,8 +123,10 @@ export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
 
   for (const template of [...customPaths, ...CONFIG_SEARCH_PATHS]) {
     const expanded = expandPath(template)
-    if (expanded && !expanded.startsWith("/.envpkt") && existsSync(expanded)) {
-      const found: DiscoveredConfig = { path: expanded, source: "search" }
+    if (!expanded || expanded.startsWith("/.envpkt")) continue
+    const matches = expandGlobPath(expanded)
+    if (matches.length > 0) {
+      const found: DiscoveredConfig = { path: matches[0]!, source: "search" }
       return Option(found)
     }
   }

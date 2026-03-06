@@ -36,10 +36,10 @@ Commands that read `envpkt.toml` (audit, inspect, resolve, exec, env check, env 
 4. `ENVPKT_SEARCH_PATH` (colon-separated list of candidate paths)
 5. Built-in search locations:
    - `~/.envpkt/envpkt.toml`
-   - OneDrive (`$WINHOME/OneDrive/.envpkt/`, `$USERPROFILE/OneDrive/.envpkt/`)
+   - OneDrive — macOS (`~/OneDrive/`, `~/Library/CloudStorage/OneDrive-*/`), Windows (`$USERPROFILE/OneDrive/`, `$OneDrive/`), WSL (`/mnt/c/Users/$USER/OneDrive/`)
    - iCloud (`~/Library/Mobile Documents/com~apple~CloudDocs/.envpkt/`)
    - Dropbox (`~/Dropbox/.envpkt/`, `$DROPBOX_PATH/.envpkt/`)
-   - Google Drive (`$GOOGLE_DRIVE/.envpkt/`)
+   - Google Drive (`~/Google Drive/My Drive/`, `~/Library/CloudStorage/GoogleDrive-*/`, `$GOOGLE_DRIVE/`)
 
 When a config is loaded from outside CWD, envpkt prints the resolved path to stderr for transparency.
 
