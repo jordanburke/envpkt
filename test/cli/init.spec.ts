@@ -35,19 +35,19 @@ describe("envpkt init", () => {
     expect(content).toContain(`created = "${today}"`)
   })
 
-  it("includes agent section when --agent is set", () => {
-    runInit(tmpDir, { agent: true, name: "my-bot", capabilities: "read,write", expires: "2026-06-01" })
+  it("includes identity section when --identity is set", () => {
+    runInit(tmpDir, { identity: true, name: "my-bot", capabilities: "read,write", expires: "2026-06-01" })
 
     const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
-    expect(content).toContain("[agent]")
+    expect(content).toContain("[identity]")
     expect(content).toContain('name = "my-bot"')
     expect(content).toContain('"read"')
     expect(content).toContain('"write"')
     expect(content).toContain('expires = "2026-06-01"')
   })
 
-  it("includes consumer comment in agent section", () => {
-    runInit(tmpDir, { agent: true, name: "test" })
+  it("includes consumer comment in identity section", () => {
+    runInit(tmpDir, { identity: true, name: "test" })
 
     const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
     expect(content).toContain("consumer")

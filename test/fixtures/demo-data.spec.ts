@@ -22,8 +22,8 @@ describe("demo fixture cross-check", () => {
       result.fold(
         (err) => expect.fail(`Failed to resolve api-gateway: ${JSON.stringify(err)}`),
         (resolved) => {
-          expect(resolved.config.agent?.name).toBe(apiGatewayResult.config.agent?.name)
-          expect(resolved.config.agent?.consumer).toBe(apiGatewayResult.config.agent?.consumer)
+          expect(resolved.config.identity?.name).toBe(apiGatewayResult.config.identity?.name)
+          expect(resolved.config.identity?.consumer).toBe(apiGatewayResult.config.identity?.consumer)
           expect(Object.keys(resolved.config.secret).sort()).toEqual(Object.keys(apiGatewayResult.config.secret).sort())
           expect(resolved.overridden).toEqual([...apiGatewayResult.overridden])
           expect(resolved.merged.sort()).toEqual([...apiGatewayResult.merged].sort())
@@ -42,8 +42,8 @@ describe("demo fixture cross-check", () => {
       result.fold(
         (err) => expect.fail(`Failed to resolve data-pipeline: ${JSON.stringify(err)}`),
         (resolved) => {
-          expect(resolved.config.agent?.name).toBe(dataPipelineResult.config.agent?.name)
-          expect(resolved.config.agent?.consumer).toBe(dataPipelineResult.config.agent?.consumer)
+          expect(resolved.config.identity?.name).toBe(dataPipelineResult.config.identity?.name)
+          expect(resolved.config.identity?.consumer).toBe(dataPipelineResult.config.identity?.consumer)
           expect(Object.keys(resolved.config.secret).sort()).toEqual(
             Object.keys(dataPipelineResult.config.secret).sort(),
           )
@@ -63,8 +63,8 @@ describe("demo fixture cross-check", () => {
       result.fold(
         (err) => expect.fail(`Failed to resolve monitoring: ${JSON.stringify(err)}`),
         (resolved) => {
-          expect(resolved.config.agent?.name).toBe(monitoringResult.config.agent?.name)
-          expect(resolved.config.agent?.consumer).toBe(monitoringResult.config.agent?.consumer)
+          expect(resolved.config.identity?.name).toBe(monitoringResult.config.identity?.name)
+          expect(resolved.config.identity?.consumer).toBe(monitoringResult.config.identity?.consumer)
           expect(Object.keys(resolved.config.secret).sort()).toEqual(Object.keys(monitoringResult.config.secret).sort())
           // Standalone — no catalog
           expect(resolved.catalogPath).toBeUndefined()

@@ -35,15 +35,15 @@ const resolveAndLoad = (opts: BootOptions): Either<BootError, ResolvedConfig> =>
       ),
   )
 
-type AgentKeyResult = Either<BootError, string | undefined>
+type IdentityKeyResult = Either<BootError, string | undefined>
 
-const resolveAgentKey = (config: EnvpktConfig, configDir: string): AgentKeyResult => {
-  if (!config.agent?.identity) {
-    const result: AgentKeyResult = Right(undefined as string | undefined)
+const resolveIdentityKey = (config: EnvpktConfig, configDir: string): IdentityKeyResult => {
+  if (!config.identity?.identity) {
+    const result: IdentityKeyResult = Right(undefined as string | undefined)
     return result
   }
-  const identityPath = resolve(configDir, expandPath(config.agent.identity))
-  return unwrapAgentKey(identityPath).fold<AgentKeyResult>(
+  const identityPath = resolve(configDir, expandPath(config.identity.identity))
+  return unwrapAgentKey(identityPath).fold<IdentityKeyResult>(
     (err) => Left(err),
     (key) => Right(key as string | undefined),
   )
@@ -118,20 +118,20 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
     const metaKeys = Object.keys(secretEntries)
     const hasSealedValues = metaKeys.some((k) => !!secretEntries[k]?.encrypted_value)
 
-    // Resolve agent key — non-fatal when sealed values exist (identity may be a plain age identity)
-    const agentKeyResult = resolveAgentKey(config, configDir)
-    const agentKey = agentKeyResult.fold(
+    // Resolve identity key — non-fatal when sealed values exist (identity may be a plain age identity)
+    const identityKeyResult = resolveIdentityKey(config, configDir)
+    const identityKey = identityKeyResult.fold(
       () => undefined,
       (k) => k,
     )
 
-    // If agent key resolution failed AND no sealed values, propagate the error
-    const agentKeyError = agentKeyResult.fold<BootError | undefined>(
+    // If identity key resolution failed AND no sealed values, propagate the error
+    const identityKeyError = identityKeyResult.fold<BootError | undefined>(
       (err) => err,
       () => undefined,
     )
-    if (agentKeyError && !hasSealedValues) {
-      return Left(agentKeyError)
+    if (identityKeyError && !hasSealedValues) {
+      return Left(identityKeyError)
     }
 
     const fnoxKeys = detectFnoxKeys(configDir)
@@ -163,8 +163,8 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
       // Phase 1: try sealed values (encrypted_value in meta)
       const sealedKeys = new Set<string>()
 
-      if (hasSealedValues && config.agent?.identity) {
-        const identityPath = resolve(configDir, expandPath(config.agent.identity))
+      if (hasSealedValues && config.identity?.identity) {
+        const identityPath = resolve(configDir, expandPath(config.identity.identity))
         unsealSecrets(secretEntries, identityPath).fold(
           (err) => {
             warnings.push(`Sealed value decryption failed: ${err.message}`)
@@ -184,7 +184,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
 
       if (remainingKeys.length > 0) {
         if (fnoxAvailable()) {
-          fnoxExport(opts.profile, agentKey).fold(
+          fnoxExport(opts.profile, identityKey).fold(
             (err) => {
               warnings.push(`fnox export failed: ${err.message}`)
               for (const key of remainingKeys) {

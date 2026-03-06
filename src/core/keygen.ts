@@ -83,7 +83,7 @@ export const generateKeypair = (options?: {
 }
 
 /* eslint-disable functional/no-let -- line-by-line TOML update */
-/** Update agent.recipient in an envpkt.toml file, preserving structure */
+/** Update identity.recipient in an envpkt.toml file, preserving structure */
 export const updateConfigRecipient = (configPath: string, recipient: string): Either<KeygenError, true> => {
   const readResult = Try(() => readFileSync(configPath, "utf-8"))
 
@@ -92,33 +92,33 @@ export const updateConfigRecipient = (configPath: string, recipient: string): Ei
     (raw) => {
       const lines = raw.split("\n")
       const output: string[] = []
-      let inAgentSection = false
+      let inIdentitySection = false
       let recipientUpdated = false
-      let hasAgentSection = false
+      let hasIdentitySection = false
 
       for (const line of lines) {
-        // Detect [agent] section
-        if (/^\[agent\]\s*$/.test(line)) {
-          inAgentSection = true
-          hasAgentSection = true
+        // Detect [identity] section
+        if (/^\[identity\]\s*$/.test(line)) {
+          inIdentitySection = true
+          hasIdentitySection = true
           output.push(line)
           continue
         }
 
-        // Detect new section (leaving [agent])
-        if (/^\[/.test(line) && !/^\[agent\]\s*$/.test(line)) {
-          // If we were in [agent] and didn't update recipient, insert it
-          if (inAgentSection && !recipientUpdated) {
+        // Detect new section (leaving [identity])
+        if (/^\[/.test(line) && !/^\[identity\]\s*$/.test(line)) {
+          // If we were in [identity] and didn't update recipient, insert it
+          if (inIdentitySection && !recipientUpdated) {
             output.push(`recipient = "${recipient}"`)
             recipientUpdated = true
           }
-          inAgentSection = false
+          inIdentitySection = false
           output.push(line)
           continue
         }
 
         // Update existing recipient line
-        if (inAgentSection && /^recipient\s*=/.test(line)) {
+        if (inIdentitySection && /^recipient\s*=/.test(line)) {
           output.push(`recipient = "${recipient}"`)
           recipientUpdated = true
           continue
@@ -127,15 +127,15 @@ export const updateConfigRecipient = (configPath: string, recipient: string): Ei
         output.push(line)
       }
 
-      // If still in [agent] at EOF and didn't update
-      if (inAgentSection && !recipientUpdated) {
+      // If still in [identity] at EOF and didn't update
+      if (inIdentitySection && !recipientUpdated) {
         output.push(`recipient = "${recipient}"`)
       }
 
-      // If no [agent] section at all, append one
-      if (!hasAgentSection) {
+      // If no [identity] section at all, append one
+      if (!hasIdentitySection) {
         output.push("")
-        output.push("[agent]")
+        output.push("[identity]")
         output.push(`recipient = "${recipient}"`)
       }
 

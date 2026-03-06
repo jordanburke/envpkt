@@ -71,7 +71,7 @@ Each service creates a config referencing the catalog and listing only its neede
 version = 1
 catalog = "../../infra/catalog.toml"
 
-[agent]
+[identity]
 name = "api-gateway"
 consumer = "service"
 description = "REST API — handles payments and database writes"
@@ -84,7 +84,7 @@ secrets = ["DATABASE_URL", "STRIPE_SECRET_KEY"]
 version = 1
 catalog = "../../infra/catalog.toml"
 
-[agent]
+[identity]
 name = "worker"
 consumer = "service"
 description = "Background job processor"

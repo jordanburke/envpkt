@@ -7,12 +7,12 @@
 version = 1
 
 # Optional path to shared secret catalog (relative to this config file)
-# When set, secrets listed in [agent].secrets are merged from the catalog
+# When set, secrets listed in [identity].secrets are merged from the catalog
 catalog = "../shared/catalog.toml"
 
-# --- Agent Identity (optional) ---
-[agent]
-name = "data-processor"                    # Display name (required in [agent])
+# --- Identity (optional) ---
+[identity]
+name = "data-processor"                    # Display name (required in [identity])
 consumer = "agent"                         # "agent" | "service" | "developer" | "ci"
 description = "Processes customer data"    # Agent role description
 capabilities = ["read", "write", "admin"]  # Agent-level capabilities
@@ -113,7 +113,7 @@ service = "my-service"
 ```toml
 version = 1
 
-[agent]
+[identity]
 name = "ci-runner"
 consumer = "ci"
 
@@ -134,7 +134,7 @@ require_service = true
 ```toml
 version = 1
 
-[agent]
+[identity]
 name = "research-agent"
 consumer = "agent"
 identity = "./keys/agent.age"
@@ -152,7 +152,7 @@ encrypted_value = "-----BEGIN AGE ENCRYPTED FILE-----\n..."
 version = 1
 catalog = "../shared/catalog.toml"
 
-[agent]
+[identity]
 name = "team-agent"
 consumer = "agent"
 secrets = ["OPENAI_API_KEY", "SLACK_TOKEN"]
@@ -160,7 +160,7 @@ secrets = ["OPENAI_API_KEY", "SLACK_TOKEN"]
 
 ## Catalog Merge Behavior
 
-When `catalog` is set and `[agent].secrets` lists key names:
+When `catalog` is set and `[identity].secrets` lists key names:
 
 1. envpkt loads the catalog file (another `envpkt.toml` with `[secret.*]` entries)
 2. For each key in `secrets`, it looks up `[secret.KEY]` in the catalog

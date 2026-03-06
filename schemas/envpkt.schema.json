@@ -17,15 +17,15 @@
       "description": "Path to shared secret catalog (relative to this config file)",
       "type": "string"
     },
-    "agent": {
-      "description": "Identity and capabilities of the AI agent using this envpkt",
+    "identity": {
+      "description": "Identity and capabilities of the principal using this envpkt",
       "type": "object",
       "required": [
         "name"
       ],
       "properties": {
         "name": {
-          "description": "Agent display name",
+          "description": "Display name",
           "type": "string"
         },
         "consumer": {
@@ -50,11 +50,11 @@
           ]
         },
         "description": {
-          "description": "Agent description or role",
+          "description": "Description or role",
           "type": "string"
         },
         "capabilities": {
-          "description": "List of capabilities this agent provides",
+          "description": "List of capabilities this identity provides",
           "type": "array",
           "items": {
             "type": "string"
@@ -62,26 +62,26 @@
         },
         "expires": {
           "format": "date",
-          "description": "Agent credential expiration date (YYYY-MM-DD)",
+          "description": "Credential expiration date (YYYY-MM-DD)",
           "type": "string"
         },
         "services": {
-          "description": "Service dependencies for this agent",
+          "description": "Service dependencies",
           "type": "array",
           "items": {
             "type": "string"
           }
         },
         "identity": {
-          "description": "Path to encrypted agent key file (relative to config directory)",
+          "description": "Path to age identity file (relative to config directory)",
           "type": "string"
         },
         "recipient": {
-          "description": "Agent's age public key for encryption",
+          "description": "Age public key for encryption",
           "type": "string"
         },
         "secrets": {
-          "description": "Secret keys this agent needs from the catalog",
+          "description": "Secret keys needed from the catalog",
           "type": "array",
           "items": {
             "type": "string"

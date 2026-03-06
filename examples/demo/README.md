@@ -116,7 +116,7 @@ age-keygen -o examples/demo/agents/api-gateway/identity.txt
 See [`examples/sealed-agent.toml`](../sealed-agent.toml) for a full example. The key fields are:
 
 ```toml
-[agent]
+[identity]
 name = "my-agent"
 recipient = "age1..."    # Public key — safe to commit
 identity = "identity.txt" # Private key path — add to .gitignore
@@ -168,7 +168,7 @@ envpkt inspect -c examples/sealed-agent.toml
 | Concept                               | Where                                                                        |
 | ------------------------------------- | ---------------------------------------------------------------------------- |
 | Shared secret catalog                 | `infra/envpkt.toml`                                                          |
-| Agent identity (`[agent]`)            | All agent configs                                                            |
+| Agent identity (`[identity]`)         | All agent configs                                                            |
 | Catalog reference (`catalog = "..."`) | `data-pipeline`, `api-gateway`                                               |
 | Capability narrowing (override)       | `data-pipeline` overrides `DATABASE_URL` to `SELECT` only                    |
 | Standalone agent (no catalog)         | `monitoring`                                                                 |

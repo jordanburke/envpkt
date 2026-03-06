@@ -134,20 +134,20 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     (c) => c,
   )
 
-  // Verify agent.recipient exists
-  if (!config.agent?.recipient) {
-    console.error(`${RED}Error:${RESET} agent.recipient is required for sealing (age public key)`)
+  // Verify identity.recipient exists
+  if (!config.identity?.recipient) {
+    console.error(`${RED}Error:${RESET} identity.recipient is required for sealing (age public key)`)
     console.error("")
     console.error(
       `${BOLD}Quick fix:${RESET} run ${CYAN}envpkt keygen${RESET} to generate a key and auto-configure recipient`,
     )
     console.error(`${DIM}Or manually add to your envpkt.toml:${RESET}`)
-    console.error(`${DIM}  [agent]${RESET}`)
+    console.error(`${DIM}  [identity]${RESET}`)
     console.error(`${DIM}  recipient = "age1..."${RESET}`)
     process.exit(2)
   }
 
-  const { recipient } = config.agent
+  const { recipient } = config.identity
   const configDir = dirname(configPath)
 
   // Guard: refuse to seal keys that exist in [env.*]
@@ -160,10 +160,10 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     process.exit(2)
   }
 
-  // Resolve agent key if identity is configured
-  const agentKey: string | undefined = config.agent.identity
+  // Resolve identity key if identity is configured
+  const identityKey: string | undefined = config.identity.identity
     ? (() => {
-        const identityPath = resolve(configDir, expandPath(config.agent.identity))
+        const identityPath = resolve(configDir, expandPath(config.identity.identity))
         return unwrapAgentKey(identityPath).fold(
           (err) => {
             const msg = err._tag === "IdentityNotFound" ? `not found: ${err.path}` : err.message
@@ -204,7 +204,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   )
   console.log("")
 
-  const values = await resolveValues(metaKeys, options.profile, agentKey)
+  const values = await resolveValues(metaKeys, options.profile, identityKey)
 
   const resolved = Object.keys(values).length
   const skipped = metaKeys.length - resolved

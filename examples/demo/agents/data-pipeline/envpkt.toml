@@ -1,7 +1,7 @@
 version = 1
 catalog = "../../infra/envpkt.toml"
 
-[agent]
+[identity]
 name = "data-pipeline"
 consumer = "agent"
 description = "ETL pipeline — reads from Postgres, caches in Redis"

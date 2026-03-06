@@ -146,12 +146,12 @@ describe("envpkt CLI e2e", () => {
       expect(content).toContain("#:schema")
     })
 
-    it("creates envpkt.toml with agent section", () => {
-      const { status } = run(["init", "--agent", "--name", "my-agent"], { cwd: tmpDir })
+    it("creates envpkt.toml with identity section", () => {
+      const { status } = run(["init", "--identity", "--name", "my-agent"], { cwd: tmpDir })
       expect(status).toBe(0)
 
       const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
-      expect(content).toContain("[agent]")
+      expect(content).toContain("[identity]")
       expect(content).toContain('name = "my-agent"')
     })
   })
@@ -188,7 +188,7 @@ describe("envpkt CLI e2e", () => {
     it("shows structured config view", () => {
       writeFileSync(
         join(tmpDir, "envpkt.toml"),
-        `version = 1\n[agent]\nname = "bot"\n[secret.API_KEY]\nservice = "stripe"\npurpose = "Payments"\n`,
+        `version = 1\n[identity]\nname = "bot"\n[secret.API_KEY]\nservice = "stripe"\npurpose = "Payments"\n`,
       )
       const { stdout, status } = run(["inspect", "-c", join(tmpDir, "envpkt.toml")])
       expect(status).toBe(0)

@@ -26,7 +26,7 @@ const writeConfig = (dir: string, content: string): string => {
 const validConfig = `
 version = 1
 
-[agent]
+[identity]
 name = "test-agent"
 consumer = "agent"
 description = "Test processor agent"
@@ -115,19 +115,19 @@ describe("callTool", () => {
       const result = callTool("listCapabilities", { configPath })
       const data = JSON.parse((result.content[0] as { text: string }).text)
 
-      expect(data.agent.name).toBe("test-agent")
-      expect(data.agent.consumer).toBe("agent")
-      expect(data.agent.description).toBe("Test processor agent")
-      expect(data.agent.capabilities).toEqual(["read", "write"])
+      expect(data.identity.name).toBe("test-agent")
+      expect(data.identity.consumer).toBe("agent")
+      expect(data.identity.description).toBe("Test processor agent")
+      expect(data.identity.capabilities).toEqual(["read", "write"])
       expect(data.secrets.API_KEY).toEqual(["charge", "refund"])
       expect(data.secrets.DB_PASS).toEqual(["read", "write"])
     })
 
-    it("returns null agent when no agent section", () => {
+    it("returns null identity when no identity section", () => {
       const configPath = writeConfig(tmpDir, `version = 1\n[secret.X]\nservice = "x"\n`)
       const result = callTool("listCapabilities", { configPath })
       const data = JSON.parse((result.content[0] as { text: string }).text)
-      expect(data.agent).toBeNull()
+      expect(data.identity).toBeNull()
     })
   })
 

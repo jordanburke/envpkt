@@ -45,7 +45,7 @@ export const runFleet = (options: FleetOptions): void => {
   console.log("")
 
   for (const agent of agents) {
-    const name = agent.agent?.name ? BOLD + agent.agent.name + RESET : DIM + agent.path + RESET
+    const name = agent.identity?.name ? BOLD + agent.identity.name + RESET : DIM + agent.path + RESET
     const icon = statusIcon(agent.audit.status)
     console.log(`  ${icon} ${name} ${DIM}(${agent.audit.total} secrets)${RESET}`)
   }

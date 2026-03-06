@@ -75,7 +75,7 @@ describe("envpkt resolve e2e", () => {
 version = 1
 catalog = "catalog.toml"
 
-[agent]
+[identity]
 name = "test-agent"
 consumer = "agent"
 secrets = ["DATABASE_URL", "REDIS_URL"]
@@ -94,7 +94,7 @@ secrets = ["DATABASE_URL", "REDIS_URL"]
 version = 1
 catalog = "catalog.toml"
 
-[agent]
+[identity]
 name = "test-agent"
 secrets = ["DATABASE_URL"]
 `)
@@ -112,7 +112,7 @@ secrets = ["DATABASE_URL"]
 version = 1
 catalog = "catalog.toml"
 
-[agent]
+[identity]
 name = "file-agent"
 secrets = ["REDIS_URL"]
 `)
@@ -132,7 +132,7 @@ secrets = ["REDIS_URL"]
 version = 1
 catalog = "nonexistent.toml"
 
-[agent]
+[identity]
 name = "bad-agent"
 secrets = ["KEY"]
 `)
@@ -148,7 +148,7 @@ secrets = ["KEY"]
 version = 1
 catalog = "catalog.toml"
 
-[agent]
+[identity]
 name = "bad-agent"
 secrets = ["NONEXISTENT_KEY"]
 `)
@@ -164,7 +164,7 @@ secrets = ["NONEXISTENT_KEY"]
 version = 1
 catalog = "catalog.toml"
 
-[agent]
+[identity]
 name = "readonly-agent"
 secrets = ["DATABASE_URL"]
 

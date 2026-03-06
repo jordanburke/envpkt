@@ -267,7 +267,9 @@ describe("boot", () => {
 describe("boot with catalog", () => {
   it("resolves catalog before audit", () => {
     writeFileSync(join(tmpDir, "catalog.toml"), `version = 1\n[secret.DB]\nservice = "postgres"\n`)
-    const configPath = writeConfig(`version = 1\ncatalog = "catalog.toml"\n[agent]\nname = "test"\nsecrets = ["DB"]\n`)
+    const configPath = writeConfig(
+      `version = 1\ncatalog = "catalog.toml"\n[identity]\nname = "test"\nsecrets = ["DB"]\n`,
+    )
     const result = bootSafe({ configPath, inject: false })
 
     result.fold(
@@ -280,7 +282,7 @@ describe("boot with catalog", () => {
 
   it("returns error for invalid catalog path", () => {
     const configPath = writeConfig(
-      `version = 1\ncatalog = "nonexistent.toml"\n[agent]\nname = "test"\nsecrets = ["DB"]\n`,
+      `version = 1\ncatalog = "nonexistent.toml"\n[identity]\nname = "test"\nsecrets = ["DB"]\n`,
     )
     const result = bootSafe({ configPath, inject: false })
 
@@ -317,7 +319,7 @@ describe("boot with sealed values", () => {
     const configPath = writeConfig(
       [
         `version = 1`,
-        `[agent]`,
+        `[identity]`,
         `name = "test-sealed"`,
         `recipient = "${recipient}"`,
         `identity = "identity.txt"`,
@@ -365,7 +367,7 @@ describe("boot with sealed values", () => {
     const configPath = writeConfig(
       [
         `version = 1`,
-        `[agent]`,
+        `[identity]`,
         `name = "mixed"`,
         `recipient = "${recipient}"`,
         `identity = "identity.txt"`,

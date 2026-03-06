@@ -3,7 +3,7 @@ title: envpkt init
 description: Generate an envpkt.toml template in the current directory
 ---
 
-Generate a new `envpkt.toml` file with optional agent identity, catalog reference, or scaffolding from fnox.
+Generate a new `envpkt.toml` file with optional identity section, catalog reference, or scaffolding from fnox.
 
 ## Usage
 
@@ -17,10 +17,10 @@ envpkt init [options]
 | ----------------------- | ------------------------------------------------------------------------ |
 | `--from-fnox [path]`    | Scaffold `[secret.*]` entries from `fnox.toml` (optionally specify path) |
 | `--catalog <path>`      | Path to shared secret catalog                                            |
-| `--agent`               | Include `[agent]` section                                                |
-| `--name <name>`         | Agent name (requires `--agent`)                                          |
-| `--capabilities <caps>` | Comma-separated capabilities (requires `--agent`)                        |
-| `--expires <date>`      | Agent credential expiration `YYYY-MM-DD` (requires `--agent`)            |
+| `--identity`            | Include `[identity]` section                                             |
+| `--name <name>`         | Name (requires `--identity`)                                             |
+| `--capabilities <caps>` | Comma-separated capabilities (requires `--identity`)                     |
+| `--expires <date>`      | Credential expiration `YYYY-MM-DD` (requires `--identity`)               |
 | `--force`               | Overwrite existing `envpkt.toml`                                         |
 
 ## Examples
@@ -29,11 +29,11 @@ envpkt init [options]
 # Basic template
 envpkt init
 
-# With agent identity
-envpkt init --agent --name "my-agent"
+# With identity section
+envpkt init --identity --name "my-agent"
 
-# Full agent with capabilities
-envpkt init --agent --name "bot" --capabilities "read,write" --expires "2027-01-01"
+# Full identity with capabilities
+envpkt init --identity --name "bot" --capabilities "read,write" --expires "2027-01-01"
 
 # Reference a shared catalog
 envpkt init --catalog "../infra/envpkt.toml"

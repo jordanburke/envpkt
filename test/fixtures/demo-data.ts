@@ -31,7 +31,7 @@ export const demoSecrets: Readonly<Record<string, string>> = {
 export const apiGatewayResult: ResolveResult = {
   config: {
     version: 1,
-    agent: {
+    identity: {
       name: "api-gateway",
       consumer: "service",
       description: "REST API — handles payments and database writes",
@@ -73,7 +73,7 @@ export const apiGatewayResult: ResolveResult = {
 export const dataPipelineResult: ResolveResult = {
   config: {
     version: 1,
-    agent: {
+    identity: {
       name: "data-pipeline",
       consumer: "agent",
       description: "ETL pipeline — reads from Postgres, caches in Redis",
@@ -113,7 +113,7 @@ export const dataPipelineResult: ResolveResult = {
 export const sealedAgentResult: ResolveResult = {
   config: {
     version: 1,
-    agent: {
+    identity: {
       name: "sealed-agent",
       consumer: "agent",
       description: "Agent with sealed secrets for offline operation",
@@ -152,7 +152,7 @@ export const sealedAgentResult: ResolveResult = {
 export const monitoringResult: ResolveResult = {
   config: {
     version: 1,
-    agent: {
+    identity: {
       name: "monitoring",
       consumer: "agent",
       description: "Infrastructure health checks and alerting",

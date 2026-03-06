@@ -1,7 +1,7 @@
 version = 1
 catalog = "../../infra/envpkt.toml"
 
-[agent]
+[identity]
 name = "api-gateway"
 consumer = "service"
 description = "REST API — handles payments and database writes"

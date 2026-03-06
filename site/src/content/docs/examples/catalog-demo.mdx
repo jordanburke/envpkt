@@ -81,7 +81,7 @@ source = "ci"
     version = 1
     catalog = "../../infra/envpkt.toml"
 
-    [agent]
+    [identity]
     name = "api-gateway"
     consumer = "service"
     description = "REST API — handles payments and database writes"
@@ -97,7 +97,7 @@ source = "ci"
     version = 1
     catalog = "../../infra/envpkt.toml"
 
-    [agent]
+    [identity]
     name = "data-pipeline"
     consumer = "agent"
     description = "ETL pipeline — reads from Postgres, caches in Redis"
@@ -116,7 +116,7 @@ source = "ci"
     ```toml
     version = 1
 
-    [agent]
+    [identity]
     name = "monitoring"
     consumer = "agent"
     description = "Infrastructure health checks and alerting"

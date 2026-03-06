@@ -85,7 +85,7 @@ Each agent references the catalog and declares which secrets it needs:
 version = 1
 catalog = "../../infra/envpkt.toml"
 
-[agent]
+[identity]
 name = "api-gateway"
 consumer = "service"
 description = "REST API — handles payments and database writes"
@@ -103,7 +103,7 @@ An agent can override catalog fields to narrow permissions:
 version = 1
 catalog = "../../infra/envpkt.toml"
 
-[agent]
+[identity]
 name = "data-pipeline"
 consumer = "agent"
 secrets = ["DATABASE_URL", "REDIS_URL"]
@@ -121,7 +121,7 @@ When resolving a catalog:
 
 - Each field in the agent's `[secret.KEY]` override **replaces** the catalog field (shallow merge)
 - Omitted fields keep the catalog value
-- `agent.secrets` is the source of truth for which keys the agent needs
+- `identity.secrets` is the source of truth for which keys the agent needs
 
 ## Resolving
 

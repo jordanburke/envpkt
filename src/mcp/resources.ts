@@ -87,7 +87,7 @@ const readCapabilities = (): ReadResourceResult => {
   }
 
   const { config } = loaded
-  const agentCapabilities = config.agent?.capabilities ?? []
+  const agentCapabilities = config.identity?.capabilities ?? []
   const secretCapabilities: Record<string, readonly string[]> = {}
 
   const secretEntries = config.secret ?? {}
@@ -104,11 +104,11 @@ const readCapabilities = (): ReadResourceResult => {
         mimeType: "application/json",
         text: JSON.stringify(
           {
-            agent: config.agent
+            identity: config.identity
               ? {
-                  name: config.agent.name,
-                  consumer: config.agent.consumer,
-                  description: config.agent.description,
+                  name: config.identity.name,
+                  consumer: config.identity.consumer,
+                  description: config.identity.description,
                   capabilities: agentCapabilities,
                 }
               : null,

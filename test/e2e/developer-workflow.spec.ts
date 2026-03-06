@@ -96,7 +96,7 @@ describe("Developer Workflow: env scan → catalog → env export", () => {
 
       writeFileSync(
         join(agentDir, "envpkt.toml"),
-        `version = 1\ncatalog = "../../shared/catalog.toml"\n\n[agent]\nname = "my-agent"\nsecrets = ["DATABASE_URL"]\n`,
+        `version = 1\ncatalog = "../../shared/catalog.toml"\n\n[identity]\nname = "my-agent"\nsecrets = ["DATABASE_URL"]\n`,
       )
 
       const { stdout, status } = run(["audit", "-c", join(agentDir, "envpkt.toml")])

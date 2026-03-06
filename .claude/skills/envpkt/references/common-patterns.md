@@ -55,8 +55,8 @@ fi
 ## Sealed Workflow
 
 ```bash
-# 1. Initialize with agent identity
-envpkt init --agent --name "my-agent"
+# 1. Initialize with identity section
+envpkt init --identity --name "my-agent"
 
 # 2. Generate age keypair (if needed)
 age-keygen -o keys/agent.age

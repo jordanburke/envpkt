@@ -160,7 +160,7 @@ const handleListCapabilities = (args: Record<string, unknown>): CallToolResult =
 
   const { config } = loaded
 
-  const agentCapabilities = config.agent?.capabilities ?? []
+  const agentCapabilities = config.identity?.capabilities ?? []
   const secretCapabilities: Record<string, readonly string[]> = {}
 
   const secretEntries = config.secret ?? {}
@@ -173,11 +173,11 @@ const handleListCapabilities = (args: Record<string, unknown>): CallToolResult =
   return textResult(
     JSON.stringify(
       {
-        agent: config.agent
+        identity: config.identity
           ? {
-              name: config.agent.name,
-              consumer: config.agent.consumer,
-              description: config.agent.description,
+              name: config.identity.name,
+              consumer: config.identity.consumer,
+              description: config.identity.description,
               capabilities: agentCapabilities,
             }
           : null,

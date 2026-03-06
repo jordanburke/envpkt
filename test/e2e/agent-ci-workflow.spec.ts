@@ -42,7 +42,7 @@ const run = (
 const healthyConfig = `version = 1
 catalog = "../../shared/catalog.toml"
 
-[agent]
+[identity]
 name = "deploy-bot"
 consumer = "ci"
 secrets = ["API_KEY", "DB_URL"]
@@ -104,7 +104,7 @@ describe("Agent & CI/CD Workflow: audit → seal → exec → fleet", () => {
       const { agentDir } = setupCatalogAgent(
         tmpDir,
         expiredCatalog,
-        `version = 1\ncatalog = "../../shared/catalog.toml"\n\n[agent]\nname = "stale-bot"\nsecrets = ["OLD_KEY"]\n`,
+        `version = 1\ncatalog = "../../shared/catalog.toml"\n\n[identity]\nname = "stale-bot"\nsecrets = ["OLD_KEY"]\n`,
       )
       const configPath = join(agentDir, "envpkt.toml")
 
@@ -140,7 +140,7 @@ describe("Agent & CI/CD Workflow: audit → seal → exec → fleet", () => {
       const { agentDir } = setupCatalogAgent(
         tmpDir,
         expiredCatalog,
-        `version = 1\ncatalog = "../../shared/catalog.toml"\n\n[agent]\nname = "stale-bot"\nsecrets = ["OLD_KEY"]\n`,
+        `version = 1\ncatalog = "../../shared/catalog.toml"\n\n[identity]\nname = "stale-bot"\nsecrets = ["OLD_KEY"]\n`,
       )
       const configPath = join(agentDir, "envpkt.toml")
 

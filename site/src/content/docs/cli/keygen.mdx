@@ -13,11 +13,11 @@ envpkt keygen [options]
 
 ## Options
 
-| Option                | Description                                       | Default                 |
-| --------------------- | ------------------------------------------------- | ----------------------- |
-| `-c, --config <path>` | Path to `envpkt.toml` (updates `agent.recipient`) | `./envpkt.toml`         |
-| `--force`             | Overwrite existing identity file                  | `false`                 |
-| `-o, --output <path>` | Output path for identity file                     | `~/.envpkt/age-key.txt` |
+| Option                | Description                                          | Default                 |
+| --------------------- | ---------------------------------------------------- | ----------------------- |
+| `-c, --config <path>` | Path to `envpkt.toml` (updates `identity.recipient`) | `./envpkt.toml`         |
+| `--force`             | Overwrite existing identity file                     | `false`                 |
+| `-o, --output <path>` | Output path for identity file                        | `~/.envpkt/age-key.txt` |
 
 ## Key Path Resolution
 
@@ -52,7 +52,7 @@ envpkt keygen -c /path/to/envpkt.toml
 3. If file exists and `--force` is not set: warns and exits with code 1
 4. Generates keypair via `age-keygen`
 5. Writes identity file with `0600` permissions
-6. If `envpkt.toml` exists in the working directory (or at `-c` path): updates `agent.recipient` automatically
+6. If `envpkt.toml` exists in the working directory (or at `-c` path): updates `identity.recipient` automatically
 7. If no config found: prints next-step guidance
 
 ## Typical Workflow

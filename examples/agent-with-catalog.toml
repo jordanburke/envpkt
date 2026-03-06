@@ -6,7 +6,7 @@
 version = 1
 catalog = "catalog.toml"
 
-[agent]
+[identity]
 name = "data-pipeline"
 consumer = "agent"
 secrets = ["DATABASE_URL", "REDIS_URL"]

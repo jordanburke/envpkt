@@ -25,7 +25,7 @@ The `#:schema` directive enables autocompletion and validation in editors with T
 
 version = 1
 
-[agent]
+[identity]
 name = "billing-service"
 consumer = "agent"
 description = "Payment processing agent"
@@ -69,12 +69,12 @@ Each `[secret.<KEY>]` section describes a single secret. Fields are organized by
 
 The `comment` field is a free-form annotation — use it for ad-hoc notes distinct from `purpose` (e.g., "Shared with reporting service — coordinate rotation").
 
-## Agent Identity
+## Identity
 
-The optional `[agent]` section identifies the consumer of these credentials:
+The optional `[identity]` section identifies the consumer of these credentials:
 
 ```toml
-[agent]
+[identity]
 name = "data-pipeline-agent"
 consumer = "agent"                     # agent | service | developer | ci
 description = "ETL pipeline processor"
@@ -140,7 +140,7 @@ To share secret metadata across agents, point to a shared catalog:
 version = 1
 catalog = "../../infra/envpkt.toml"
 
-[agent]
+[identity]
 name = "data-pipeline"
 secrets = ["DATABASE_URL", "REDIS_URL"]
 ```

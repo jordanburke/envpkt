@@ -57,15 +57,15 @@ export const resolveConfig = (
     return Right(result)
   }
 
-  if (!agentConfig.agent?.secrets || agentConfig.agent.secrets.length === 0) {
+  if (!agentConfig.identity?.secrets || agentConfig.identity.secrets.length === 0) {
     return Left({
       _tag: "MissingSecretsList",
-      message: "Config has 'catalog' but agent.secrets is missing — declare which catalog secrets this agent needs",
+      message: "Config has 'catalog' but identity.secrets is missing — declare which catalog secrets this agent needs",
     })
   }
 
   const catalogPath = resolve(agentConfigDir, agentConfig.catalog)
-  const agentSecrets = agentConfig.agent.secrets
+  const agentSecrets = agentConfig.identity.secrets
 
   const agentSecretEntries = agentConfig.secret ?? {}
 
@@ -84,16 +84,16 @@ export const resolveConfig = (
         }
 
         const { catalog: _catalog, ...agentWithoutCatalog } = agentConfig
-        const agentIdentity = agentConfig.agent
+        const identityData = agentConfig.identity
           ? (() => {
-              const { secrets: _secrets, ...rest } = agentConfig.agent!
+              const { secrets: _secrets, ...rest } = agentConfig.identity!
               return rest
             })()
           : undefined
 
         const resolvedConfig: EnvpktConfig = {
           ...agentWithoutCatalog,
-          agent: agentIdentity ? { ...agentIdentity, name: agentIdentity.name } : undefined,
+          identity: identityData ? { ...identityData, name: identityData.name } : undefined,
           secret: resolvedMeta,
         }
 

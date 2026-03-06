@@ -85,13 +85,13 @@ describe("envpkt keygen", () => {
 
   it.skipIf(!ageInstalled)("updates envpkt.toml when present", () => {
     const keyPath = join(tmpDir, "key.txt")
-    writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n\n[agent]\nname = "test"\n`)
+    writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n\n[identity]\nname = "test"\n`)
 
     const result = run(["keygen", "-o", keyPath], { cwd: tmpDir })
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain("Updated")
-    expect(result.stdout).toContain("agent.recipient")
+    expect(result.stdout).toContain("identity.recipient")
 
     const config = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
     expect(config).toContain("recipient = ")

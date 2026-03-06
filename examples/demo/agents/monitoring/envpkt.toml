@@ -1,6 +1,6 @@
 version = 1
 
-[agent]
+[identity]
 name = "monitoring"
 consumer = "agent"
 description = "Infrastructure health checks and alerting"

@@ -141,7 +141,7 @@ export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string
     missing,
     missing_metadata,
     orphaned,
-    agent: config.agent,
+    identity: config.identity,
   }
 }
 

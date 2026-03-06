@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest"
 import { TypeCompiler } from "@sinclair/typebox/compiler"
-import { EnvpktConfigSchema, SecretMetaSchema, AgentIdentitySchema, EnvMetaSchema } from "../../src/core/schema.js"
+import { EnvpktConfigSchema, SecretMetaSchema, IdentitySchema, EnvMetaSchema } from "../../src/core/schema.js"
 
 const configChecker = TypeCompiler.Compile(EnvpktConfigSchema)
 const secretMetaChecker = TypeCompiler.Compile(SecretMetaSchema)
-const agentChecker = TypeCompiler.Compile(AgentIdentitySchema)
+const agentChecker = TypeCompiler.Compile(IdentitySchema)
 const envMetaChecker = TypeCompiler.Compile(EnvMetaSchema)
 
 describe("EnvpktConfigSchema", () => {
@@ -29,7 +29,7 @@ describe("EnvpktConfigSchema", () => {
   it("validates a full config", () => {
     const config = {
       version: 1,
-      agent: {
+      identity: {
         name: "my-agent",
         consumer: "agent",
         description: "Data processing agent",
@@ -144,7 +144,7 @@ describe("EnvMetaSchema", () => {
   })
 })
 
-describe("AgentIdentitySchema", () => {
+describe("IdentitySchema", () => {
   it("validates minimal agent", () => {
     expect(agentChecker.Check({ name: "test-agent" })).toBe(true)
   })

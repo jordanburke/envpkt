@@ -12,7 +12,7 @@ A comprehensive configuration demonstrating all available sections.
 
 version = 1
 
-[agent]
+[identity]
 name = "data-pipeline-agent"
 consumer = "agent"
 description = "ETL pipeline processor for data ingestion"
@@ -92,7 +92,7 @@ source = "manual"
 
 ## Sections Breakdown
 
-- **`[agent]`** — identifies the AI agent, its role, capabilities, and service dependencies
+- **`[identity]`** — identifies the consumer, its role, capabilities, and service dependencies
 - **`[lifecycle]`** — configures audit policies (stale warnings, required fields)
 - **`[callbacks]`** — Slack webhooks triggered on lifecycle events
 - **`[tools]`** — enables fnox and MCP integrations

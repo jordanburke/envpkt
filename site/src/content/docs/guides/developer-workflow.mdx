@@ -55,7 +55,7 @@ Before sealing secrets, generate an age keypair:
 envpkt keygen
 ```
 
-If you already ran `env scan --write`, keygen will automatically update `agent.recipient` in your `envpkt.toml`. You can then seal:
+If you already ran `env scan --write`, keygen will automatically update `identity.recipient` in your `envpkt.toml`. You can then seal:
 
 ```bash
 # Encrypt secret values into envpkt.toml
@@ -174,7 +174,7 @@ For projects that need a subset of catalog secrets, create a local `envpkt.toml`
 version = 1
 catalog = "../../Library/Mobile Documents/com~apple~CloudDocs/envpkt/catalog.toml"
 
-[agent]
+[identity]
 name = "my-project"
 secrets = ["DATABASE_URL", "STRIPE_SECRET_KEY"]
 ```

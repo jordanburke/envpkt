@@ -79,7 +79,7 @@ describe("scanFleet", () => {
   it("reads agent identity from config", () => {
     writeEnvpkt(
       join(tmpDir, "named-agent"),
-      `version = 1\n[agent]\nname = "my-agent"\nconsumer = "agent"\ndescription = "Test agent"\n[secret.K]\nservice = "s"\n`,
+      `version = 1\n[identity]\nname = "my-agent"\nconsumer = "agent"\ndescription = "Test agent"\n[secret.K]\nservice = "s"\n`,
     )
 
     const fleet = scanFleet(tmpDir)
@@ -87,9 +87,9 @@ describe("scanFleet", () => {
     agent.fold(
       () => expect.unreachable("Expected agent"),
       (a) => {
-        expect(a.agent?.name).toBe("my-agent")
-        expect(a.agent?.consumer).toBe("agent")
-        expect(a.agent?.description).toBe("Test agent")
+        expect(a.identity?.name).toBe("my-agent")
+        expect(a.identity?.consumer).toBe("agent")
+        expect(a.identity?.description).toBe("Test agent")
       },
     )
   })

@@ -37,8 +37,8 @@ envpkt init
 # From existing fnox.toml
 envpkt init --from-fnox
 
-# With agent identity
-envpkt init --agent --name "my-agent" --capabilities "read,write"
+# With identity section
+envpkt init --identity --name "my-agent" --capabilities "read,write"
 ```
 
 ### 2. Discover credentials
@@ -98,7 +98,7 @@ See `references/envpkt-toml-reference.md` for the complete annotated schema.
 version = 1
 catalog = "./shared-catalog.toml"   # Optional shared catalog path
 
-[agent]
+[identity]
 name = "my-agent"
 consumer = "agent"                  # "agent" | "service" | "developer" | "ci"
 description = "Data processing agent"
@@ -166,7 +166,7 @@ See `references/quick-reference.md` for a compact cheat sheet.
 | `envpkt env scan`         | Auto-discover credentials from `process.env`      |
 | `envpkt env scan --write` | Write discovered credentials to `envpkt.toml`     |
 
-**init options**: `--from-fnox [path]`, `--catalog <path>`, `--agent`, `--name <name>`, `--capabilities <caps>`, `--expires <date>`, `--force`
+**init options**: `--from-fnox [path]`, `--catalog <path>`, `--identity`, `--name <name>`, `--capabilities <caps>`, `--expires <date>`, `--force`
 
 **keygen options**: `-c <path>`, `--force`, `-o <path>`
 
@@ -368,7 +368,7 @@ const keyPath: string = resolveKeyPath()
 // Check for inline key (CI): ENVPKT_AGE_KEY env
 const inlineKey: Option<string> = resolveInlineKey()
 
-// Update agent.recipient in envpkt.toml
+// Update identity.recipient in envpkt.toml
 const updated = updateConfigRecipient("envpkt.toml", "age1...")
 ```
 
@@ -483,23 +483,23 @@ All errors are tagged unions with a `_tag` discriminant:
 
 ### BootError Tags
 
-| Tag                  | Meaning                               |
-| -------------------- | ------------------------------------- |
-| `FileNotFound`       | `envpkt.toml` not found at path       |
-| `ParseError`         | TOML parse failure                    |
-| `ValidationError`    | Schema validation failed              |
-| `ReadError`          | File read error                       |
-| `FnoxNotFound`       | fnox CLI not installed                |
-| `FnoxCliError`       | fnox command failed                   |
-| `FnoxParseError`     | fnox output parse failure             |
-| `AuditFailed`        | Credential audit failed policy        |
-| `CatalogNotFound`    | Catalog file not found                |
-| `CatalogLoadError`   | Catalog load/parse error              |
-| `SecretNotInCatalog` | Requested secret not in catalog       |
-| `MissingSecretsList` | Agent has no secrets list for catalog |
-| `AgeNotFound`        | age CLI not installed                 |
-| `DecryptFailed`      | Decryption failed                     |
-| `IdentityNotFound`   | Agent identity file not found         |
+| Tag                  | Meaning                                  |
+| -------------------- | ---------------------------------------- |
+| `FileNotFound`       | `envpkt.toml` not found at path          |
+| `ParseError`         | TOML parse failure                       |
+| `ValidationError`    | Schema validation failed                 |
+| `ReadError`          | File read error                          |
+| `FnoxNotFound`       | fnox CLI not installed                   |
+| `FnoxCliError`       | fnox command failed                      |
+| `FnoxParseError`     | fnox output parse failure                |
+| `AuditFailed`        | Credential audit failed policy           |
+| `CatalogNotFound`    | Catalog file not found                   |
+| `CatalogLoadError`   | Catalog load/parse error                 |
+| `SecretNotInCatalog` | Requested secret not in catalog          |
+| `MissingSecretsList` | Identity has no secrets list for catalog |
+| `AgeNotFound`        | age CLI not installed                    |
+| `DecryptFailed`      | Decryption failed                        |
+| `IdentityNotFound`   | Agent identity file not found            |
 
 ### KeygenError Tags
 
@@ -596,7 +596,7 @@ All tools accept an optional `configPath` argument.
 
 - **Config not found**: envpkt searches up from cwd. Use `-c <path>` to specify explicitly.
 - **Audit shows "missing"**: The secret key is in `[secret.*]` but not in the environment. Check `envpkt env check`.
-- **Sealed values fail**: Ensure `age` CLI is installed and the identity file path in `[agent].identity` is correct.
+- **Sealed values fail**: Ensure `age` CLI is installed and the identity file path in `[identity].identity` is correct.
 - **fnox errors**: Check `fnox` is installed and configured. Use `envpkt inspect --resolved` to see what the config looks like after catalog merge.
 - **Boot skips secrets**: Check `bootSafe()` result's `skipped` array and `warnings` for details.
 - **Schema validation**: Run `envpkt inspect` to see validation errors. The JSON schema is available at `envpkt/schema` export for editor autocomplete.
@@ -614,5 +614,5 @@ envpkt uses TypeBox for schema-first design. The JSON schema is exported for edi
 Import schemas for runtime validation:
 
 ```typescript
-import { EnvpktConfigSchema, SecretMetaSchema, AgentIdentitySchema } from "envpkt"
+import { EnvpktConfigSchema, SecretMetaSchema, IdentitySchema } from "envpkt"
 ```

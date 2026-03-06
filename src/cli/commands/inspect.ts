@@ -55,14 +55,14 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
   console.log(`version: ${config.version}`)
   console.log("")
 
-  if (config.agent) {
-    console.log(`${BOLD}Agent:${RESET} ${config.agent.name}`)
-    if (config.agent.consumer) console.log(`  consumer: ${config.agent.consumer}`)
-    if (config.agent.description) console.log(`  description: ${config.agent.description}`)
-    if (config.agent.capabilities) console.log(`  capabilities: ${config.agent.capabilities.join(", ")}`)
-    if (config.agent.expires) console.log(`  expires: ${config.agent.expires}`)
-    if (config.agent.services) console.log(`  services: ${config.agent.services.join(", ")}`)
-    if (config.agent.secrets) console.log(`  secrets: ${config.agent.secrets.join(", ")}`)
+  if (config.identity) {
+    console.log(`${BOLD}Identity:${RESET} ${config.identity.name}`)
+    if (config.identity.consumer) console.log(`  consumer: ${config.identity.consumer}`)
+    if (config.identity.description) console.log(`  description: ${config.identity.description}`)
+    if (config.identity.capabilities) console.log(`  capabilities: ${config.identity.capabilities.join(", ")}`)
+    if (config.identity.expires) console.log(`  expires: ${config.identity.expires}`)
+    if (config.identity.services) console.log(`  services: ${config.identity.services.join(", ")}`)
+    if (config.identity.secrets) console.log(`  secrets: ${config.identity.secrets.join(", ")}`)
     console.log("")
   }
 

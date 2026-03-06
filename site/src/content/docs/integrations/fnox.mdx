@@ -47,12 +47,12 @@ envpkt exec --profile staging -- node server.js
 envpkt exec --profile production -- ./deploy.sh
 ```
 
-## Agent Identity
+## Identity
 
-envpkt supports encrypted agent identity via age keys:
+envpkt supports encrypted identity via age keys:
 
 ```toml
-[agent]
+[identity]
 name = "data-pipeline"
 identity = "keys/agent.age"
 recipient = "age1..."

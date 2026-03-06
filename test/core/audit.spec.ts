@@ -259,16 +259,16 @@ describe("computeAudit", () => {
     expect(result.orphaned).toBe(0)
   })
 
-  it("includes agent in audit result", () => {
+  it("includes identity in audit result", () => {
     const config: EnvpktConfig = {
       version: 1,
-      agent: { name: "test-agent", consumer: "agent" },
+      identity: { name: "test-agent", consumer: "agent" },
       secret: { KEY: { service: "svc" } },
     }
 
     const result = computeAudit(config, undefined, today)
-    expect(result.agent?.name).toBe("test-agent")
-    expect(result.agent?.consumer).toBe("agent")
+    expect(result.identity?.name).toBe("test-agent")
+    expect(result.identity?.consumer).toBe("agent")
   })
 
   it("service is Option in SecretHealth", () => {

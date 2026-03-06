@@ -4,7 +4,7 @@
 
 version = 1
 
-[agent]
+[identity]
 name = "billing-service"
 consumer = "service"
 description = "Payment processing and subscription management"

@@ -19,27 +19,29 @@ export const ConsumerType = Type.Union(
 )
 export type ConsumerType = Static<typeof ConsumerType>
 
-// --- Agent Identity ---
+// --- Identity ---
 
-export const AgentIdentitySchema = Type.Object(
+export const IdentitySchema = Type.Object(
   {
-    name: Type.String({ description: "Agent display name" }),
+    name: Type.String({ description: "Display name" }),
     consumer: Type.Optional(ConsumerType),
-    description: Type.Optional(Type.String({ description: "Agent description or role" })),
-    capabilities: Type.Optional(Type.Array(Type.String(), { description: "List of capabilities this agent provides" })),
-    expires: Type.Optional(
-      Type.String({ format: "date", description: "Agent credential expiration date (YYYY-MM-DD)" }),
+    description: Type.Optional(Type.String({ description: "Description or role" })),
+    capabilities: Type.Optional(
+      Type.Array(Type.String(), { description: "List of capabilities this identity provides" }),
     ),
-    services: Type.Optional(Type.Array(Type.String(), { description: "Service dependencies for this agent" })),
-    identity: Type.Optional(
-      Type.String({ description: "Path to encrypted agent key file (relative to config directory)" }),
-    ),
-    recipient: Type.Optional(Type.String({ description: "Agent's age public key for encryption" })),
-    secrets: Type.Optional(Type.Array(Type.String(), { description: "Secret keys this agent needs from the catalog" })),
+    expires: Type.Optional(Type.String({ format: "date", description: "Credential expiration date (YYYY-MM-DD)" })),
+    services: Type.Optional(Type.Array(Type.String(), { description: "Service dependencies" })),
+    identity: Type.Optional(Type.String({ description: "Path to age identity file (relative to config directory)" })),
+    recipient: Type.Optional(Type.String({ description: "Age public key for encryption" })),
+    secrets: Type.Optional(Type.Array(Type.String(), { description: "Secret keys needed from the catalog" })),
   },
-  { description: "Identity and capabilities of the AI agent using this envpkt" },
+  { description: "Identity and capabilities of the principal using this envpkt" },
 )
-export type AgentIdentity = Static<typeof AgentIdentitySchema>
+export type Identity = Static<typeof IdentitySchema>
+/** @deprecated Use `Identity` instead */
+export type AgentIdentity = Identity
+/** @deprecated Use `IdentitySchema` instead */
+export const AgentIdentitySchema = IdentitySchema
 
 // --- Secret Metadata ---
 
@@ -135,7 +137,7 @@ export const EnvpktConfigSchema = Type.Object(
     catalog: Type.Optional(
       Type.String({ description: "Path to shared secret catalog (relative to this config file)" }),
     ),
-    agent: Type.Optional(AgentIdentitySchema),
+    identity: Type.Optional(IdentitySchema),
     secret: Type.Optional(
       Type.Record(Type.String(), SecretMetaSchema, {
         description: "Per-secret metadata keyed by secret name",

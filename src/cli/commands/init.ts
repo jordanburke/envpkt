@@ -13,7 +13,7 @@ const CONFIG_FILENAME = "envpkt.toml"
 type InitOptions = {
   readonly fromFnox?: string
   readonly catalog?: string
-  readonly agent?: boolean
+  readonly identity?: boolean
   readonly name?: string
   readonly capabilities?: string
   readonly expires?: string
@@ -36,7 +36,7 @@ created = "${todayIso()}"
 `
 }
 
-const generateAgentSection = (name: string, capabilities?: string, expires?: string): string => {
+const generateIdentitySection = (name: string, capabilities?: string, expires?: string): string => {
   const caps = capabilities
     ? `\ncapabilities = [${capabilities
         .split(",")
@@ -44,7 +44,7 @@ const generateAgentSection = (name: string, capabilities?: string, expires?: str
         .join(", ")}]`
     : ""
   const exp = expires ? `\nexpires = "${expires}"` : ""
-  return `[agent]
+  return `[identity]
 name = "${name}"
 # consumer = "agent"         # agent | service | developer | ci${caps}${exp}
 `
@@ -63,8 +63,8 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
     lines.push(``)
   }
 
-  if (options.agent && options.name) {
-    lines.push(generateAgentSection(options.name, options.capabilities, options.expires))
+  if (options.identity && options.name) {
+    lines.push(generateIdentitySection(options.name, options.capabilities, options.expires))
     if (options.catalog) {
       lines.push(`secrets = []  # Add catalog secret keys this agent needs`)
     }

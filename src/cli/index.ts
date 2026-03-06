@@ -42,10 +42,10 @@ program
   .description("Initialize a new envpkt.toml in the current directory")
   .option("--from-fnox [path]", "Scaffold from fnox.toml (optionally specify path)")
   .option("--catalog <path>", "Path to shared secret catalog")
-  .option("--agent", "Include [agent] section")
-  .option("--name <name>", "Agent name (requires --agent)")
-  .option("--capabilities <caps>", "Comma-separated capabilities (requires --agent)")
-  .option("--expires <date>", "Agent credential expiration YYYY-MM-DD (requires --agent)")
+  .option("--identity", "Include [identity] section")
+  .option("--name <name>", "Identity name (requires --identity)")
+  .option("--capabilities <caps>", "Comma-separated capabilities (requires --identity)")
+  .option("--expires <date>", "Credential expiration YYYY-MM-DD (requires --identity)")
   .option("--force", "Overwrite existing envpkt.toml")
   .action((options) => {
     runInit(process.cwd(), options)
@@ -54,7 +54,7 @@ program
 program
   .command("keygen")
   .description("Generate an age keypair for sealing secrets — run this before `seal` if you don't have a key yet")
-  .option("-c, --config <path>", "Path to envpkt.toml (updates agent.recipient if found)")
+  .option("-c, --config <path>", "Path to envpkt.toml (updates identity.recipient if found)")
   .option("--force", "Overwrite existing identity file")
   .option("-o, --output <path>", "Output path for identity file (default: ~/.envpkt/age-key.txt)")
   .action((options) => {

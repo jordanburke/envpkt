@@ -144,9 +144,9 @@ export const formatFleetJson = (fleet: FleetHealth): string =>
       agents: fleet.agents
         .map((a) => ({
           path: a.path,
-          name: a.agent?.name ?? null,
-          consumer: a.agent?.consumer ?? null,
-          description: a.agent?.description ?? null,
+          name: a.identity?.name ?? null,
+          consumer: a.identity?.consumer ?? null,
+          description: a.identity?.description ?? null,
           status: a.audit.status,
           secrets: a.audit.total,
         }))

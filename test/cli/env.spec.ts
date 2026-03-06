@@ -244,7 +244,7 @@ describe("envpkt env export", () => {
       stdio: ["pipe", "pipe", "pipe"],
     })
 
-    const toml = `version = 1\n\n[agent]\nname = "test"\nrecipient = "${recipient}"\nidentity = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
+    const toml = `version = 1\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nidentity = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["env", "export"], { cwd: tmpDir })

@@ -147,7 +147,7 @@ describe("resolveConfig", () => {
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
-      agent: { name: "test-agent", consumer: "agent", secrets: ["DB_URL", "REDIS"] },
+      identity: { name: "test-agent", consumer: "agent", secrets: ["DB_URL", "REDIS"] },
       secret: {},
     }
     const result = resolveConfig(config, tmpDir)
@@ -162,7 +162,7 @@ describe("resolveConfig", () => {
         expect(r.catalogPath).toContain("catalog.toml")
         // Resolved config should not have catalog or agent.secrets
         expect(r.config.catalog).toBeUndefined()
-        expect(r.config.agent?.secrets).toBeUndefined()
+        expect(r.config.identity?.secrets).toBeUndefined()
       },
     )
   })
@@ -173,7 +173,7 @@ describe("resolveConfig", () => {
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
-      agent: { name: "test-agent" },
+      identity: { name: "test-agent" },
       secret: {},
     }
     const result = resolveConfig(config, tmpDir)
@@ -190,7 +190,7 @@ describe("resolveConfig", () => {
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
-      agent: { name: "test-agent", secrets: ["NONEXISTENT"] },
+      identity: { name: "test-agent", secrets: ["NONEXISTENT"] },
       secret: {},
     }
     const result = resolveConfig(config, tmpDir)
@@ -214,7 +214,7 @@ describe("resolveConfig", () => {
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
-      agent: { name: "read-only-agent", secrets: ["DB"] },
+      identity: { name: "read-only-agent", secrets: ["DB"] },
       secret: { DB: { capabilities: ["SELECT"] } },
     }
     const result = resolveConfig(config, tmpDir)
@@ -236,7 +236,7 @@ describe("resolveConfig", () => {
     const config: EnvpktConfig = {
       version: 1,
       catalog: "catalog.toml",
-      agent: { name: "agent", secrets: ["KEY"] },
+      identity: { name: "agent", secrets: ["KEY"] },
       secret: {},
       lifecycle: { stale_warning_days: 30 },
       callbacks: { on_expired: "https://hooks.example.com/expired" },
@@ -258,7 +258,7 @@ describe("resolveConfig", () => {
     const config: EnvpktConfig = {
       version: 1,
       catalog: "nonexistent.toml",
-      agent: { name: "agent", secrets: ["KEY"] },
+      identity: { name: "agent", secrets: ["KEY"] },
       secret: {},
     }
     const result = resolveConfig(config, tmpDir)

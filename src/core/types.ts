@@ -1,18 +1,21 @@
 import type { List, Option } from "functype"
 
-import type { AgentIdentity, EnvpktConfig } from "./schema.js"
+import type { EnvpktConfig, Identity } from "./schema.js"
 
 // Re-export schema-derived types
 export type {
-  AgentIdentity,
   CallbackConfig,
   ConsumerType,
   EnvMeta,
   EnvpktConfig,
+  Identity,
   LifecycleConfig,
   SecretMeta,
   ToolsConfig,
 } from "./schema.js"
+
+/** @deprecated Use `Identity` instead */
+export type AgentIdentity = Identity
 
 // --- Health status unions ---
 
@@ -45,7 +48,7 @@ export type AuditResult = {
   readonly missing: number
   readonly missing_metadata: number
   readonly orphaned: number
-  readonly agent?: AgentIdentity
+  readonly identity?: Identity
 }
 
 // --- Env drift types ---
@@ -72,7 +75,7 @@ export type EnvAuditResult = {
 
 export type FleetAgent = {
   readonly path: string
-  readonly agent?: AgentIdentity
+  readonly identity?: Identity
   readonly min_expiry_days?: number
   readonly audit: AuditResult
 }

@@ -97,7 +97,7 @@ And a more complete one:
 
 version = 1
 
-[agent]
+[identity]
 name = "billing-service"
 consumer = "agent"
 description = "Payment processing agent"
@@ -158,7 +158,7 @@ age-keygen -o identity.txt
 Add the public key to your config and the identity file to `.gitignore`:
 
 ```toml
-[agent]
+[identity]
 name = "my-agent"
 recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
 identity = "identity.txt"
@@ -233,7 +233,7 @@ expires = "2026-11-01"
 version = 1
 catalog = "../../infra/envpkt.toml"
 
-[agent]
+[identity]
 name = "data-pipeline"
 consumer = "agent"
 secrets = ["DATABASE_URL", "REDIS_URL"]
@@ -255,7 +255,7 @@ This produces a self-contained config with catalog metadata merged in and agent 
 
 - Each field in the agent's `[secret.KEY]` override **replaces** the catalog field (shallow merge)
 - Omitted fields keep the catalog value
-- `agent.secrets` is the source of truth for which keys the agent needs
+- `identity.secrets` is the source of truth for which keys the agent needs
 
 ## How envpkt Compares
 
@@ -267,7 +267,7 @@ The agentic credential space is splitting into approaches. Here's where envpkt f
 | **What agents see**         | Structured metadata (capabilities, constraints, expiration) | Raw secret values           | Nothing (proxy handles it) | Nothing (autofill handles it) | Raw secret values    |
 | **MCP server**              | Yes                                                         | Yes                         | No                         | No                            | Yes                  |
 | **Encryption at rest**      | age sealed packets                                          | Git-crypt                   | N/A (proxy model)          | Vault encryption              | Vault encryption     |
-| **Per-agent scoping**       | Yes (agent.secrets, capabilities)                           | Yes (policies)              | Yes (proxy rules)          | No                            | Yes (policies)       |
+| **Per-agent scoping**       | Yes (identity.secrets, capabilities)                        | Yes (policies)              | Yes (proxy rules)          | No                            | Yes (policies)       |
 | **Fleet health monitoring** | Yes (fleet scan, aggregated audit)                          | No                          | No                         | No                            | No                   |
 | **Credential metadata**     | Rich (purpose, capabilities, rotation, lifecycle)           | Minimal                     | Minimal                    | Minimal                       | Moderate             |
 | **Adoption path**           | Scan existing env vars, add metadata incrementally          | New secret storage workflow | Proxy configuration        | Browser extension             | API integration      |
@@ -285,9 +285,9 @@ Generate an `envpkt.toml` template in the current directory.
 ```bash
 envpkt init                                    # Basic template
 envpkt init --from-fnox                        # Scaffold from fnox.toml
-envpkt init --agent --name "my-agent"          # Include agent identity
+envpkt init --identity --name "my-agent"        # Include identity section
 envpkt init --catalog "../infra/envpkt.toml"   # Reference a shared catalog
-envpkt init --agent --name "bot" --capabilities "read,write" --expires "2027-01-01"
+envpkt init --identity --name "bot" --capabilities "read,write" --expires "2027-01-01"
 ```
 
 ### `envpkt audit`
@@ -354,13 +354,13 @@ envpkt seal -c path/to/envpkt.toml     # Specify config path
 envpkt seal --profile staging          # Use a specific fnox profile for value resolution
 ```
 
-Requires `agent.recipient` (age public key) in your config. Values are resolved via cascade:
+Requires `identity.recipient` (age public key) in your config. Values are resolved via cascade:
 
 1. **fnox** (if available)
 2. **Environment variables** (e.g. `OPENAI_API_KEY` in your shell)
 3. **Interactive prompt** (asks you to paste each value)
 
-After sealing, each secret gets an `encrypted_value` field. At boot time, `envpkt exec` or `boot()` automatically decrypts sealed values using the `agent.identity` file.
+After sealing, each secret gets an `encrypted_value` field. At boot time, `envpkt exec` or `boot()` automatically decrypts sealed values using the `identity.identity` file.
 
 See [`examples/sealed-agent.toml`](./examples/sealed-agent.toml) for a complete example.
 
@@ -645,12 +645,12 @@ Each `[secret.<KEY>]` section describes a secret:
 | **Sealed**      | `encrypted_value`                               | Age-encrypted secret value (safe to commit) |
 | **Enforcement** | `required`, `tags`                              | Filtering, grouping, and policy             |
 
-### Agent Identity
+### Identity
 
-The optional `[agent]` section identifies the AI agent:
+The optional `[identity]` section identifies the consumer of these credentials:
 
 ```toml
-[agent]
+[identity]
 name = "data-pipeline-agent"
 consumer = "agent"                     # agent | service | developer | ci
 description = "ETL pipeline processor"

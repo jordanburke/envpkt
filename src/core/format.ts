@@ -49,20 +49,20 @@ export const formatPacket = (result: ResolveResult, options?: FormatPacketOption
   const sections: string[] = []
 
   // Header
-  if (config.agent) {
-    const consumer = config.agent.consumer ? ` (${config.agent.consumer})` : ""
-    sections.push(`envpkt packet: ${config.agent.name}${consumer}`)
+  if (config.identity) {
+    const consumer = config.identity.consumer ? ` (${config.identity.consumer})` : ""
+    sections.push(`envpkt packet: ${config.identity.name}${consumer}`)
   } else {
     sections.push("envpkt packet")
   }
 
   // Agent block
-  if (config.agent) {
+  if (config.identity) {
     const agentLines: string[] = []
-    if (config.agent.description) agentLines.push(`  ${config.agent.description}`)
-    if (config.agent.capabilities) agentLines.push(`  capabilities: ${config.agent.capabilities.join(", ")}`)
-    if (config.agent.services) agentLines.push(`  services: ${config.agent.services.join(", ")}`)
-    if (config.agent.expires) agentLines.push(`  expires: ${config.agent.expires}`)
+    if (config.identity.description) agentLines.push(`  ${config.identity.description}`)
+    if (config.identity.capabilities) agentLines.push(`  capabilities: ${config.identity.capabilities.join(", ")}`)
+    if (config.identity.services) agentLines.push(`  services: ${config.identity.services.join(", ")}`)
+    if (config.identity.expires) agentLines.push(`  expires: ${config.identity.expires}`)
     if (agentLines.length > 0) sections.push(agentLines.join("\n"))
   }
 

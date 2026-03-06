@@ -21,7 +21,7 @@ describe("formatPacket", () => {
   it("formats agent header with consumer type", () => {
     const result = makeResult({
       version: 1,
-      agent: { name: "api-gateway", consumer: "service", description: "REST API server" },
+      identity: { name: "api-gateway", consumer: "service", description: "REST API server" },
       secret: {},
     })
     const output = formatPacket(result)
@@ -33,7 +33,7 @@ describe("formatPacket", () => {
   it("formats agent capabilities", () => {
     const result = makeResult({
       version: 1,
-      agent: { name: "bot", capabilities: ["http:serve", "payments:process"] },
+      identity: { name: "bot", capabilities: ["http:serve", "payments:process"] },
       secret: {},
     })
     const output = formatPacket(result)
@@ -287,7 +287,7 @@ describe("formatPacket", () => {
   it("contains no ANSI escape sequences", () => {
     const result = makeResult({
       version: 1,
-      agent: { name: "test", consumer: "agent", description: "A test agent", capabilities: ["read"] },
+      identity: { name: "test", consumer: "agent", description: "A test agent", capabilities: ["read"] },
       secret: {
         KEY: { service: "svc", purpose: "test", capabilities: ["read"], source: "vault" },
       },
@@ -303,7 +303,7 @@ describe("formatPacket", () => {
     const result: ResolveResult = {
       config: {
         version: 1,
-        agent: {
+        identity: {
           name: "api-gateway",
           consumer: "service",
           description: "REST API — handles payments and database writes",

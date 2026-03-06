@@ -137,9 +137,9 @@ describe("generateKeypair", () => {
 })
 
 describe("updateConfigRecipient", () => {
-  it("adds recipient to existing [agent] section", () => {
+  it("adds recipient to existing [identity] section", () => {
     const configPath = join(tmpDir, "envpkt.toml")
-    writeFileSync(configPath, `version = 1\n\n[agent]\nname = "test-agent"\n\n[secret.MY_KEY]\nservice = "test"\n`)
+    writeFileSync(configPath, `version = 1\n\n[identity]\nname = "test-agent"\n\n[secret.MY_KEY]\nservice = "test"\n`)
 
     const result = updateConfigRecipient(configPath, "age1testrecipient123")
 
@@ -154,20 +154,20 @@ describe("updateConfigRecipient", () => {
     expect(content).toContain("[secret.MY_KEY]")
   })
 
-  it("creates [agent] section when missing", () => {
+  it("creates [identity] section when missing", () => {
     const configPath = join(tmpDir, "envpkt.toml")
     writeFileSync(configPath, `version = 1\n\n[secret.MY_KEY]\nservice = "test"\n`)
 
     updateConfigRecipient(configPath, "age1newrecipient456")
 
     const content = readFileSync(configPath, "utf-8")
-    expect(content).toContain("[agent]")
+    expect(content).toContain("[identity]")
     expect(content).toContain('recipient = "age1newrecipient456"')
   })
 
   it("updates existing recipient value", () => {
     const configPath = join(tmpDir, "envpkt.toml")
-    writeFileSync(configPath, `version = 1\n\n[agent]\nname = "test"\nrecipient = "age1oldkey"\n`)
+    writeFileSync(configPath, `version = 1\n\n[identity]\nname = "test"\nrecipient = "age1oldkey"\n`)
 
     updateConfigRecipient(configPath, "age1newkey")
 
@@ -178,7 +178,7 @@ describe("updateConfigRecipient", () => {
 
   it("preserves TOML structure", () => {
     const configPath = join(tmpDir, "envpkt.toml")
-    const original = `version = 1\n\n[agent]\nname = "test"\n\n[lifecycle]\nstale_warning_days = 90\n\n[secret.KEY]\nservice = "svc"\n`
+    const original = `version = 1\n\n[identity]\nname = "test"\n\n[lifecycle]\nstale_warning_days = 90\n\n[secret.KEY]\nservice = "svc"\n`
     writeFileSync(configPath, original)
 
     updateConfigRecipient(configPath, "age1recipient")

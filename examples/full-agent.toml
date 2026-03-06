@@ -5,7 +5,7 @@
 
 version = 1
 
-[agent]
+[identity]
 name = "data-pipeline-agent"
 consumer = "agent"
 description = "ETL pipeline processor for data ingestion"

@@ -76,7 +76,7 @@ export const scanFleet = (rootDir: string, options?: { maxDepth?: number }): Fle
         const audit = computeAudit(config)
         agents.push({
           path: configPath,
-          agent: config.agent,
+          identity: config.identity,
           min_expiry_days: audit.secrets.toArray().reduce<number | undefined>(
             (min, s) =>
               s.days_remaining.fold(

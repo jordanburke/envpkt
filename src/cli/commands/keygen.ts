@@ -40,11 +40,11 @@ export const runKeygen = (options: KeygenOptions): void => {
               `${YELLOW}Warning:${RESET} Could not update config: ${"message" in err ? err.message : err._tag}`,
             )
             console.log(`${DIM}Manually add to your envpkt.toml:${RESET}`)
-            console.log(`  [agent]`)
+            console.log(`  [identity]`)
             console.log(`  recipient = "${recipient}"`)
           },
           () => {
-            console.log(`${GREEN}Updated${RESET} ${CYAN}${configPath}${RESET} with agent.recipient`)
+            console.log(`${GREEN}Updated${RESET} ${CYAN}${configPath}${RESET} with identity.recipient`)
           },
         )
       } else {

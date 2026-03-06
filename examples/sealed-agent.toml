@@ -13,7 +13,7 @@
 
 version = 1
 
-[agent]
+[identity]
 name = "inference-agent"
 consumer = "agent"
 description = "LLM inference agent with sealed API keys"
