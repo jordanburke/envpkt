@@ -21,6 +21,7 @@ export default defineConfig({
           items: [
             { slug: "cli" },
             { slug: "cli/init" },
+            { slug: "cli/keygen" },
             { slug: "cli/audit" },
             { slug: "cli/inspect" },
             { slug: "cli/resolve" },

@@ -8,13 +8,15 @@ The developer workflow gives you structured credential awareness across every pr
 ## The Flow
 
 ```
-env scan → catalog.toml → cloud-synced folder → ENVPKT_CONFIG → eval "$(envpkt env export)"
+env scan → keygen → seal → catalog.toml → cloud-synced folder → eval "$(envpkt env export)"
 ```
 
 1. **Discover** what's in your environment with `env scan`
-2. **Catalog** the secrets with metadata (service, expiration, rotation)
-3. **Sync** the catalog via iCloud Drive, OneDrive, or a private git repo
-4. **Pick up** secrets per-terminal with `env export` + shell hook
+2. **Generate** an age keypair with `keygen` (one-time setup)
+3. **Seal** secret values into your config with `seal`
+4. **Catalog** the secrets with metadata (service, expiration, rotation)
+5. **Sync** the catalog via iCloud Drive, OneDrive, or a private git repo
+6. **Pick up** secrets per-terminal with `env export` + shell hook
 
 ## Step 1: Discover Your Secrets
 
@@ -44,7 +46,25 @@ Example output:
 ✓ Created envpkt.toml with 4 credential(s)
 ```
 
-## Step 2: Build a Catalog
+## Step 2: Generate an Encryption Key
+
+Before sealing secrets, generate an age keypair:
+
+```bash
+# One-time setup — generates ~/.envpkt/age-key.txt
+envpkt keygen
+```
+
+If you already ran `env scan --write`, keygen will automatically update `agent.recipient` in your `envpkt.toml`. You can then seal:
+
+```bash
+# Encrypt secret values into envpkt.toml
+envpkt seal
+```
+
+Sealed configs are safe to commit — only metadata and ciphertext are stored.
+
+## Step 3: Build a Catalog
 
 Promote your scanned output into a proper catalog with lifecycle metadata:
 
@@ -86,7 +106,7 @@ source = "vault"
 
 The catalog is a standard `envpkt.toml` — there's no special format. It becomes a catalog when other configs reference it.
 
-## Step 3: Cloud Sync Setup
+## Step 4: Cloud Sync Setup
 
 Put your catalog in a cloud-synced folder so every machine picks it up. envpkt is a reader — it never writes to or manages the sync folder.
 
@@ -110,7 +130,7 @@ export ENVPKT_CONFIG="$HOME/IdeaProjects/secrets/catalog.toml"
 
 The catalog contains metadata only — no secret values — so cloud sync and private git are both safe.
 
-## Step 4: Shell Pickup
+## Step 5: Shell Pickup
 
 Add to your `.zshrc` or `.bashrc` to load secrets on every new terminal:
 
@@ -129,7 +149,7 @@ The `env export` command resolves values through the cascade (sealed packets →
 
 The shell hook runs a lightweight `audit --format minimal` whenever you `cd` into a directory with an `envpkt.toml`, warning you about expiring or stale credentials.
 
-## Step 5: Ongoing Maintenance
+## Step 6: Ongoing Maintenance
 
 ```bash
 # Check health of your catalog

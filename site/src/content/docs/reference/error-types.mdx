@@ -77,6 +77,27 @@ type IdentityError =
 | `DecryptFailed`    | Agent key decryption failed                   |
 | `IdentityNotFound` | Identity key file not found at specified path |
 
+## `KeygenError`
+
+Errors from key generation and config update operations.
+
+```typescript
+type KeygenError =
+  | { readonly _tag: "AgeNotFound"; readonly message: string }
+  | { readonly _tag: "KeygenFailed"; readonly message: string }
+  | { readonly _tag: "KeyExists"; readonly path: string }
+  | { readonly _tag: "WriteError"; readonly message: string }
+  | { readonly _tag: "ConfigUpdateError"; readonly message: string }
+```
+
+| Tag                 | When                                                    |
+| ------------------- | ------------------------------------------------------- |
+| `AgeNotFound`       | `age-keygen` CLI not found on PATH                      |
+| `KeygenFailed`      | `age-keygen` command failed or output unreadable        |
+| `KeyExists`         | Identity file already exists (use `--force`)            |
+| `WriteError`        | Failed to write identity file or create directory       |
+| `ConfigUpdateError` | Failed to read/write `envpkt.toml` for recipient update |
+
 ## `BootError`
 
 Union of all error types that can occur during boot:

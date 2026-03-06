@@ -1,0 +1,76 @@
+---
+title: envpkt keygen
+description: Generate an age keypair for sealing secrets
+---
+
+Generate an [age](https://github.com/FiloSottile/age) keypair and optionally update `envpkt.toml` with the recipient public key. This is the bridge between `env scan --write` and `seal`.
+
+## Usage
+
+```bash
+envpkt keygen [options]
+```
+
+## Options
+
+| Option                | Description                                       | Default                 |
+| --------------------- | ------------------------------------------------- | ----------------------- |
+| `-c, --config <path>` | Path to `envpkt.toml` (updates `agent.recipient`) | `./envpkt.toml`         |
+| `--force`             | Overwrite existing identity file                  | `false`                 |
+| `-o, --output <path>` | Output path for identity file                     | `~/.envpkt/age-key.txt` |
+
+## Key Path Resolution
+
+The identity file location is resolved in this order:
+
+1. `-o` / `--output` flag
+2. `ENVPKT_AGE_KEY_FILE` environment variable
+3. Default: `~/.envpkt/age-key.txt`
+
+For CI environments, you can also set `ENVPKT_AGE_KEY` with the inline key content instead of a file path.
+
+## Examples
+
+```bash
+# Generate a keypair (writes to ~/.envpkt/age-key.txt)
+envpkt keygen
+
+# Generate to a custom path
+envpkt keygen -o ./keys/agent-key.txt
+
+# Overwrite an existing key (key rotation)
+envpkt keygen --force
+
+# Generate and update a specific config
+envpkt keygen -c /path/to/envpkt.toml
+```
+
+## Behavior
+
+1. Checks that `age-keygen` is available on PATH
+2. Resolves the output path (flag > env var > default)
+3. If file exists and `--force` is not set: warns and exits with code 1
+4. Generates keypair via `age-keygen`
+5. Writes identity file with `0600` permissions
+6. If `envpkt.toml` exists in the working directory (or at `-c` path): updates `agent.recipient` automatically
+7. If no config found: prints next-step guidance
+
+## Typical Workflow
+
+```bash
+# 1. Discover credentials
+envpkt env scan --write
+
+# 2. Generate encryption key
+envpkt keygen
+
+# 3. Seal secrets into envpkt.toml
+envpkt seal
+```
+
+## Security Notes
+
+- The identity file (private key) is written with `0600` permissions (owner-only read/write)
+- Never commit identity files to version control
+- The recipient (public key) is safe to store in `envpkt.toml` and commit
+- For CI, use `ENVPKT_AGE_KEY` env var instead of writing to disk

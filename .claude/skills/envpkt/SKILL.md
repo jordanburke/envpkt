@@ -9,7 +9,7 @@ description: Help developers use envpkt for credential management — CLI usage,
 
 envpkt is a credential lifecycle and fleet management tool for AI agents. It provides:
 
-- **CLI** (`envpkt`) — 12 commands for credential setup, auditing, sealing, fleet scanning, and environment management
+- **CLI** (`envpkt`) — 13 commands for credential setup, keygen, auditing, sealing, fleet scanning, and environment management
 - **Library API** — Programmatic access via `import { boot, bootSafe, computeAudit, ... } from "envpkt"`
 - **MCP Server** — Expose credential health and capabilities to LLM agents via Model Context Protocol
 - **Configuration** — `envpkt.toml` declares per-secret metadata across 5 tiers with lifecycle policies, plus `[env.*]` for plaintext environment defaults
@@ -51,7 +51,20 @@ envpkt env scan
 envpkt env scan --write
 ```
 
-### 3. Audit health
+### 3. Generate encryption key
+
+```bash
+# Generate age keypair (one-time setup)
+envpkt keygen
+
+# Custom output path
+envpkt keygen -o ./keys/agent-key.txt
+
+# Overwrite existing key (rotation)
+envpkt keygen --force
+```
+
+### 4. Audit health
 
 ```bash
 envpkt audit
@@ -59,7 +72,7 @@ envpkt audit --strict          # Exit non-zero on any non-healthy secret
 envpkt audit --format json     # Machine-readable output
 ```
 
-### 4. Programmatic boot
+### 5. Programmatic boot
 
 ```typescript
 import { boot, bootSafe } from "envpkt"
@@ -149,10 +162,13 @@ See `references/quick-reference.md` for a compact cheat sheet.
 | Command                   | Description                                       |
 | ------------------------- | ------------------------------------------------- |
 | `envpkt init`             | Initialize `envpkt.toml` in the current directory |
+| `envpkt keygen`           | Generate age keypair for sealing secrets          |
 | `envpkt env scan`         | Auto-discover credentials from `process.env`      |
 | `envpkt env scan --write` | Write discovered credentials to `envpkt.toml`     |
 
 **init options**: `--from-fnox [path]`, `--catalog <path>`, `--agent`, `--name <name>`, `--capabilities <caps>`, `--expires <date>`, `--force`
+
+**keygen options**: `-c <path>`, `--force`, `-o <path>`
 
 **env scan options**: `--format table|json`, `--write`, `--dry-run`, `--include-unknown`
 
@@ -338,6 +354,24 @@ import { resolveValues } from "envpkt"
 const values = resolveValues(config, options)
 ```
 
+### Keygen
+
+```typescript
+import { generateKeypair, resolveKeyPath, resolveInlineKey, updateConfigRecipient } from "envpkt"
+
+// Generate age keypair
+const result = generateKeypair({ outputPath: "~/.envpkt/age-key.txt" })
+
+// Resolve key path: ENVPKT_AGE_KEY_FILE env > ~/.envpkt/age-key.txt
+const keyPath: string = resolveKeyPath()
+
+// Check for inline key (CI): ENVPKT_AGE_KEY env
+const inlineKey: Option<string> = resolveInlineKey()
+
+// Update agent.recipient in envpkt.toml
+const updated = updateConfigRecipient("envpkt.toml", "age1...")
+```
+
 ### fnox Integration
 
 ```typescript
@@ -466,6 +500,16 @@ All errors are tagged unions with a `_tag` discriminant:
 | `AgeNotFound`        | age CLI not installed                 |
 | `DecryptFailed`      | Decryption failed                     |
 | `IdentityNotFound`   | Agent identity file not found         |
+
+### KeygenError Tags
+
+| Tag                 | Meaning                                      |
+| ------------------- | -------------------------------------------- |
+| `AgeNotFound`       | `age-keygen` CLI not found on PATH           |
+| `KeygenFailed`      | `age-keygen` command failed                  |
+| `KeyExists`         | Identity file already exists (use `--force`) |
+| `WriteError`        | Failed to write identity file                |
+| `ConfigUpdateError` | Failed to update `envpkt.toml`               |
 
 ### Pattern: Error Recovery with Either
 

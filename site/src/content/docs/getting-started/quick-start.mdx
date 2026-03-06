@@ -33,7 +33,17 @@ import { Steps } from "@astrojs/starlight/components"
 
    This creates (or appends to) `envpkt.toml` with `[secret.*]` sections for each discovered credential.
 
-4. **Audit credential health**
+4. **Generate an encryption key** _(optional — needed for sealing)_
+
+   If you want to encrypt secrets into your config:
+
+   ```bash
+   envpkt keygen
+   ```
+
+   This generates an age keypair and auto-configures `agent.recipient` in your `envpkt.toml`.
+
+5. **Audit credential health**
 
    Check expiration dates, staleness, and missing metadata:
 
@@ -43,7 +53,7 @@ import { Steps } from "@astrojs/starlight/components"
 
    Exit codes: `0` = healthy, `1` = degraded, `2` = critical.
 
-5. **Check for drift**
+6. **Check for drift**
 
    Detect mismatches between your config and live environment:
 

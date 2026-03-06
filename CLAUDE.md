@@ -49,10 +49,11 @@ The validate chain is customized in `ts-builds.config.json` to include `build:sc
 | `fleet.ts`          | Directory tree scanner for `envpkt.toml` files, aggregates health across agents.                                                                      |
 | `format.ts`         | Human-readable packet formatting with optional secret masking.                                                                                        |
 | `resolve-values.ts` | Value resolution cascade: sealed → fnox → env → interactive prompt.                                                                                   |
+| `keygen.ts`         | Age keypair generation, key path resolution, and config recipient update.                                                                             |
 
 ### CLI Layer (`src/cli/`)
 
-Commander-based CLI. Each command in `src/cli/commands/` maps 1:1 to a subcommand (`audit`, `env`, `exec`, `fleet`, `init`, `inspect`, `mcp`, `resolve`, `seal`, `shell-hook`). Output formatting is in `src/cli/output.ts`.
+Commander-based CLI. Each command in `src/cli/commands/` maps 1:1 to a subcommand (`audit`, `env`, `exec`, `fleet`, `init`, `inspect`, `keygen`, `mcp`, `resolve`, `seal`, `shell-hook`). Output formatting is in `src/cli/output.ts`.
 
 ### MCP Layer (`src/mcp/`)
 

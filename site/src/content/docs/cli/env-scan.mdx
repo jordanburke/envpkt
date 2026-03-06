@@ -53,3 +53,19 @@ envpkt env scan --include-unknown
 3. **Generic suffix** (~13 patterns) — Suffixes like `_API_KEY`, `_SECRET`, `_TOKEN`, `_PASSWORD`
 
 See the [Environment Scanning guide](/guides/environment-scanning/) for details on the pattern registry.
+
+## After `--write`
+
+When `--write` creates or appends to `envpkt.toml`, only **metadata** is stored — secret values are never written.
+
+To encrypt and store actual secret values:
+
+```bash
+# Generate an age keypair (one-time)
+envpkt keygen
+
+# Seal secret values into envpkt.toml
+envpkt seal
+```
+
+See [`envpkt keygen`](/cli/keygen/) and the [Developer Workflow](/guides/developer-workflow/) for the full scan-to-seal flow.

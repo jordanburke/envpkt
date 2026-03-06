@@ -272,6 +272,46 @@ const plain = formatPacket(resolveResult, {
 
 Mask a secret value for display (e.g., `postgres://user:pass@host/db` → `pos•••••t/db`).
 
+## Keygen API
+
+### `resolveKeyPath()`
+
+Resolve the age identity file path: `-o` flag > `ENVPKT_AGE_KEY_FILE` env var > `~/.envpkt/age-key.txt`. Returns `string`.
+
+### `resolveInlineKey()`
+
+Check for inline age key in `ENVPKT_AGE_KEY` env var (for CI). Returns `Option<string>`.
+
+### `generateKeypair(options?)`
+
+Generate an age keypair and write to disk. Returns `Either<KeygenError, KeygenResult>`.
+
+```typescript
+import { generateKeypair } from "envpkt"
+
+const result = generateKeypair({ outputPath: "~/.envpkt/age-key.txt" })
+result.fold(
+  (err) => console.error(`Keygen failed: ${err._tag}`),
+  (res) => console.log(`Recipient: ${res.recipient}`),
+)
+```
+
+Options: `{ force?: boolean; outputPath?: string }`
+
+### `updateConfigRecipient(configPath, recipient)`
+
+Update `agent.recipient` in an `envpkt.toml` file, preserving TOML structure. Creates `[agent]` section if missing. Returns `Either<KeygenError, true>`.
+
+### `KeygenResult`
+
+```typescript
+type KeygenResult = {
+  readonly recipient: string
+  readonly identityPath: string
+  readonly configUpdated: boolean
+}
+```
+
 ## fnox Integration
 
 ### `detectFnox()` / `fnoxAvailable()`
