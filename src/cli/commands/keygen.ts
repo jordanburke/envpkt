@@ -1,0 +1,58 @@
+import { existsSync } from "node:fs"
+import { join, resolve } from "node:path"
+
+import { generateKeypair, resolveKeyPath, updateConfigRecipient } from "../../core/keygen.js"
+import { BOLD, CYAN, DIM, formatError, GREEN, RESET, YELLOW } from "../output.js"
+
+type KeygenOptions = {
+  readonly config?: string
+  readonly force?: boolean
+  readonly output?: string
+}
+
+export const runKeygen = (options: KeygenOptions): void => {
+  const outputPath = options.output ?? resolveKeyPath()
+
+  const result = generateKeypair({ force: options.force, outputPath })
+
+  result.fold(
+    (err) => {
+      if (err._tag === "KeyExists") {
+        console.error(`${YELLOW}Warning:${RESET} Identity file already exists: ${CYAN}${err.path}${RESET}`)
+        console.error(`${DIM}Use --force to overwrite.${RESET}`)
+        process.exit(1)
+      }
+      console.error(formatError(err))
+      process.exit(2)
+    },
+    ({ recipient, identityPath }) => {
+      console.log(`${GREEN}Generated${RESET} age identity: ${CYAN}${identityPath}${RESET}`)
+      console.log(`${BOLD}Recipient:${RESET} ${recipient}`)
+      console.log("")
+
+      // Try to update envpkt.toml if it exists
+      const configPath = resolve(options.config ?? join(process.cwd(), "envpkt.toml"))
+      if (existsSync(configPath)) {
+        const updateResult = updateConfigRecipient(configPath, recipient)
+        updateResult.fold(
+          (err) => {
+            console.error(
+              `${YELLOW}Warning:${RESET} Could not update config: ${"message" in err ? err.message : err._tag}`,
+            )
+            console.log(`${DIM}Manually add to your envpkt.toml:${RESET}`)
+            console.log(`  [agent]`)
+            console.log(`  recipient = "${recipient}"`)
+          },
+          () => {
+            console.log(`${GREEN}Updated${RESET} ${CYAN}${configPath}${RESET} with agent.recipient`)
+          },
+        )
+      } else {
+        console.log(`${BOLD}Next steps:${RESET}`)
+        console.log(`  ${DIM}1.${RESET} envpkt init          ${DIM}# create envpkt.toml${RESET}`)
+        console.log(`  ${DIM}2.${RESET} envpkt env scan --write  ${DIM}# discover credentials${RESET}`)
+        console.log(`  ${DIM}3.${RESET} envpkt seal           ${DIM}# encrypt secret values${RESET}`)
+      }
+    },
+  )
+}

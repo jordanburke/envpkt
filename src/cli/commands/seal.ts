@@ -137,7 +137,13 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   // Verify agent.recipient exists
   if (!config.agent?.recipient) {
     console.error(`${RED}Error:${RESET} agent.recipient is required for sealing (age public key)`)
-    console.error(`${DIM}Add [agent] section with recipient = "age1..." to your envpkt.toml${RESET}`)
+    console.error("")
+    console.error(
+      `${BOLD}Quick fix:${RESET} run ${CYAN}envpkt keygen${RESET} to generate a key and auto-configure recipient`,
+    )
+    console.error(`${DIM}Or manually add to your envpkt.toml:${RESET}`)
+    console.error(`${DIM}  [agent]${RESET}`)
+    console.error(`${DIM}  recipient = "age1..."${RESET}`)
     process.exit(2)
   }
 

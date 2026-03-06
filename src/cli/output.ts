@@ -183,6 +183,14 @@ export const formatError = (error: { _tag: string; message?: string; path?: stri
       return `${RED}Error:${RESET} Secret "${(error as unknown as { key: string }).key}" not found in catalog: ${error.path}`
     case "MissingSecretsList":
       return `${RED}Error:${RESET} ${error.message}`
+    case "KeygenFailed":
+      return `${RED}Error:${RESET} Keygen failed: ${error.message}`
+    case "KeyExists":
+      return `${YELLOW}Warning:${RESET} Identity file already exists: ${error.path}\n${DIM}Use --force to overwrite.${RESET}`
+    case "WriteError":
+      return `${RED}Error:${RESET} Write failed: ${error.message}`
+    case "ConfigUpdateError":
+      return `${RED}Error:${RESET} Config update failed: ${error.message}`
     default:
       return `${RED}Error:${RESET} ${error.message ?? tag}`
   }

@@ -180,3 +180,18 @@ export type SealError =
   | { readonly _tag: "EncryptFailed"; readonly key: string; readonly message: string }
   | { readonly _tag: "DecryptFailed"; readonly key: string; readonly message: string }
   | { readonly _tag: "NoRecipient"; readonly message: string }
+
+// --- Keygen types ---
+
+export type KeygenError =
+  | { readonly _tag: "AgeNotFound"; readonly message: string }
+  | { readonly _tag: "KeygenFailed"; readonly message: string }
+  | { readonly _tag: "KeyExists"; readonly path: string }
+  | { readonly _tag: "WriteError"; readonly message: string }
+  | { readonly _tag: "ConfigUpdateError"; readonly message: string }
+
+export type KeygenResult = {
+  readonly recipient: string
+  readonly identityPath: string
+  readonly configUpdated: boolean
+}

@@ -10,6 +10,7 @@ import { runExec } from "./commands/exec.js"
 import { runFleet } from "./commands/fleet.js"
 import { runInit } from "./commands/init.js"
 import { runInspect } from "./commands/inspect.js"
+import { runKeygen } from "./commands/keygen.js"
 import { runMcp } from "./commands/mcp.js"
 import { runResolve } from "./commands/resolve.js"
 import { runSeal } from "./commands/seal.js"
@@ -21,7 +22,7 @@ program
   .name("envpkt")
   .description(
     "Credential lifecycle and fleet management for AI agents\n\n" +
-      "  Developer workflow:  env scan → catalog → cloud-synced folder → eval $(envpkt env export)\n" +
+      "  Developer workflow:  env scan → keygen → seal → eval $(envpkt env export)\n" +
       "  Agent / CI workflow: catalog → audit --strict → seal → exec --strict → fleet",
   )
   .version(
@@ -48,6 +49,16 @@ program
   .option("--force", "Overwrite existing envpkt.toml")
   .action((options) => {
     runInit(process.cwd(), options)
+  })
+
+program
+  .command("keygen")
+  .description("Generate an age keypair for sealing secrets — run this before `seal` if you don't have a key yet")
+  .option("-c, --config <path>", "Path to envpkt.toml (updates agent.recipient if found)")
+  .option("--force", "Overwrite existing identity file")
+  .option("-o, --output <path>", "Output path for identity file (default: ~/.envpkt/age-key.txt)")
+  .action((options) => {
+    runKeygen(options)
   })
 
 program

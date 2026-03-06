@@ -73,7 +73,7 @@ describe("envpkt env scan", () => {
   })
 
   it("writes new envpkt.toml with --write", () => {
-    run(["env", "scan", "--write"], {
+    const result = run(["env", "scan", "--write"], {
       cwd: tmpDir,
       env: { OPENAI_API_KEY: "sk-test123" },
     })
@@ -82,13 +82,18 @@ describe("envpkt env scan", () => {
     expect(content).toContain("version = 1")
     expect(content).toContain("[secret.OPENAI_API_KEY]")
     expect(content).toContain('service = "openai"')
+
+    // Next-step messaging
+    expect(result.stdout).toContain("NOT stored")
+    expect(result.stdout).toContain("envpkt keygen")
+    expect(result.stdout).toContain("envpkt seal")
   })
 
   it("appends to existing envpkt.toml with --write", () => {
     const existingToml = `version = 1\n\n[secret.EXISTING_KEY]\nservice = "existing"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), existingToml)
 
-    run(["env", "scan", "--write"], {
+    const result = run(["env", "scan", "--write"], {
       cwd: tmpDir,
       env: { OPENAI_API_KEY: "sk-test123" },
     })
@@ -96,6 +101,10 @@ describe("envpkt env scan", () => {
     const content = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
     expect(content).toContain("[secret.EXISTING_KEY]")
     expect(content).toContain("[secret.OPENAI_API_KEY]")
+
+    // Next-step messaging on append too
+    expect(result.stdout).toContain("NOT stored")
+    expect(result.stdout).toContain("envpkt keygen")
   })
 
   it("does not duplicate already-tracked entries on --write", () => {

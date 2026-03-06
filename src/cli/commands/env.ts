@@ -43,6 +43,13 @@ type ExportOptions = {
   readonly skipAudit?: boolean
 }
 
+const printPostWriteGuidance = (): void => {
+  console.log(`\n${DIM}Note: Secret values are NOT stored — only metadata.${RESET}`)
+  console.log(`${BOLD}Next steps:${RESET}`)
+  console.log(`  ${DIM}1.${RESET} envpkt keygen          ${DIM}# generate age key (if no recipient configured)${RESET}`)
+  console.log(`  ${DIM}2.${RESET} envpkt seal            ${DIM}# encrypt secret values into envpkt.toml${RESET}`)
+}
+
 export const runEnvScan = (options: ScanOptions): void => {
   const scan = envScan(process.env, { includeUnknown: options.includeUnknown })
 
@@ -92,6 +99,7 @@ export const runEnvScan = (options: ScanOptions): void => {
           console.log(
             `\n${GREEN}✓${RESET} Appended ${BOLD}${newEntries.length}${RESET} new entry/entries to ${CYAN}${configPath}${RESET}`,
           )
+          printPostWriteGuidance()
         },
       )
     } else {
@@ -107,6 +115,7 @@ export const runEnvScan = (options: ScanOptions): void => {
           console.log(
             `\n${GREEN}✓${RESET} Created ${CYAN}${configPath}${RESET} with ${BOLD}${scan.discovered.size}${RESET} credential(s)`,
           )
+          printPostWriteGuidance()
         },
       )
     }
