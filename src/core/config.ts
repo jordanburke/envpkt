@@ -1,10 +1,9 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs"
-import { homedir } from "node:os"
 import { join, resolve } from "node:path"
 
 import { TypeCompiler } from "@sinclair/typebox/compiler"
 import type { Either } from "functype"
 import { Left, List, Option, Right, Try } from "functype"
+import { Env, Fs, Path } from "functype-os"
 import { parse, TomlDate } from "smol-toml"
 
 import { EnvpktConfigSchema } from "./schema.js"
@@ -29,19 +28,19 @@ const normalizeDates = (obj: unknown): unknown => {
   return obj
 }
 
-/** Expand ~ and $ENV_VAR / ${ENV_VAR} in a path string */
+/** Expand ~ and $ENV_VAR / ${ENV_VAR} in a path string (silent — unresolved vars become "") */
 export const expandPath = (p: string): string => {
-  const homExpanded = p.startsWith("~/") || p === "~" ? join(homedir(), p.slice(1)) : p
+  const homExpanded = Path.expandTilde(p)
   return homExpanded.replace(/\$\{(\w+)\}|\$(\w+)/g, (_, braced: string | undefined, bare: string | undefined) => {
     const name = braced ?? bare ?? ""
-    return process.env[name] ?? ""
+    return Env.getOrDefault(name, "")
   })
 }
 
 /** Find envpkt.toml in the given directory */
 export const findConfigPath = (dir: string): Option<string> => {
   const candidate = join(dir, CONFIG_FILENAME)
-  return existsSync(candidate) ? Option(candidate) : Option<string>(undefined)
+  return Fs.existsSync(candidate) ? Option(candidate) : Option<string>(undefined)
 }
 
 /**
@@ -51,7 +50,7 @@ export const findConfigPath = (dir: string): Option<string> => {
  */
 export const expandGlobPath = (expanded: string): ReadonlyArray<string> => {
   if (!expanded.includes("*")) {
-    return existsSync(expanded) ? [expanded] : []
+    return Fs.existsSync(expanded) ? [expanded] : []
   }
   // Split into segments to find the one containing *
   const segments = expanded.split("/")
@@ -62,13 +61,18 @@ export const expandGlobPath = (expanded: string): ReadonlyArray<string> => {
   const globSegment = segments[globIdx]!
   const suffix = segments.slice(globIdx + 1).join("/")
 
-  if (!existsSync(parentDir)) return []
+  if (!Fs.existsSync(parentDir)) return []
 
   const prefix = globSegment.replace(/\*.*$/, "")
-  return readdirSync(parentDir)
-    .filter((entry) => entry.startsWith(prefix))
-    .map((entry) => join(parentDir, entry, suffix))
-    .filter((p) => existsSync(p))
+  return Fs.readdirSync(parentDir).fold(
+    () => [],
+    (entries) =>
+      entries
+        .filter((entry) => entry.startsWith(prefix))
+        .map((entry) => join(parentDir, entry, suffix))
+        .filter((p) => Fs.existsSync(p))
+        .toArray(),
+  )
 }
 
 /** Ordered candidate paths for config discovery beyond CWD */
@@ -114,12 +118,15 @@ type DiscoveredConfig = { readonly path: string; readonly source: "cwd" | "searc
 export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
   const dir = cwd ?? process.cwd()
   const cwdCandidate = join(dir, CONFIG_FILENAME)
-  if (existsSync(cwdCandidate)) {
+  if (Fs.existsSync(cwdCandidate)) {
     const found: DiscoveredConfig = { path: cwdCandidate, source: "cwd" }
     return Option(found)
   }
 
-  const customPaths = process.env.ENVPKT_SEARCH_PATH?.split(":").filter(Boolean) ?? []
+  const customPaths = Env.get("ENVPKT_SEARCH_PATH").fold(
+    () => [] as string[],
+    (v) => v.split(":").filter(Boolean),
+  )
 
   for (const template of [...customPaths, ...CONFIG_SEARCH_PATHS]) {
     const expanded = expandPath(template)
@@ -136,13 +143,10 @@ export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
 
 /** Read a config file, returning Either<ConfigError, string> */
 export const readConfigFile = (path: string): Either<ConfigError, string> => {
-  if (!existsSync(path)) {
+  if (!Fs.existsSync(path)) {
     return Left({ _tag: "FileNotFound", path } as const)
   }
-  return Try(() => readFileSync(path, "utf-8")).fold(
-    (err) => Left({ _tag: "ReadError", message: String(err) } as const),
-    (content) => Right(content),
-  )
+  return Fs.readFileSync(path, "utf-8").mapLeft((err) => ({ _tag: "ReadError", message: err.message }) as const)
 }
 
 /** Ensure required fields have defaults for valid configs (e.g. agent configs with catalog may omit secret) */
@@ -204,14 +208,19 @@ export const resolveConfigPath = (
   if (flagPath) {
     const resolved = resolve(flagPath)
     const result: ResolvedPath = { path: resolved, source: "flag" }
-    return existsSync(resolved) ? Right(result) : Left({ _tag: "FileNotFound", path: resolved } as const)
+    return Fs.existsSync(resolved) ? Right(result) : Left({ _tag: "FileNotFound", path: resolved } as const)
   }
 
-  const envPath = envVar ?? process.env[ENV_VAR_CONFIG]
+  const envPath =
+    envVar ??
+    Env.get(ENV_VAR_CONFIG).fold(
+      () => undefined,
+      (v) => v,
+    )
   if (envPath) {
     const resolved = resolve(envPath)
     const result: ResolvedPath = { path: resolved, source: "env" }
-    return existsSync(resolved) ? Right(result) : Left({ _tag: "FileNotFound", path: resolved } as const)
+    return Fs.existsSync(resolved) ? Right(result) : Left({ _tag: "FileNotFound", path: resolved } as const)
   }
 
   return discoverConfig(cwd).fold<Either<ConfigError, ResolvedPath>>(
