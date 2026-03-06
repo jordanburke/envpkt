@@ -1,3 +1,5 @@
+import { createRequire } from "node:module"
+
 import { Command } from "commander"
 
 import { runAudit } from "./commands/audit.js"
@@ -20,7 +22,7 @@ program
       "  Developer workflow:  env scan → catalog → cloud-synced folder → eval $(envpkt env export)\n" +
       "  Agent / CI workflow: catalog → audit --strict → seal → exec --strict → fleet",
   )
-  .version("0.1.0")
+  .version((createRequire(import.meta.url)("../../package.json") as { version: string }).version)
 
 program
   .command("init")

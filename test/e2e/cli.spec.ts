@@ -132,7 +132,7 @@ describe("envpkt CLI e2e", () => {
   it("shows version with --version", () => {
     const { stdout, status } = run(["--version"])
     expect(status).toBe(0)
-    expect(stdout.trim()).toBe("0.1.0")
+    expect(stdout.trim()).toMatch(/^\d+\.\d+\.\d+$/)
   })
 
   describe("init", () => {
