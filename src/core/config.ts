@@ -8,7 +8,7 @@ import { Left, List, Option, Right, Try } from "functype"
 import { parse, TomlDate } from "smol-toml"
 
 import { EnvpktConfigSchema } from "./schema.js"
-import type { ConfigError, EnvpktConfig } from "./types.js"
+import type { ConfigError, EnvpktConfig, ResolvedPath } from "./types.js"
 
 const CONFIG_FILENAME = "envpkt.toml"
 const ENV_VAR_CONFIG = "ENVPKT_CONFIG"
@@ -42,6 +42,43 @@ export const expandPath = (p: string): string => {
 export const findConfigPath = (dir: string): Option<string> => {
   const candidate = join(dir, CONFIG_FILENAME)
   return existsSync(candidate) ? Option(candidate) : Option<string>(undefined)
+}
+
+/** Ordered candidate paths for config discovery beyond CWD */
+const CONFIG_SEARCH_PATHS: ReadonlyArray<string> = [
+  "~/.envpkt/envpkt.toml",
+  "$WINHOME/OneDrive/.envpkt/envpkt.toml",
+  "$USERPROFILE/OneDrive/.envpkt/envpkt.toml",
+  "~/Library/Mobile Documents/com~apple~CloudDocs/.envpkt/envpkt.toml",
+  "~/Dropbox/.envpkt/envpkt.toml",
+  "$DROPBOX_PATH/.envpkt/envpkt.toml",
+  "$GOOGLE_DRIVE/.envpkt/envpkt.toml",
+  "$WINHOME/.envpkt/envpkt.toml",
+  "$USERPROFILE/.envpkt/envpkt.toml",
+]
+
+type DiscoveredConfig = { readonly path: string; readonly source: "cwd" | "search" }
+
+/** Discover config by checking CWD, then ENVPKT_SEARCH_PATH, then built-in candidate paths */
+export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
+  const dir = cwd ?? process.cwd()
+  const cwdCandidate = join(dir, CONFIG_FILENAME)
+  if (existsSync(cwdCandidate)) {
+    const found: DiscoveredConfig = { path: cwdCandidate, source: "cwd" }
+    return Option(found)
+  }
+
+  const customPaths = process.env.ENVPKT_SEARCH_PATH?.split(":").filter(Boolean) ?? []
+
+  for (const template of [...customPaths, ...CONFIG_SEARCH_PATHS]) {
+    const expanded = expandPath(template)
+    if (expanded && !expanded.startsWith("/.envpkt") && existsSync(expanded)) {
+      const found: DiscoveredConfig = { path: expanded, source: "search" }
+      return Option(found)
+    }
+  }
+
+  return Option<DiscoveredConfig>(undefined)
 }
 
 /** Read a config file, returning Either<ConfigError, string> */
@@ -91,36 +128,41 @@ export const validateConfig = (data: unknown): Either<ConfigError, EnvpktConfig>
 export const loadConfig = (path: string): Either<ConfigError, EnvpktConfig> =>
   readConfigFile(path).flatMap(parseToml).flatMap(validateConfig)
 
-/** Load config from CWD, returning both path and parsed config */
-export const loadConfigFromCwd = (cwd?: string): Either<ConfigError, { path: string; config: EnvpktConfig }> => {
-  const dir = cwd ?? process.cwd()
-  return findConfigPath(dir).fold(
-    () => Left({ _tag: "FileNotFound", path: join(dir, CONFIG_FILENAME) } as const),
-    (path) => loadConfig(path).map((config) => ({ path, config })),
+/** Load config from CWD or discovery chain, returning path, source, and parsed config */
+export const loadConfigFromCwd = (
+  cwd?: string,
+): Either<ConfigError, { path: string; source: "cwd" | "search"; config: EnvpktConfig }> =>
+  discoverConfig(cwd).fold(
+    () => Left({ _tag: "FileNotFound", path: join(cwd ?? process.cwd(), CONFIG_FILENAME) } as const),
+    ({ path, source }) => loadConfig(path).map((config) => ({ path, source, config })),
   )
-}
 
 /**
  * Resolve config path via priority chain:
  * 1. Explicit flag path
  * 2. ENVPKT_CONFIG env var
- * 3. CWD discovery
+ * 3. CWD + discovery chain (home dir, cloud storage, custom search paths)
  */
-export const resolveConfigPath = (flagPath?: string, envVar?: string, cwd?: string): Either<ConfigError, string> => {
+export const resolveConfigPath = (
+  flagPath?: string,
+  envVar?: string,
+  cwd?: string,
+): Either<ConfigError, ResolvedPath> => {
   if (flagPath) {
     const resolved = resolve(flagPath)
-    return existsSync(resolved) ? Right(resolved) : Left({ _tag: "FileNotFound", path: resolved } as const)
+    const result: ResolvedPath = { path: resolved, source: "flag" }
+    return existsSync(resolved) ? Right(result) : Left({ _tag: "FileNotFound", path: resolved } as const)
   }
 
   const envPath = envVar ?? process.env[ENV_VAR_CONFIG]
   if (envPath) {
     const resolved = resolve(envPath)
-    return existsSync(resolved) ? Right(resolved) : Left({ _tag: "FileNotFound", path: resolved } as const)
+    const result: ResolvedPath = { path: resolved, source: "env" }
+    return existsSync(resolved) ? Right(result) : Left({ _tag: "FileNotFound", path: resolved } as const)
   }
 
-  const dir = cwd ?? process.cwd()
-  return findConfigPath(dir).fold(
-    () => Left({ _tag: "FileNotFound", path: join(dir, CONFIG_FILENAME) } as const),
-    (path) => Right(path),
+  return discoverConfig(cwd).fold<Either<ConfigError, ResolvedPath>>(
+    () => Left({ _tag: "FileNotFound", path: join(cwd ?? process.cwd(), CONFIG_FILENAME) } as const),
+    ({ path, source }) => Right({ path, source } as ResolvedPath),
   )
 }

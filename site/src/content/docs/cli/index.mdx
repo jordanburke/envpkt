@@ -31,8 +31,17 @@ All commands support:
 Commands that read `envpkt.toml` (audit, inspect, resolve, exec, env check, env export) follow this resolution chain:
 
 1. Explicit `-c path/to/envpkt.toml` flag
-2. `envpkt.toml` in the current working directory
-3. Search upward through parent directories
+2. `ENVPKT_CONFIG` environment variable
+3. `envpkt.toml` in the current working directory
+4. `ENVPKT_SEARCH_PATH` (colon-separated list of candidate paths)
+5. Built-in search locations:
+   - `~/.envpkt/envpkt.toml`
+   - OneDrive (`$WINHOME/OneDrive/.envpkt/`, `$USERPROFILE/OneDrive/.envpkt/`)
+   - iCloud (`~/Library/Mobile Documents/com~apple~CloudDocs/.envpkt/`)
+   - Dropbox (`~/Dropbox/.envpkt/`, `$DROPBOX_PATH/.envpkt/`)
+   - Google Drive (`$GOOGLE_DRIVE/.envpkt/`)
+
+When a config is loaded from outside CWD, envpkt prints the resolved path to stderr for transparency.
 
 If a `catalog` field is present, it's resolved relative to the config file's directory.
 

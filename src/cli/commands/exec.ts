@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process"
 
 import { bootSafe } from "../../core/boot.js"
-import { BOLD, exitCodeForAudit, formatAudit, formatError, RED, RESET, YELLOW } from "../output.js"
+import { BOLD, exitCodeForAudit, formatAudit, formatConfigSource, formatError, RED, RESET, YELLOW } from "../output.js"
 
 type ExecOptions = {
   readonly config?: string
@@ -39,6 +39,9 @@ export const runExec = (args: ReadonlyArray<string>, options: ExecOptions): void
   )
 
   if (!boot) return
+
+  const sourceMsg = formatConfigSource(boot.configPath, boot.configSource)
+  if (sourceMsg) console.error(sourceMsg)
 
   // Pre-flight audit display (unless --skip-audit / --no-check)
   if (!skipAudit) {

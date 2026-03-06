@@ -17,6 +17,7 @@ const main = () => {
       process.exit(1)
     },
     (ok) => {
+      console.log(`[envpkt] Config: ${ok.configPath} (source: ${ok.configSource})`)
       console.log(`[envpkt] Injected: ${ok.injected.join(", ")}`)
       if (ok.skipped.length > 0) {
         console.warn(`[envpkt] Skipped: ${ok.skipped.join(", ")}`)
@@ -111,8 +112,11 @@ eval "$(envpkt shell-hook zsh)"
 # Add to ~/.bashrc
 eval "$(envpkt shell-hook bash)"
 
-# Now when you `cd` into a directory with envpkt.toml,
-# you get ambient warnings about expired/expiring credentials
+# Now when you `cd` into any directory, envpkt automatically
+# discovers the nearest envpkt.toml (CWD, ~/.envpkt/, cloud
+# storage, or ENVPKT_SEARCH_PATH) and shows credential health.
+# No envpkt.toml file check needed in the hook — envpkt handles
+# discovery internally and silently exits if no config is found.
 ```
 
 ## Environment Discovery

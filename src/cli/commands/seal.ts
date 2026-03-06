@@ -5,7 +5,7 @@ import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import { resolveValues } from "../../core/resolve-values.js"
 import { sealSecrets } from "../../core/seal.js"
 import { unwrapAgentKey } from "../../fnox/identity.js"
-import { BOLD, CYAN, DIM, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
+import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 
 type SealOptions = {
   readonly config?: string
@@ -114,14 +114,16 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
 export const runSeal = async (options: SealOptions): Promise<void> => {
   const configResult = resolveConfigPath(options.config)
 
-  const configPath = configResult.fold(
+  const { path: configPath, source: configSource } = configResult.fold(
     (err) => {
       console.error(formatError(err))
       process.exit(2)
-      return "" // unreachable
+      return { path: "", source: "flag" as const } // unreachable
     },
-    (p) => p,
+    (r) => r,
   )
+  const sourceMsg = formatConfigSource(configPath, configSource)
+  if (sourceMsg) console.error(sourceMsg)
 
   const config = loadConfig(configPath).fold(
     (err) => {

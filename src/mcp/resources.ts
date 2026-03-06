@@ -8,7 +8,7 @@ const loadConfigSafe = (): { config: EnvpktConfig; path: string } | undefined =>
   const resolved = resolveConfigPath()
   return resolved.fold(
     () => undefined,
-    (path) =>
+    ({ path }) =>
       loadConfig(path).fold(
         () => undefined,
         (config) => ({ config, path }),

@@ -44,9 +44,10 @@ Warnings are emitted to stderr so they don't pollute the `eval` output.
 
 ## How It Works
 
-1. Resolves `envpkt.toml` (auto-detected or via `--config`)
-2. Decrypts sealed packets and/or resolves via fnox
-3. Outputs `export KEY='VALUE'` for each resolved secret to stdout
-4. Emits any warnings to stderr
+1. Resolves `envpkt.toml` via the config discovery chain (CWD → `ENVPKT_CONFIG` → `~/.envpkt/` → cloud storage → `ENVPKT_SEARCH_PATH`)
+2. If config is loaded from outside CWD, prints the resolved path to stderr
+3. Decrypts sealed packets and/or resolves via fnox
+4. Outputs `export KEY='VALUE'` for each resolved secret to stdout
+5. Emits any warnings to stderr
 
 Values containing single quotes are safely escaped (`'` becomes `'\''`).

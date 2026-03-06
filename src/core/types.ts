@@ -111,6 +111,15 @@ export type FnoxError =
   | { readonly _tag: "FnoxCliError"; readonly message: string }
   | { readonly _tag: "FnoxParseError"; readonly message: string }
 
+// --- Config resolution types ---
+
+export type ConfigSource = "flag" | "env" | "cwd" | "search"
+
+export type ResolvedPath = {
+  readonly path: string
+  readonly source: ConfigSource
+}
+
 // --- Catalog / Resolve types ---
 
 export type ResolveOptions = {
@@ -150,6 +159,8 @@ export type BootResult = {
   readonly warnings: ReadonlyArray<string>
   readonly envDefaults: Readonly<Record<string, string>>
   readonly overridden: ReadonlyArray<string>
+  readonly configPath: string
+  readonly configSource: ConfigSource
 }
 
 export type BootError =

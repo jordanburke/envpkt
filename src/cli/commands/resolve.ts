@@ -5,7 +5,7 @@ import { stringify } from "smol-toml"
 
 import { resolveConfig } from "../../core/catalog.js"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
-import { BOLD, CYAN, DIM, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
+import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 
 type ResolveOptions = {
   readonly config?: string
@@ -22,7 +22,9 @@ export const runResolve = (options: ResolveOptions): void => {
       console.error(formatError(err))
       process.exit(2)
     },
-    (configPath) => {
+    ({ path: configPath, source }) => {
+      const sourceMsg = formatConfigSource(configPath, source)
+      if (sourceMsg) console.error(sourceMsg)
       const loadResult = loadConfig(configPath)
 
       loadResult.fold(

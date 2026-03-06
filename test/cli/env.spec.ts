@@ -212,7 +212,7 @@ describe("envpkt env export", () => {
   })
 
   it("exits 2 when no config found", () => {
-    const result = run(["env", "export"], { cwd: tmpDir })
+    const result = run(["env", "export"], { cwd: tmpDir, env: { HOME: tmpDir } })
 
     expect(result.status).toBe(2)
   })

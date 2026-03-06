@@ -10,25 +10,26 @@ import { computeAudit } from "./audit.js"
 import { resolveConfig } from "./catalog.js"
 import { expandPath, loadConfig, resolveConfigPath } from "./config.js"
 import { unsealSecrets } from "./seal.js"
-import type { AuditResult, BootError, BootOptions, BootResult, EnvpktConfig } from "./types.js"
+import type { AuditResult, BootError, BootOptions, BootResult, ConfigSource, EnvpktConfig } from "./types.js"
 
 type ResolvedConfig = {
   readonly config: EnvpktConfig
   readonly configPath: string
   readonly configDir: string
+  readonly configSource: ConfigSource
 }
 
 const resolveAndLoad = (opts: BootOptions): Either<BootError, ResolvedConfig> =>
   resolveConfigPath(opts.configPath).fold<Either<BootError, ResolvedConfig>>(
     (err) => Left(err),
-    (configPath) =>
+    ({ path: configPath, source: configSource }) =>
       loadConfig(configPath).fold<Either<BootError, ResolvedConfig>>(
         (err) => Left(err),
         (config) => {
           const configDir = dirname(configPath)
           return resolveConfig(config, configDir).fold<Either<BootError, ResolvedConfig>>(
             (err) => Left(err),
-            (result) => Right({ config: result.config, configPath, configDir }),
+            (result) => Right({ config: result.config, configPath, configDir, configSource }),
           )
         },
       ),
@@ -112,7 +113,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
   const failOnExpired = opts.failOnExpired !== false
   const warnOnly = opts.warnOnly ?? false
 
-  return resolveAndLoad(opts).flatMap(({ config, configDir }) => {
+  return resolveAndLoad(opts).flatMap(({ config, configPath, configDir, configSource }) => {
     const secretEntries = config.secret ?? {}
     const metaKeys = Object.keys(secretEntries)
     const hasSealedValues = metaKeys.some((k) => !!secretEntries[k]?.encrypted_value)
@@ -225,6 +226,8 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
         warnings: warnings as ReadonlyArray<string>,
         envDefaults: envDefaults as Readonly<Record<string, string>>,
         overridden: overridden as ReadonlyArray<string>,
+        configPath,
+        configSource,
       }
     })
   })

@@ -20,6 +20,7 @@ export type {
   CallbackConfig,
   CatalogError,
   ConfigError,
+  ConfigSource,
   EnvAuditResult,
   EnvDriftEntry,
   EnvDriftStatus,
@@ -33,6 +34,7 @@ export type {
   HealthStatus,
   IdentityError,
   LifecycleConfig,
+  ResolvedPath,
   ResolveOptions,
   ResolveResult,
   SealError,
@@ -44,6 +46,7 @@ export type {
 
 // Config operations
 export {
+  discoverConfig,
   findConfigPath,
   loadConfig,
   loadConfigFromCwd,

@@ -230,19 +230,30 @@ const result: Either<BootError, BootResult> = bootSafe({ inject: true })
 - `skipped: ReadonlyArray<string>` — keys that could not be resolved
 - `secrets: Readonly<Record<string, string>>` — resolved secret values
 - `warnings: ReadonlyArray<string>` — non-fatal warnings
+- `configPath: string` — resolved path to the config file
+- `configSource: ConfigSource` — how the config was found: `"flag"` | `"env"` | `"cwd"` | `"search"`
 
 ### Config Loading
 
 ```typescript
-import { loadConfig, loadConfigFromCwd, resolveConfigPath, findConfigPath } from "envpkt"
+import { loadConfig, loadConfigFromCwd, resolveConfigPath, discoverConfig, findConfigPath } from "envpkt"
 
-// Resolve config path (Either<ConfigError, string>)
-const path = resolveConfigPath("./envpkt.toml")
+// Resolve config path via full chain: flag → env → CWD → discovery
+// Returns Either<ConfigError, ResolvedPath> where ResolvedPath = { path, source }
+const resolved = resolveConfigPath("./envpkt.toml")
+resolved.fold(
+  (err) => console.error(err._tag),
+  ({ path, source }) => console.log(`Loaded from ${source}: ${path}`),
+)
+
+// Discover config (CWD → ENVPKT_SEARCH_PATH → built-in paths)
+// Returns Option<{ path, source: "cwd" | "search" }>
+const found = discoverConfig()
 
 // Load and validate config (Either<ConfigError, EnvpktConfig>)
 const config = loadConfig("/path/to/envpkt.toml")
 
-// Load from current working directory
+// Load from CWD or discovery chain
 const config = loadConfigFromCwd()
 ```
 

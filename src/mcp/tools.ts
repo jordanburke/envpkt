@@ -33,7 +33,7 @@ const loadConfigForTool = (configPath?: string): LoadedConfig | LoadError => {
       ok: false,
       result: errorResult(`Config error: ${err._tag} — ${err._tag === "FileNotFound" ? err.path : ""}`),
     }),
-    (path) =>
+    ({ path }) =>
       loadConfig(path).fold<LoadedConfig | LoadError>(
         (err) => ({
           ok: false,

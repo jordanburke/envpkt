@@ -1,12 +1,14 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 import { homedir } from "node:os"
 import {
+  discoverConfig,
   expandPath,
   findConfigPath,
   readConfigFile,
+  resolveConfigPath,
   parseToml,
   loadConfig,
   validateConfig,
@@ -222,5 +224,236 @@ describe("loadConfig", () => {
       (err) => expect(err._tag).toBe("ValidationError"),
       () => expect.unreachable("Expected Left"),
     )
+  })
+})
+
+describe("discoverConfig", () => {
+  it("finds envpkt.toml in CWD with source 'cwd'", () => {
+    writeFileSync(join(tmpDir, "envpkt.toml"), "version = 1\n[secret]\n")
+    const result = discoverConfig(tmpDir)
+    expect(result.isSome()).toBe(true)
+    result.fold(
+      () => expect.unreachable("Expected Some"),
+      ({ path, source }) => {
+        expect(path).toBe(join(tmpDir, "envpkt.toml"))
+        expect(source).toBe("cwd")
+      },
+    )
+  })
+
+  it("returns None when no config found anywhere", () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), "envpkt-empty-"))
+    // Override HOME so built-in ~/.envpkt/envpkt.toml isn't found
+    const originalHome = process.env.HOME
+    process.env.HOME = emptyDir
+    try {
+      const result = discoverConfig(emptyDir)
+      expect(result.isNone()).toBe(true)
+    } finally {
+      process.env.HOME = originalHome
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+
+  it("finds config via ENVPKT_SEARCH_PATH with source 'search'", () => {
+    const searchDir = mkdtempSync(join(tmpdir(), "envpkt-search-"))
+    const configPath = join(searchDir, "envpkt.toml")
+    writeFileSync(configPath, "version = 1\n[secret]\n")
+
+    const emptyDir = mkdtempSync(join(tmpdir(), "envpkt-nocwd-"))
+    const originalSearchPath = process.env.ENVPKT_SEARCH_PATH
+    process.env.ENVPKT_SEARCH_PATH = configPath
+
+    try {
+      const result = discoverConfig(emptyDir)
+      expect(result.isSome()).toBe(true)
+      result.fold(
+        () => expect.unreachable("Expected Some"),
+        ({ path, source }) => {
+          expect(path).toBe(configPath)
+          expect(source).toBe("search")
+        },
+      )
+    } finally {
+      if (originalSearchPath !== undefined) {
+        process.env.ENVPKT_SEARCH_PATH = originalSearchPath
+      } else {
+        delete process.env.ENVPKT_SEARCH_PATH
+      }
+      rmSync(searchDir, { recursive: true, force: true })
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+
+  it("prefers CWD over search paths", () => {
+    const searchDir = mkdtempSync(join(tmpdir(), "envpkt-search2-"))
+    const searchConfig = join(searchDir, "envpkt.toml")
+    writeFileSync(searchConfig, "version = 1\n[secret]\n")
+    writeFileSync(join(tmpDir, "envpkt.toml"), "version = 1\n[secret]\n")
+
+    const originalSearchPath = process.env.ENVPKT_SEARCH_PATH
+    process.env.ENVPKT_SEARCH_PATH = searchConfig
+
+    try {
+      const result = discoverConfig(tmpDir)
+      expect(result.isSome()).toBe(true)
+      result.fold(
+        () => expect.unreachable("Expected Some"),
+        ({ path, source }) => {
+          expect(path).toBe(join(tmpDir, "envpkt.toml"))
+          expect(source).toBe("cwd")
+        },
+      )
+    } finally {
+      if (originalSearchPath !== undefined) {
+        process.env.ENVPKT_SEARCH_PATH = originalSearchPath
+      } else {
+        delete process.env.ENVPKT_SEARCH_PATH
+      }
+      rmSync(searchDir, { recursive: true, force: true })
+    }
+  })
+
+  it("skips paths where env vars are unset", () => {
+    delete process.env.ENVPKT_NONEXISTENT_VAR
+    const emptyDir = mkdtempSync(join(tmpdir(), "envpkt-skipenv-"))
+    // Override HOME so built-in ~/.envpkt/envpkt.toml isn't found
+    const originalHome = process.env.HOME
+    process.env.HOME = emptyDir
+    try {
+      const result = discoverConfig(emptyDir)
+      expect(result.isNone()).toBe(true)
+    } finally {
+      process.env.HOME = originalHome
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+
+  it("searches ENVPKT_SEARCH_PATH before built-in candidates", () => {
+    const customDir = mkdtempSync(join(tmpdir(), "envpkt-custom-"))
+    const customConfig = join(customDir, "envpkt.toml")
+    writeFileSync(customConfig, "version = 1\n[secret]\n")
+
+    const homeEnvpkt = join(homedir(), ".envpkt", "envpkt.toml")
+    const homeExists = (() => {
+      try {
+        return require("node:fs").existsSync(homeEnvpkt)
+      } catch {
+        return false
+      }
+    })()
+
+    const emptyDir = mkdtempSync(join(tmpdir(), "envpkt-nocwd2-"))
+    const originalSearchPath = process.env.ENVPKT_SEARCH_PATH
+    process.env.ENVPKT_SEARCH_PATH = customConfig
+
+    try {
+      const result = discoverConfig(emptyDir)
+      expect(result.isSome()).toBe(true)
+      result.fold(
+        () => expect.unreachable("Expected Some"),
+        ({ path }) => {
+          // Custom path should be found (before home dir if it exists)
+          expect(path).toBe(customConfig)
+        },
+      )
+    } finally {
+      if (originalSearchPath !== undefined) {
+        process.env.ENVPKT_SEARCH_PATH = originalSearchPath
+      } else {
+        delete process.env.ENVPKT_SEARCH_PATH
+      }
+      rmSync(customDir, { recursive: true, force: true })
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("resolveConfigPath", () => {
+  it("returns source 'flag' for explicit config path", () => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, "version = 1\n[secret]\n")
+
+    const result = resolveConfigPath(configPath)
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      ({ path, source }) => {
+        expect(source).toBe("flag")
+        expect(path).toContain("envpkt.toml")
+      },
+    )
+  })
+
+  it("returns source 'env' for ENVPKT_CONFIG env var", () => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, "version = 1\n[secret]\n")
+
+    const result = resolveConfigPath(undefined, configPath)
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      ({ path, source }) => {
+        expect(source).toBe("env")
+        expect(path).toContain("envpkt.toml")
+      },
+    )
+  })
+
+  it("returns source 'cwd' for CWD discovery", () => {
+    writeFileSync(join(tmpDir, "envpkt.toml"), "version = 1\n[secret]\n")
+
+    const result = resolveConfigPath(undefined, undefined, tmpDir)
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+      ({ path, source }) => {
+        expect(source).toBe("cwd")
+        expect(path).toBe(join(tmpDir, "envpkt.toml"))
+      },
+    )
+  })
+
+  it("returns source 'search' for discovered config", () => {
+    const searchDir = mkdtempSync(join(tmpdir(), "envpkt-resolve-"))
+    const searchConfig = join(searchDir, "envpkt.toml")
+    writeFileSync(searchConfig, "version = 1\n[secret]\n")
+
+    const emptyDir = mkdtempSync(join(tmpdir(), "envpkt-resolvecwd-"))
+    const originalSearchPath = process.env.ENVPKT_SEARCH_PATH
+    process.env.ENVPKT_SEARCH_PATH = searchConfig
+
+    try {
+      const result = resolveConfigPath(undefined, undefined, emptyDir)
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+        ({ path, source }) => {
+          expect(source).toBe("search")
+          expect(path).toBe(searchConfig)
+        },
+      )
+    } finally {
+      if (originalSearchPath !== undefined) {
+        process.env.ENVPKT_SEARCH_PATH = originalSearchPath
+      } else {
+        delete process.env.ENVPKT_SEARCH_PATH
+      }
+      rmSync(searchDir, { recursive: true, force: true })
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
+  })
+
+  it("returns Left FileNotFound when nothing found", () => {
+    const emptyDir = mkdtempSync(join(tmpdir(), "envpkt-notfound-"))
+    // Override HOME so built-in ~/.envpkt/envpkt.toml isn't found
+    const originalHome = process.env.HOME
+    process.env.HOME = emptyDir
+    try {
+      const result = resolveConfigPath(undefined, undefined, emptyDir)
+      result.fold(
+        (err) => expect(err._tag).toBe("FileNotFound"),
+        () => expect.unreachable("Expected Left"),
+      )
+    } finally {
+      process.env.HOME = originalHome
+      rmSync(emptyDir, { recursive: true, force: true })
+    }
   })
 })

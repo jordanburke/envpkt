@@ -2,9 +2,7 @@ import { RED, RESET } from "../output.js"
 
 const ZSH_HOOK = `# envpkt shell hook — add to your .zshrc
 _envpkt_chpwd() {
-  if [[ -f envpkt.toml ]]; then
-    envpkt audit --format minimal 2>/dev/null
-  fi
+  envpkt audit --format minimal 2>/dev/null
 }
 
 if (( $+functions[add-zsh-hook] )); then
@@ -18,9 +16,7 @@ fi
 
 const BASH_HOOK = `# envpkt shell hook — add to your .bashrc
 _envpkt_prompt() {
-  if [[ -f envpkt.toml ]]; then
-    envpkt audit --format minimal 2>/dev/null
-  fi
+  envpkt audit --format minimal 2>/dev/null
 }
 
 if [[ ! "$PROMPT_COMMAND" == *"_envpkt_prompt"* ]]; then

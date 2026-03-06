@@ -407,7 +407,7 @@ eval "$(envpkt env export --profile staging)"
 eval "$(envpkt env export -c path/to/envpkt.toml)"
 ```
 
-Add to your shell startup (e.g. `~/.zshrc` or `~/.bashrc`) for automatic secret loading:
+Add to your shell startup (e.g. `~/.zshrc` or `~/.bashrc`) for automatic secret loading. envpkt's [config discovery chain](#config-resolution) finds your config automatically — no platform-specific shell logic needed:
 
 ```bash
 eval "$(envpkt env export 2>/dev/null)"
@@ -415,7 +415,7 @@ eval "$(envpkt env export 2>/dev/null)"
 
 ### `envpkt shell-hook`
 
-Output a shell function that runs `envpkt audit --format minimal` whenever you `cd` into a directory containing `envpkt.toml`.
+Output a shell function that runs `envpkt audit --format minimal` whenever you `cd` into a directory. envpkt's config discovery chain automatically finds config files beyond CWD (see [Config Resolution](#config-resolution)), so the hook works even in directories without a local `envpkt.toml`.
 
 ```bash
 # Add to your .zshrc
@@ -433,6 +433,34 @@ Start the envpkt MCP server (stdio transport) for AI agent integration.
 envpkt mcp
 ```
 
+## Config Resolution
+
+Commands that read `envpkt.toml` resolve the config path via a priority chain:
+
+1. **Explicit flag** — `-c path/to/envpkt.toml`
+2. **Environment variable** — `ENVPKT_CONFIG`
+3. **Discovery chain** — searches in order:
+   - `./envpkt.toml` (current working directory)
+   - Custom paths in `ENVPKT_SEARCH_PATH` (colon-separated)
+   - `~/.envpkt/envpkt.toml` (user home)
+   - Cloud storage paths (OneDrive, iCloud, Dropbox, Google Drive)
+
+When a config is discovered outside CWD, envpkt prints where it loaded from to stderr:
+
+```
+envpkt: loaded /Users/you/.envpkt/envpkt.toml
+```
+
+### `ENVPKT_SEARCH_PATH`
+
+Prepend custom search locations (colon-separated paths to `envpkt.toml` files):
+
+```bash
+export ENVPKT_SEARCH_PATH="$HOME/OneDrive/.envpkt/envpkt.toml:/custom/path/envpkt.toml"
+```
+
+These are searched after CWD but before the built-in candidate paths. Useful for corporate OneDrive names, Google Drive with email in the path, or any non-standard location.
+
 ## Library API
 
 envpkt is also available as a TypeScript library with a functional programming API built on [functype](https://github.com/jordanburke/functype). All functions return `Either<Error, Result>` or `Option<T>` — no thrown exceptions.
@@ -443,6 +471,7 @@ import { boot, bootSafe, loadConfig, computeAudit, scanFleet, resolveConfig } fr
 // Boot API — load config, resolve catalog, audit, inject secrets
 const result = boot({ configPath: "envpkt.toml", inject: true })
 console.log(result.audit.status) // "healthy" | "degraded" | "critical"
+console.log(result.configSource) // "flag" | "env" | "cwd" | "search"
 
 // Safe variant returns Either instead of throwing
 const safe = bootSafe({ configPath: "envpkt.toml" })

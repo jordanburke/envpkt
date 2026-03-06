@@ -5,7 +5,7 @@ import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import type { SecretDisplay } from "../../core/format.js"
 import { maskValue } from "../../core/format.js"
 import type { EnvpktConfig, ResolveResult, SecretMeta } from "../../core/types.js"
-import { BOLD, CYAN, DIM, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
+import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 
 type InspectOptions = {
   readonly config?: string
@@ -140,7 +140,9 @@ export const runInspect = (options: InspectOptions): void => {
       console.error(formatError(err))
       process.exit(2)
     },
-    (path) => {
+    ({ path, source }) => {
+      const sourceMsg = formatConfigSource(path, source)
+      if (sourceMsg) console.error(sourceMsg)
       const result = loadConfig(path)
 
       result.fold(

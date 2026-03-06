@@ -352,4 +352,9 @@ export const formatAuditMinimal = (audit: AuditResult): string => {
   return `${icon} ${parts.join(", ")}`
 }
 
+export const formatConfigSource = (path: string, source: string): string => {
+  if (source === "cwd") return ""
+  return `${DIM}envpkt: loaded ${path}${RESET}`
+}
+
 export { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW }

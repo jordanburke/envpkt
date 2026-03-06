@@ -55,8 +55,18 @@ type BootResult = {
   readonly skipped: ReadonlyArray<string>
   readonly secrets: Readonly<Record<string, string>>
   readonly warnings: ReadonlyArray<string>
+  readonly configPath: string
+  readonly configSource: ConfigSource
 }
 ```
+
+### `ConfigSource`
+
+```typescript
+type ConfigSource = "flag" | "env" | "cwd" | "search"
+```
+
+Indicates how the config was resolved: explicit `--config` flag, `ENVPKT_CONFIG` env var, current working directory, or the discovery search chain.
 
 ## Config Operations
 
@@ -72,13 +82,25 @@ config.fold(
 )
 ```
 
-### `loadConfigFromCwd()`
+### `resolveConfigPath(flagPath?, envVar?, cwd?)`
 
-Load config from the current working directory.
+Resolve config path via priority chain: explicit flag → `ENVPKT_CONFIG` env var → CWD + discovery chain. Returns `Either<ConfigError, ResolvedPath>`.
 
-### `findConfigPath(startDir?)`
+```typescript
+type ResolvedPath = { readonly path: string; readonly source: ConfigSource }
+```
 
-Search for `envpkt.toml` starting from a directory, walking upward.
+### `discoverConfig(cwd?)`
+
+Discover config by checking CWD, then `ENVPKT_SEARCH_PATH`, then built-in candidate paths (`~/.envpkt/`, cloud storage, etc.). Returns `Option<{ path: string; source: "cwd" | "search" }>`.
+
+### `loadConfigFromCwd(cwd?)`
+
+Load config from CWD or discovery chain. Returns `Either<ConfigError, { path: string; source: string; config: EnvpktConfig }>`.
+
+### `findConfigPath(dir)`
+
+Check for `envpkt.toml` in a specific directory. Returns `Option<string>`.
 
 ### `parseToml(content)`
 

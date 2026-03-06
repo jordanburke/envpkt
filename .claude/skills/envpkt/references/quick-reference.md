@@ -28,15 +28,16 @@
 
 ### Config
 
-| Function                    | Returns                             |
-| --------------------------- | ----------------------------------- |
-| `resolveConfigPath(path?)`  | `Either<ConfigError, string>`       |
-| `loadConfig(path)`          | `Either<ConfigError, EnvpktConfig>` |
-| `loadConfigFromCwd()`       | `Either<ConfigError, EnvpktConfig>` |
-| `findConfigPath(startDir?)` | `Option<string>`                    |
-| `parseToml(content)`        | `Either<ConfigError, unknown>`      |
-| `readConfigFile(path)`      | `Either<ConfigError, string>`       |
-| `validateConfig(data)`      | `Either<ConfigError, EnvpktConfig>` |
+| Function                                      | Returns                                                                       |
+| --------------------------------------------- | ----------------------------------------------------------------------------- |
+| `resolveConfigPath(flagPath?, envVar?, cwd?)` | `Either<ConfigError, ResolvedPath>`                                           |
+| `discoverConfig(cwd?)`                        | `Option<{ path: string; source: "cwd" \| "search" }>`                         |
+| `loadConfig(path)`                            | `Either<ConfigError, EnvpktConfig>`                                           |
+| `loadConfigFromCwd(cwd?)`                     | `Either<ConfigError, { path: string; source: string; config: EnvpktConfig }>` |
+| `findConfigPath(dir)`                         | `Option<string>`                                                              |
+| `parseToml(content)`                          | `Either<ConfigError, unknown>`                                                |
+| `readConfigFile(path)`                        | `Either<ConfigError, string>`                                                 |
+| `validateConfig(data)`                        | `Either<ConfigError, EnvpktConfig>`                                           |
 
 ### Audit & Health
 

@@ -3,7 +3,7 @@ title: Shell Hooks
 description: Ambient credential warnings when you cd into a project
 ---
 
-envpkt provides shell hooks that display credential health automatically when you navigate into a directory containing `envpkt.toml`.
+envpkt provides shell hooks that display credential health automatically when you navigate between directories. The hook delegates config discovery to envpkt itself — it will find `envpkt.toml` in CWD, `~/.envpkt/`, cloud storage paths, or any custom `ENVPKT_SEARCH_PATH` location.
 
 ## Setup
 
@@ -25,13 +25,13 @@ eval "$(envpkt shell-hook bash)"
 
 ## What the Hook Does
 
-The hook wraps the `cd` command. When you `cd` into a directory containing `envpkt.toml`, it runs:
+The hook wraps the `cd` command. On every directory change, it runs:
 
 ```bash
-envpkt audit --format minimal
+envpkt audit --format minimal 2>/dev/null
 ```
 
-This provides a one-line health summary without interrupting your workflow.
+envpkt handles config discovery internally — if no config is found anywhere in the resolution chain, it silently exits. This provides a one-line health summary without interrupting your workflow.
 
 ## Generated Shell Code
 
@@ -39,14 +39,12 @@ The `envpkt shell-hook` command outputs a shell function. For zsh, it looks appr
 
 ```bash
 envpkt_chpwd() {
-  if [[ -f envpkt.toml ]]; then
-    envpkt audit --format minimal 2>/dev/null
-  fi
+  envpkt audit --format minimal 2>/dev/null
 }
 chpwd_functions=(${chpwd_functions[@]} envpkt_chpwd)
 ```
 
-For bash, it uses `PROMPT_COMMAND` or wraps `cd`.
+For bash, it uses `PROMPT_COMMAND` or wraps `cd`. Note that the hook does not check for `envpkt.toml` — envpkt's built-in config discovery chain handles resolution across CWD, home directory, cloud storage, and custom search paths.
 
 ## Sourcing Secrets
 
@@ -69,8 +67,19 @@ eval "$(envpkt env export 2>/dev/null)" # Load secrets into current session
 
 See [envpkt env export](/cli/env-export/) for full options.
 
+## Custom Search Paths
+
+If your `envpkt.toml` lives in a non-standard location (e.g., a corporate OneDrive path), set `ENVPKT_SEARCH_PATH`:
+
+```bash
+export ENVPKT_SEARCH_PATH="$HOME/OneDrive - Corp/.envpkt/envpkt.toml"
+```
+
+Colon-separated paths are searched after CWD but before built-in candidates.
+
 ## Use Cases
 
 - **Daily development** — see credential health at a glance
 - **Multi-project work** — catch issues as you switch between projects
 - **Team onboarding** — new team members see credential status immediately
+- **User-level config** — place `envpkt.toml` at `~/.envpkt/` and get health checks from any directory

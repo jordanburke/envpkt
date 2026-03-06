@@ -13,6 +13,7 @@ import {
   DIM,
   formatCheckJson,
   formatCheckTable,
+  formatConfigSource,
   formatError,
   formatScanJson,
   formatScanTable,
@@ -120,7 +121,9 @@ export const runEnvCheck = (options: CheckOptions): void => {
       console.error(formatError(err))
       process.exit(2)
     },
-    (path) => {
+    ({ path, source }) => {
+      const sourceMsg = formatConfigSource(path, source)
+      if (sourceMsg) console.error(sourceMsg)
       const result = loadConfig(path)
 
       result.fold(
@@ -173,6 +176,9 @@ export const runEnvExport = (options: ExportOptions): void => {
       process.exit(2)
     },
     (boot) => {
+      const sourceMsg = formatConfigSource(boot.configPath, boot.configSource)
+      if (sourceMsg) console.error(sourceMsg)
+
       for (const warning of boot.warnings) {
         console.error(`${YELLOW}Warning:${RESET} ${warning}`)
       }
