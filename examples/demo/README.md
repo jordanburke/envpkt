@@ -119,7 +119,7 @@ See [`examples/sealed-agent.toml`](../sealed-agent.toml) for a full example. The
 [identity]
 name = "my-agent"
 recipient = "age1..."    # Public key — safe to commit
-identity = "identity.txt" # Private key path — add to .gitignore
+key_file = "identity.txt" # Private key path — add to .gitignore
 ```
 
 #### Seal values

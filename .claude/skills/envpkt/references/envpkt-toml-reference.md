@@ -18,7 +18,7 @@ description = "Processes customer data"    # Agent role description
 capabilities = ["read", "write", "admin"]  # Agent-level capabilities
 expires = "2025-12-31"                     # Agent credential expiration (YYYY-MM-DD)
 services = ["openai", "postgres", "s3"]    # Service dependencies
-identity = "./keys/agent.age"             # Path to encrypted age identity key
+key_file = "./keys/agent.age"             # Path to encrypted age identity key
 recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"  # Age public key
 secrets = ["OPENAI_API_KEY", "DB_PASSWORD"] # Keys to pull from catalog
 
@@ -137,7 +137,7 @@ version = 1
 [identity]
 name = "research-agent"
 consumer = "agent"
-identity = "./keys/agent.age"
+key_file = "./keys/agent.age"
 recipient = "age1..."
 
 [secret.ANTHROPIC_API_KEY]

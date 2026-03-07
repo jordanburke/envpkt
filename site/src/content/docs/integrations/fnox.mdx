@@ -54,11 +54,11 @@ envpkt supports encrypted identity via age keys:
 ```toml
 [identity]
 name = "data-pipeline"
-identity = "keys/agent.age"
+key_file = "keys/agent.age"
 recipient = "age1..."
 ```
 
-The `identity` field points to an age-encrypted key file. The `recipient` field is the agent's public key for encryption.
+The `key_file` field points to an age identity (private key) file. The `recipient` field is the agent's public key for encryption.
 
 ## Library API
 

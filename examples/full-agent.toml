@@ -13,7 +13,7 @@ capabilities = ["read-s3", "write-postgres", "send-notifications"]
 expires = "2027-01-01"
 services = ["aws", "postgres", "slack"]
 # Sealed packets: uncomment to enable `envpkt seal` (encrypts values into TOML)
-# identity = "identity.txt"
+# key_file = "identity.txt"
 # recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
 
 # --- Lifecycle Policy ---

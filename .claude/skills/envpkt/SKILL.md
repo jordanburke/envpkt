@@ -105,7 +105,7 @@ description = "Data processing agent"
 capabilities = ["read", "write"]
 expires = "2025-12-31"
 services = ["openai", "postgres"]
-identity = "./keys/agent.age"       # Path to encrypted age key
+key_file = "./keys/agent.age"       # Path to encrypted age key
 recipient = "age1..."               # Public key for encryption
 secrets = ["OPENAI_API_KEY"]        # Keys to pull from catalog
 

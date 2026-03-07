@@ -31,7 +31,7 @@ export const IdentitySchema = Type.Object(
     ),
     expires: Type.Optional(Type.String({ format: "date", description: "Credential expiration date (YYYY-MM-DD)" })),
     services: Type.Optional(Type.Array(Type.String(), { description: "Service dependencies" })),
-    identity: Type.Optional(Type.String({ description: "Path to age identity file (relative to config directory)" })),
+    key_file: Type.Optional(Type.String({ description: "Path to age identity file (relative to config directory)" })),
     recipient: Type.Optional(Type.String({ description: "Age public key for encryption" })),
     secrets: Type.Optional(Type.Array(Type.String(), { description: "Secret keys needed from the catalog" })),
   },

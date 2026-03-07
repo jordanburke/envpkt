@@ -160,10 +160,10 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     process.exit(2)
   }
 
-  // Resolve identity key if identity is configured
-  const identityKey: string | undefined = config.identity.identity
+  // Resolve identity key if key_file is configured
+  const identityKey: string | undefined = config.identity.key_file
     ? (() => {
-        const identityPath = resolve(configDir, expandPath(config.identity.identity))
+        const identityPath = resolve(configDir, expandPath(config.identity.key_file))
         return unwrapAgentKey(identityPath).fold(
           (err) => {
             const msg = err._tag === "IdentityNotFound" ? `not found: ${err.path}` : err.message

@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
 import { type Either, Left, Right } from "functype"
@@ -9,6 +10,7 @@ import { extractFnoxKeys, readFnoxConfig } from "../fnox/parse.js"
 import { computeAudit } from "./audit.js"
 import { resolveConfig } from "./catalog.js"
 import { expandPath, loadConfig, resolveConfigPath } from "./config.js"
+import { resolveKeyPath } from "./keygen.js"
 import { unsealSecrets } from "./seal.js"
 import type { AuditResult, BootError, BootOptions, BootResult, ConfigSource, EnvpktConfig } from "./types.js"
 
@@ -37,12 +39,26 @@ const resolveAndLoad = (opts: BootOptions): Either<BootError, ResolvedConfig> =>
 
 type IdentityKeyResult = Either<BootError, string | undefined>
 
+/** Resolve identity file path with explicit fallback control */
+const resolveIdentityFilePath = (
+  config: EnvpktConfig,
+  configDir: string,
+  useDefaultFallback: boolean,
+): string | undefined => {
+  if (config.identity?.key_file) {
+    return resolve(configDir, expandPath(config.identity.key_file))
+  }
+  if (!useDefaultFallback) return undefined
+  const defaultPath = resolveKeyPath()
+  return existsSync(defaultPath) ? defaultPath : undefined
+}
+
 const resolveIdentityKey = (config: EnvpktConfig, configDir: string): IdentityKeyResult => {
-  if (!config.identity?.identity) {
+  const identityPath = resolveIdentityFilePath(config, configDir, false)
+  if (!identityPath) {
     const result: IdentityKeyResult = Right(undefined as string | undefined)
     return result
   }
-  const identityPath = resolve(configDir, expandPath(config.identity.identity))
   return unwrapAgentKey(identityPath).fold<IdentityKeyResult>(
     (err) => Left(err),
     (key) => Right(key as string | undefined),
@@ -162,10 +178,10 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
 
       // Phase 1: try sealed values (encrypted_value in meta)
       const sealedKeys = new Set<string>()
+      const identityFilePath = resolveIdentityFilePath(config, configDir, true)
 
-      if (hasSealedValues && config.identity?.identity) {
-        const identityPath = resolve(configDir, expandPath(config.identity.identity))
-        unsealSecrets(secretEntries, identityPath).fold(
+      if (hasSealedValues && identityFilePath) {
+        unsealSecrets(secretEntries, identityFilePath).fold(
           (err) => {
             warnings.push(`Sealed value decryption failed: ${err.message}`)
           },

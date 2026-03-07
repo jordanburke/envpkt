@@ -21,7 +21,7 @@ capabilities = ["chat:completions", "embeddings"]
 expires = "2027-06-01"
 services = ["openai", "anthropic"]
 recipient = "age1reznz3x4gmec8quu4ttmfxy7v5w5pdjs3kukqz9vej5uvkwd23fs5a39n8"
-identity = "sealed-identity.txt"
+key_file = "sealed-identity.txt"
 
 [lifecycle]
 stale_warning_days = 90

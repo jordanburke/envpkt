@@ -161,10 +161,10 @@ Add the public key to your config and the identity file to `.gitignore`:
 [identity]
 name = "my-agent"
 recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-identity = "identity.txt"
+key_file = "identity.txt"
 ```
 
-The `identity` path supports `~` expansion and environment variables (`$VAR`, `${VAR}`), so you can use paths like `~/keys/identity.txt` or `$KEYS_DIR/identity.txt`. Relative paths are resolved from the config file's directory.
+The `key_file` path supports `~` expansion and environment variables (`$VAR`, `${VAR}`), so you can use paths like `~/keys/identity.txt` or `$KEYS_DIR/identity.txt`. Relative paths are resolved from the config file's directory. When omitted, envpkt falls back to `ENVPKT_AGE_KEY_FILE` env var, then `~/.envpkt/age-key.txt`.
 
 ### Seal
 
@@ -360,7 +360,7 @@ Requires `identity.recipient` (age public key) in your config. Values are resolv
 2. **Environment variables** (e.g. `OPENAI_API_KEY` in your shell)
 3. **Interactive prompt** (asks you to paste each value)
 
-After sealing, each secret gets an `encrypted_value` field. At boot time, `envpkt exec` or `boot()` automatically decrypts sealed values using the `identity.identity` file.
+After sealing, each secret gets an `encrypted_value` field. At boot time, `envpkt exec` or `boot()` automatically decrypts sealed values using the `identity.key_file` path (or the default `~/.envpkt/age-key.txt`).
 
 See [`examples/sealed-agent.toml`](./examples/sealed-agent.toml) for a complete example.
 

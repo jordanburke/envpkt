@@ -322,7 +322,7 @@ describe("boot with sealed values", () => {
         `[identity]`,
         `name = "test-sealed"`,
         `recipient = "${recipient}"`,
-        `identity = "identity.txt"`,
+        `key_file = "identity.txt"`,
         `[secret.SEALED_KEY]`,
         `service = "test"`,
         `encrypted_value = """`,
@@ -344,6 +344,64 @@ describe("boot with sealed values", () => {
     )
 
     delete process.env["SEALED_KEY"]
+  })
+
+  it.skipIf(!ageInstalled)("decrypts sealed values using default key path when key_file is unset", () => {
+    const keygenOutput = execFileSync("age-keygen", [], {
+      stdio: ["pipe", "pipe", "pipe"],
+      encoding: "utf-8",
+    })
+    const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
+    const recipient = recipientLine!.replace("# public key: ", "").trim()
+
+    // Write identity file to the default key path location, simulated via env var
+    const identityPath = join(tmpDir, "default-key.txt")
+    writeFileSync(identityPath, keygenOutput)
+
+    const encrypted = ageEncrypt("fallback-secret", recipient)
+    const ciphertext = encrypted.fold(
+      () => "",
+      (v) => v,
+    )
+    expect(ciphertext).toContain("-----BEGIN AGE ENCRYPTED FILE-----")
+
+    // Config has NO key_file set — should fall back to ENVPKT_AGE_KEY_FILE
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[identity]`,
+        `name = "test-fallback"`,
+        `recipient = "${recipient}"`,
+        `[secret.FALLBACK_KEY]`,
+        `service = "test"`,
+        `encrypted_value = """`,
+        ciphertext,
+        `"""`,
+      ].join("\n"),
+    )
+
+    const origEnv = process.env["ENVPKT_AGE_KEY_FILE"]
+    process.env["ENVPKT_AGE_KEY_FILE"] = identityPath
+    delete process.env["FALLBACK_KEY"]
+
+    try {
+      const result = bootSafe({ configPath, inject: false })
+
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
+        (boot) => {
+          expect(boot.injected).toContain("FALLBACK_KEY")
+          expect(boot.secrets["FALLBACK_KEY"]).toBe("fallback-secret")
+        },
+      )
+    } finally {
+      if (origEnv === undefined) {
+        delete process.env["ENVPKT_AGE_KEY_FILE"]
+      } else {
+        process.env["ENVPKT_AGE_KEY_FILE"] = origEnv
+      }
+      delete process.env["FALLBACK_KEY"]
+    }
   })
 
   it.skipIf(!ageInstalled)("falls back to fnox for keys without encrypted_value", () => {
@@ -370,7 +428,7 @@ describe("boot with sealed values", () => {
         `[identity]`,
         `name = "mixed"`,
         `recipient = "${recipient}"`,
-        `identity = "identity.txt"`,
+        `key_file = "identity.txt"`,
         `[secret.SEALED_KEY]`,
         `service = "test"`,
         `encrypted_value = """`,

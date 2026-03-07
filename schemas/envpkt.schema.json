@@ -72,7 +72,7 @@
             "type": "string"
           }
         },
-        "identity": {
+        "key_file": {
           "description": "Path to age identity file (relative to config directory)",
           "type": "string"
         },
