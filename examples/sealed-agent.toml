@@ -61,6 +61,7 @@ bVpRM1QrOUxLdUNKaTY2c2VVRWV1Rk0KXiBqrRNxJjhpLABxlNFLf62WzCywc0H3
 pHpfTdy9JgbL1t7fKh5+D7Izv2c+pYUyRMmLYC5akfGbnvBZS+KH7c8jHA==
 -----END AGE ENCRYPTED FILE-----
 """
+
 [secret.ANTHROPIC_API_KEY]
 service = "anthropic"
 purpose = "Claude inference via Messages API"
@@ -81,6 +82,7 @@ MjhNQ29kTnlyK2x1RkxocE12bENGOE0KLMPXiUwOvRJ3uwNj3JB/aRjrWnoXpYUU
 iLM=
 -----END AGE ENCRYPTED FILE-----
 """
+
 [secret.DATABASE_URL]
 service = "postgres"
 purpose = "Conversation history and embedding cache"
