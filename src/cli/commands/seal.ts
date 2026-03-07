@@ -12,6 +12,7 @@ type SealOptions = {
   readonly config?: string
   readonly profile?: string
   readonly reseal?: boolean
+  readonly edit?: string
 }
 
 /* eslint-disable functional/no-let -- stateful line-by-line TOML parser */
@@ -180,6 +181,74 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
         )
       })()
     : undefined
+
+  // --edit mode: re-seal specific keys with new interactively-prompted values
+  const editKeys = options.edit
+    ? options.edit
+        .split(",")
+        .map((k) => k.trim())
+        .filter((k) => k.length > 0)
+    : []
+
+  if (editKeys.length > 0) {
+    const allSecretEntries = config.secret ?? {}
+    const unknownKeys = editKeys.filter((k) => !(k in allSecretEntries))
+    if (unknownKeys.length > 0) {
+      console.error(`${RED}Error:${RESET} Unknown secret key(s): ${unknownKeys.join(", ")}`)
+      console.error(`${DIM}Available keys: ${Object.keys(allSecretEntries).join(", ")}${RESET}`)
+      process.exit(2)
+    }
+
+    if (!process.stdin.isTTY) {
+      console.error(`${RED}Error:${RESET} --edit requires an interactive terminal`)
+      process.exit(2)
+    }
+
+    const secretEntries = Object.fromEntries(editKeys.map((k) => [k, allSecretEntries[k]!]))
+
+    console.log(
+      `${BOLD}Editing ${editKeys.length} secret(s)${RESET} with recipient ${CYAN}${recipient.slice(0, 20)}...${RESET}`,
+    )
+    console.log("")
+
+    // Force interactive prompt — skip fnox/env cascade entirely
+    const rl = await import("node:readline").then((m) =>
+      m.createInterface({ input: process.stdin, output: process.stderr }),
+    )
+    const prompt = (question: string): Promise<string> =>
+      new Promise((resolve) => {
+        rl.question(question, (answer) => resolve(answer))
+      })
+
+    const values: Record<string, string> = {}
+    for (const key of editKeys) {
+      const value = await prompt(`Enter new value for ${key}: `)
+      if (value === "") {
+        console.error(`${YELLOW}Skipped${RESET} ${key} (empty value)`)
+        continue
+      }
+      values[key] = value
+    }
+    rl.close()
+
+    if (Object.keys(values).length === 0) {
+      console.error(`${RED}Error:${RESET} No values provided`)
+      process.exit(2)
+    }
+
+    const sealResult = sealSecrets(secretEntries, values, recipient)
+    sealResult.fold(
+      (err) => {
+        console.error(`${RED}Error:${RESET} Seal failed: ${err.message}`)
+        process.exit(2)
+      },
+      (sealedMeta) => {
+        writeSealedToml(configPath, sealedMeta)
+        console.log(`${GREEN}Sealed${RESET} ${Object.keys(values).length} secret(s) into ${DIM}${configPath}${RESET}`)
+      },
+    )
+    return
+  }
 
   // Partition secrets into already-sealed and unsealed
   const allSecretEntries = config.secret ?? {}
