@@ -1,11 +1,14 @@
-import { dirname } from "node:path"
+import { existsSync } from "node:fs"
+import { dirname, resolve } from "node:path"
 
 import { resolveConfig } from "../../core/catalog.js"
-import { loadConfig, resolveConfigPath } from "../../core/config.js"
+import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import type { SecretDisplay } from "../../core/format.js"
 import { maskValue } from "../../core/format.js"
+import { resolveKeyPath } from "../../core/keygen.js"
+import { unsealSecrets } from "../../core/seal.js"
 import type { EnvpktConfig, ResolveResult, SecretMeta } from "../../core/types.js"
-import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
+import { BOLD, CYAN, DIM, formatConfigSource, formatError, RESET, YELLOW } from "../output.js"
 
 type InspectOptions = {
   readonly config?: string
@@ -86,20 +89,7 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
     console.log("")
     console.log(`${BOLD}Environment Defaults:${RESET} ${envKeys.length}`)
     for (const [key, entry] of Object.entries(envEntries)) {
-      const currentValue = process.env[key]
-      const statusIcon =
-        currentValue === undefined
-          ? `${RED}!${RESET}`
-          : currentValue === entry.value
-            ? `${GREEN}=${RESET}`
-            : `${YELLOW}~${RESET}`
-      const statusLabel =
-        currentValue === undefined
-          ? `${DIM}not set${RESET}`
-          : currentValue === entry.value
-            ? `${DIM}using default${RESET}`
-            : `${YELLOW}overridden${RESET}`
-      console.log(`  ${statusIcon} ${BOLD}${key}${RESET} = "${entry.value}" ${statusLabel}`)
+      console.log(`  ${BOLD}${key}${RESET} = "${entry.value}"`)
       if (entry.purpose) console.log(`    purpose: ${entry.purpose}`)
       if (entry.comment) console.log(`    comment: ${DIM}${entry.comment}${RESET}`)
     }
@@ -170,14 +160,41 @@ export const runInspect = (options: InspectOptions): void => {
 
               const showSecrets = showConfig.secret ?? {}
               const printOpts: PrintOptions | undefined = options.secrets
-                ? {
-                    secrets: Object.fromEntries(
-                      Object.keys(showSecrets)
-                        .filter((key) => process.env[key] !== undefined)
-                        .map((key) => [key, process.env[key] as string]),
-                    ),
-                    secretDisplay: options.plaintext ? "plaintext" : "encrypted",
-                  }
+                ? (() => {
+                    // Decrypt sealed values from the toml
+                    const sealedEntries = Object.fromEntries(
+                      Object.entries(showSecrets).filter(([, meta]) => meta.encrypted_value),
+                    )
+
+                    const secrets: Record<string, string> =
+                      Object.keys(sealedEntries).length > 0
+                        ? (() => {
+                            const identityPath = showConfig.identity?.key_file
+                              ? resolve(configDir, expandPath(showConfig.identity.key_file))
+                              : (() => {
+                                  const defaultPath = resolveKeyPath()
+                                  return existsSync(defaultPath) ? defaultPath : undefined
+                                })()
+
+                            if (!identityPath) return {}
+
+                            return unsealSecrets(sealedEntries, identityPath).fold(
+                              (err) => {
+                                console.error(
+                                  `${YELLOW}Warning:${RESET} Could not decrypt sealed secrets: ${err.message}`,
+                                )
+                                return {} as Record<string, string>
+                              },
+                              (d) => d,
+                            )
+                          })()
+                        : {}
+
+                    return {
+                      secrets,
+                      secretDisplay: options.plaintext ? "plaintext" : "encrypted",
+                    } satisfies PrintOptions
+                  })()
                 : undefined
 
               printConfig(showConfig, path, showResolved ? resolveResult : undefined, printOpts)
