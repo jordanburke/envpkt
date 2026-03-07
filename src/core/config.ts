@@ -3,7 +3,7 @@ import { join, resolve } from "node:path"
 import { TypeCompiler } from "@sinclair/typebox/compiler"
 import type { Either } from "functype"
 import { Left, List, Option, Right, Try } from "functype"
-import { Env, Fs, Path } from "functype-os"
+import { Env, Fs, Path, Platform } from "functype-os"
 import { parse, TomlDate } from "smol-toml"
 
 import { EnvpktConfigSchema } from "./schema.js"
@@ -75,46 +75,39 @@ export const expandGlobPath = (expanded: string): ReadonlyArray<string> => {
   )
 }
 
-/** Ordered candidate paths for config discovery beyond CWD */
-const CONFIG_SEARCH_PATHS: ReadonlyArray<string> = [
-  // Home directory
-  "~/.envpkt/envpkt.toml",
-
-  // macOS OneDrive
-  "~/OneDrive/.envpkt/envpkt.toml",
-  "~/Library/CloudStorage/OneDrive-Personal/.envpkt/envpkt.toml",
-  "~/Library/CloudStorage/OneDrive-SharedLibraries-*/.envpkt/envpkt.toml",
-
-  // Windows OneDrive
+/** Env-var fallback paths for cases where Platform detection misses */
+const ENV_FALLBACK_PATHS: ReadonlyArray<string> = [
   "$WINHOME/OneDrive/.envpkt/envpkt.toml",
   "$USERPROFILE/OneDrive/.envpkt/envpkt.toml",
   "$OneDrive/.envpkt/envpkt.toml",
   "$OneDriveConsumer/.envpkt/envpkt.toml",
   "$OneDriveCommercial/.envpkt/envpkt.toml",
-
-  // WSL → Windows OneDrive
-  "/mnt/c/Users/$USER/OneDrive/.envpkt/envpkt.toml",
-
-  // iCloud
-  "~/Library/Mobile Documents/com~apple~CloudDocs/.envpkt/envpkt.toml",
-
-  // Dropbox
-  "~/Dropbox/.envpkt/envpkt.toml",
   "$DROPBOX_PATH/.envpkt/envpkt.toml",
-
-  // Google Drive
-  "~/Google Drive/My Drive/.envpkt/envpkt.toml",
-  "~/Library/CloudStorage/GoogleDrive-*/.envpkt/envpkt.toml",
   "$GOOGLE_DRIVE/.envpkt/envpkt.toml",
-
-  // Windows fallback (no cloud)
   "$WINHOME/.envpkt/envpkt.toml",
   "$USERPROFILE/.envpkt/envpkt.toml",
 ]
 
+/** Build discovery paths dynamically from Platform home and cloud storage detection */
+const buildSearchPaths = (): ReadonlyArray<string> => {
+  const paths: string[] = []
+
+  // Home directories (Linux/Mac home + Windows home on WSL)
+  for (const home of Platform.homeDirs().toArray()) {
+    paths.push(join(home, ".envpkt", CONFIG_FILENAME))
+  }
+
+  // Cloud storage directories from all homes
+  for (const cloud of Platform.cloudStorageDirs().toArray()) {
+    paths.push(join(cloud.path, ".envpkt", CONFIG_FILENAME))
+  }
+
+  return paths
+}
+
 type DiscoveredConfig = { readonly path: string; readonly source: "cwd" | "search" }
 
-/** Discover config by checking CWD, then ENVPKT_SEARCH_PATH, then built-in candidate paths */
+/** Discover config by checking CWD, then ENVPKT_SEARCH_PATH, then dynamic Platform paths */
 export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
   const dir = cwd ?? process.cwd()
   const cwdCandidate = join(dir, CONFIG_FILENAME)
@@ -123,17 +116,35 @@ export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
     return Option(found)
   }
 
+  // Custom search paths (support globs for user-defined patterns)
   const customPaths = Env.get("ENVPKT_SEARCH_PATH").fold(
     () => [] as string[],
     (v) => v.split(":").filter(Boolean),
   )
-
-  for (const template of [...customPaths, ...CONFIG_SEARCH_PATHS]) {
+  for (const template of customPaths) {
     const expanded = expandPath(template)
     if (!expanded || expanded.startsWith("/.envpkt")) continue
     const matches = expandGlobPath(expanded)
     if (matches.length > 0) {
       const found: DiscoveredConfig = { path: matches[0]!, source: "search" }
+      return Option(found)
+    }
+  }
+
+  // Dynamic Platform-detected paths (homes + cloud storage, no globs needed)
+  for (const p of buildSearchPaths()) {
+    if (Fs.existsSync(p)) {
+      const found: DiscoveredConfig = { path: p, source: "search" }
+      return Option(found)
+    }
+  }
+
+  // Env-var fallback paths
+  for (const template of ENV_FALLBACK_PATHS) {
+    const expanded = expandPath(template)
+    if (!expanded || expanded.startsWith("/.envpkt")) continue
+    if (Fs.existsSync(expanded)) {
+      const found: DiscoveredConfig = { path: expanded, source: "search" }
       return Option(found)
     }
   }

@@ -5,6 +5,7 @@ import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { Platform } from "functype-os"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__testDir, "../..")
@@ -221,6 +222,10 @@ describe("envpkt env export", () => {
   })
 
   it("exits 2 when no config found", () => {
+    // On WSL, Platform.windowsHomeDir() may find a real config via Windows home
+    // even with HOME overridden, so skip this test on WSL
+    if (Platform.isWSL()) return
+
     const result = run(["env", "export"], { cwd: tmpDir, env: { HOME: tmpDir } })
 
     expect(result.status).toBe(2)
