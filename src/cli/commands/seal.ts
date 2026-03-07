@@ -82,7 +82,6 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
         output.push(`encrypted_value = """`)
         output.push(pendingSeals.get(currentMetaKey!)!)
         output.push(`"""`)
-        output.push("")
         pendingSeals.delete(currentMetaKey!)
       } else {
         output.push(line)
