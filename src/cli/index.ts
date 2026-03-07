@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url"
 
 import { Command } from "commander"
 
+import { runAdd } from "./commands/add.js"
+import { runAddEnv } from "./commands/add-env.js"
 import { runAudit } from "./commands/audit.js"
 import { runEnvCheck, runEnvExport, runEnvScan } from "./commands/env.js"
 import { runExec } from "./commands/exec.js"
@@ -36,6 +38,42 @@ program
       return pkgPath ? (JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string }).version : "0.0.0"
     })(),
   )
+
+program
+  .command("add")
+  .description("Add a new secret entry to envpkt.toml")
+  .argument("<name>", "Secret name (becomes the env var key)")
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .option("--service <service>", "Service this secret authenticates to")
+  .option("--purpose <purpose>", "Why this secret exists")
+  .option("--comment <comment>", "Free-form annotation")
+  .option("--expires <date>", "Expiration date (YYYY-MM-DD)")
+  .option("--capabilities <caps>", "Comma-separated capabilities (e.g. read,write)")
+  .option("--rotates <schedule>", "Rotation schedule (e.g. 90d, quarterly)")
+  .option("--rate-limit <limit>", "Rate limit info (e.g. 1000/min)")
+  .option("--model-hint <hint>", "Suggested model or tier")
+  .option("--source <source>", "Where the value originates (e.g. vault, ci)")
+  .option("--required", "Mark this secret as required")
+  .option("--rotation-url <url>", "URL for secret rotation procedure")
+  .option("--tags <tags>", "Comma-separated key=value tags (e.g. env=prod,team=payments)")
+  .option("--dry-run", "Preview the TOML block without writing")
+  .action((name, options) => {
+    runAdd(name, options)
+  })
+
+program
+  .command("add-env")
+  .description("Add a new environment default entry to envpkt.toml")
+  .argument("<name>", "Environment variable name")
+  .argument("<value>", "Default value")
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .option("--purpose <purpose>", "Why this env var exists")
+  .option("--comment <comment>", "Free-form annotation")
+  .option("--tags <tags>", "Comma-separated key=value tags (e.g. env=prod,team=payments)")
+  .option("--dry-run", "Preview the TOML block without writing")
+  .action((name, value, options) => {
+    runAddEnv(name, value, options)
+  })
 
 program
   .command("init")
