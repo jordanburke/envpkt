@@ -15,8 +15,12 @@ fi
 `
 
 const BASH_HOOK = `# envpkt shell hook — add to your .bashrc
+_envpkt_last_dir=""
 _envpkt_prompt() {
-  envpkt audit --format minimal 2>/dev/null
+  if [[ "$PWD" != "$_envpkt_last_dir" ]]; then
+    _envpkt_last_dir="$PWD"
+    envpkt audit --format minimal 2>/dev/null
+  fi
 }
 
 if [[ ! "$PROMPT_COMMAND" == *"_envpkt_prompt"* ]]; then
