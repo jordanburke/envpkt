@@ -71,27 +71,30 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
     }
 
     if (insideMetaBlock && encryptedValueRe.test(line)) {
-      // Replace existing encrypted_value (skip until end of multiline string)
+      // Replace existing encrypted_value (skip old multiline content)
       hasEncryptedValue = true
-      if (currentMetaKey && pendingSeals.has(currentMetaKey)) {
+      const replacing = !!(currentMetaKey && pendingSeals.has(currentMetaKey))
+
+      if (replacing) {
         output.push(`encrypted_value = """`)
-        output.push(pendingSeals.get(currentMetaKey)!)
+        output.push(pendingSeals.get(currentMetaKey!)!)
         output.push(`"""`)
-        pendingSeals.delete(currentMetaKey)
-        // Skip old multiline value
-        if (line.includes('"""') && !line.endsWith('"""')) {
-          // Single-line or start of multiline
-          const afterEquals = line.slice(line.indexOf("=") + 1).trim()
-          if (afterEquals.startsWith('"""') && !afterEquals.slice(3).includes('"""')) {
-            // Skip until closing """
-            while (i + 1 < lines.length && !lines[i + 1]!.includes('"""')) {
-              i++
-            }
-            if (i + 1 < lines.length) i++ // skip the closing """
-          }
-        }
+        pendingSeals.delete(currentMetaKey!)
       } else {
         output.push(line)
+      }
+
+      // Skip old multiline value: if """ appears in the value part, consume until closing """
+      const afterEquals = line.slice(line.indexOf("=") + 1).trim()
+      if (afterEquals.includes('"""')) {
+        while (i + 1 < lines.length && !lines[i + 1]!.includes('"""')) {
+          if (!replacing) output.push(lines[i + 1]!)
+          i++
+        }
+        if (i + 1 < lines.length) {
+          if (!replacing) output.push(lines[i + 1]!)
+          i++ // skip the closing """
+        }
       }
       continue
     }
