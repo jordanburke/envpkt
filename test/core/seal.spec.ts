@@ -159,6 +159,82 @@ describe("unsealSecrets", () => {
   })
 })
 
+describe("reseal round-trip (key rotation)", () => {
+  it.skipIf(!ageInstalled)("seal with key A, unseal+reseal with key B, unseal with key B preserves values", () => {
+    // Generate key A
+    const keygenA = execFileSync("age-keygen", [], {
+      stdio: ["pipe", "pipe", "pipe"],
+      encoding: "utf-8",
+    })
+    const recipientA = keygenA
+      .split("\n")
+      .find((l) => l.startsWith("# public key:"))!
+      .replace("# public key: ", "")
+      .trim()
+    const identityPathA = join(tmpDir, "identity-a.txt")
+    writeFileSync(identityPathA, keygenA)
+
+    // Generate key B
+    const keygenB = execFileSync("age-keygen", [], {
+      stdio: ["pipe", "pipe", "pipe"],
+      encoding: "utf-8",
+    })
+    const recipientB = keygenB
+      .split("\n")
+      .find((l) => l.startsWith("# public key:"))!
+      .replace("# public key: ", "")
+      .trim()
+    const identityPathB = join(tmpDir, "identity-b.txt")
+    writeFileSync(identityPathB, keygenB)
+
+    const meta = {
+      SECRET_1: { service: "svc-1" },
+      SECRET_2: { service: "svc-2" },
+    }
+    const originalValues = { SECRET_1: "original-value-1", SECRET_2: "original-value-2" }
+
+    // Step 1: Seal with key A
+    const sealResultA = sealSecrets(meta, originalValues, recipientA)
+    const sealedA = sealResultA.fold(
+      (err) => {
+        expect.unreachable(`Seal with key A failed: ${err.message}`)
+        return meta
+      },
+      (s) => s,
+    )
+
+    // Step 2: Unseal with key A (simulating the reseal decrypt step)
+    const unsealResultA = unsealSecrets(sealedA, identityPathA)
+    const decrypted = unsealResultA.fold(
+      (err) => {
+        expect.unreachable(`Unseal with key A failed: ${err.message}`)
+        return {} as Record<string, string>
+      },
+      (d) => d,
+    )
+
+    // Step 3: Re-seal with key B using decrypted values
+    const sealResultB = sealSecrets(sealedA, decrypted, recipientB)
+    const sealedB = sealResultB.fold(
+      (err) => {
+        expect.unreachable(`Reseal with key B failed: ${err.message}`)
+        return sealedA
+      },
+      (s) => s,
+    )
+
+    // Step 4: Unseal with key B — values should match originals
+    const unsealResultB = unsealSecrets(sealedB, identityPathB)
+    unsealResultB.fold(
+      (err) => expect.unreachable(`Unseal with key B failed: ${err.message}`),
+      (unsealed) => {
+        expect(unsealed["SECRET_1"]).toBe("original-value-1")
+        expect(unsealed["SECRET_2"]).toBe("original-value-2")
+      },
+    )
+  })
+})
+
 describe("seal without age", () => {
   it("ageEncrypt returns AgeNotFound when age is mocked away", () => {
     // This test relies on the real age being available but with a bad recipient

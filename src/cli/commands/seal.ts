@@ -3,7 +3,7 @@ import { dirname, resolve } from "node:path"
 
 import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import { resolveValues } from "../../core/resolve-values.js"
-import { sealSecrets } from "../../core/seal.js"
+import { sealSecrets, unsealSecrets } from "../../core/seal.js"
 import { unwrapAgentKey } from "../../fnox/identity.js"
 import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 
@@ -210,7 +210,42 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   )
   console.log("")
 
-  const values = await resolveValues(metaKeys, options.profile, identityKey)
+  // When resealing, decrypt existing sealed values first, then only resolve NEW keys
+  const values = await (async (): Promise<Record<string, string>> => {
+    if (options.reseal && alreadySealed.length > 0) {
+      const identityPath = config.identity?.key_file
+        ? resolve(configDir, expandPath(config.identity.key_file))
+        : undefined
+
+      if (!identityPath) {
+        console.error(
+          `${RED}Error:${RESET} identity.key_file is required for --reseal (needed to decrypt existing secrets)`,
+        )
+        console.error("")
+        console.error(`${DIM}Add to your envpkt.toml:${RESET}`)
+        console.error(`${DIM}  [identity]${RESET}`)
+        console.error(`${DIM}  key_file = "path/to/identity.txt"${RESET}`)
+        process.exit(2)
+      }
+
+      const sealedEntries = Object.fromEntries(alreadySealed.map((k) => [k, allSecretEntries[k]!]))
+      const decrypted = unsealSecrets(sealedEntries, identityPath).fold(
+        (err) => {
+          console.error(`${RED}Error:${RESET} Failed to decrypt existing secrets: ${err.message}`)
+          process.exit(2)
+          return {} as Record<string, string> // unreachable
+        },
+        (d) => d,
+      )
+
+      // Only resolve values for keys that weren't already sealed
+      const newValues = unsealed.length > 0 ? await resolveValues(unsealed, options.profile, identityKey) : {}
+
+      // Merge: decrypted existing values + newly resolved values (new values override if present)
+      return { ...decrypted, ...newValues }
+    }
+    return resolveValues(metaKeys, options.profile, identityKey)
+  })()
 
   const resolved = Object.keys(values).length
   const skipped = metaKeys.length - resolved
