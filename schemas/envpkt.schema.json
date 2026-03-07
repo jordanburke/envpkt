@@ -4,9 +4,7 @@
   "title": "envpkt configuration",
   "description": "Credential lifecycle and fleet management configuration for AI agents",
   "type": "object",
-  "required": [
-    "version"
-  ],
+  "required": ["version"],
   "properties": {
     "version": {
       "description": "Schema version number",
@@ -20,9 +18,7 @@
     "identity": {
       "description": "Identity and capabilities of the principal using this envpkt",
       "type": "object",
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "properties": {
         "name": {
           "description": "Display name",
@@ -175,9 +171,7 @@
         "^(.*)$": {
           "description": "Metadata for a plaintext environment default (non-secret)",
           "type": "object",
-          "required": [
-            "value"
-          ],
+          "required": ["value"],
           "properties": {
             "value": {
               "description": "Default value for this environment variable",

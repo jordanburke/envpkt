@@ -51,6 +51,8 @@ describe("envpkt CLI e2e", () => {
     expect(stdout).toContain("exec")
     expect(stdout).toContain("resolve")
     expect(stdout).toContain("mcp")
+    expect(stdout).toContain("secret")
+    expect(stdout).toContain("env")
   })
 
   describe("subcommand help surfaces options", () => {
@@ -126,6 +128,50 @@ describe("envpkt CLI e2e", () => {
       expect(status).toBe(0)
       expect(stdout).toContain("-d, --dir <path>")
       expect(stdout).toContain("--depth <n>")
+    })
+
+    it("secret --help shows subcommands", () => {
+      const { stdout, status } = run(["secret", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("add")
+      expect(stdout).toContain("edit")
+      expect(stdout).toContain("rm")
+      expect(stdout).toContain("rename")
+    })
+
+    it("secret add --help shows options", () => {
+      const { stdout, status } = run(["secret", "add", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("--service <service>")
+      expect(stdout).toContain("--dry-run")
+    })
+
+    it("env add --help shows options", () => {
+      const { stdout, status } = run(["env", "add", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("-c, --config <path>")
+      expect(stdout).toContain("--purpose <purpose>")
+      expect(stdout).toContain("--dry-run")
+    })
+
+    it("env edit --help shows options", () => {
+      const { stdout, status } = run(["env", "edit", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("--value <value>")
+      expect(stdout).toContain("--purpose <purpose>")
+    })
+
+    it("env rm --help shows options", () => {
+      const { stdout, status } = run(["env", "rm", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("--dry-run")
+    })
+
+    it("env rename --help shows options", () => {
+      const { stdout, status } = run(["env", "rename", "--help"])
+      expect(status).toBe(0)
+      expect(stdout).toContain("--dry-run")
     })
   })
 

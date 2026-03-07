@@ -45,6 +45,7 @@ export type {
   SecretHealth,
   SecretMeta,
   SecretStatus,
+  TomlEditError,
   ToolsConfig,
 } from "./core/types.js"
 
@@ -89,6 +90,9 @@ export { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigRecipien
 
 // Value resolution
 export { resolveValues } from "./core/resolve-values.js"
+
+// TOML editing
+export { appendSection, removeSection, renameSection, updateSectionFields } from "./core/toml-edit.js"
 
 // Fleet scanner
 export { scanFleet } from "./core/fleet.js"

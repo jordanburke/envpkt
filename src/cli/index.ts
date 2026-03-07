@@ -4,10 +4,8 @@ import { fileURLToPath } from "node:url"
 
 import { Command } from "commander"
 
-import { runAdd } from "./commands/add.js"
-import { runAddEnv } from "./commands/add-env.js"
 import { runAudit } from "./commands/audit.js"
-import { runEnvCheck, runEnvExport, runEnvScan } from "./commands/env.js"
+import { registerEnvCommands } from "./commands/env.js"
 import { runExec } from "./commands/exec.js"
 import { runFleet } from "./commands/fleet.js"
 import { runInit } from "./commands/init.js"
@@ -16,6 +14,7 @@ import { runKeygen } from "./commands/keygen.js"
 import { runMcp } from "./commands/mcp.js"
 import { runResolve } from "./commands/resolve.js"
 import { runSeal } from "./commands/seal.js"
+import { registerSecretCommands } from "./commands/secret.js"
 import { runShellHook } from "./commands/shell-hook.js"
 
 const program = new Command()
@@ -38,42 +37,6 @@ program
       return pkgPath ? (JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string }).version : "0.0.0"
     })(),
   )
-
-program
-  .command("add")
-  .description("Add a new secret entry to envpkt.toml")
-  .argument("<name>", "Secret name (becomes the env var key)")
-  .option("-c, --config <path>", "Path to envpkt.toml")
-  .option("--service <service>", "Service this secret authenticates to")
-  .option("--purpose <purpose>", "Why this secret exists")
-  .option("--comment <comment>", "Free-form annotation")
-  .option("--expires <date>", "Expiration date (YYYY-MM-DD)")
-  .option("--capabilities <caps>", "Comma-separated capabilities (e.g. read,write)")
-  .option("--rotates <schedule>", "Rotation schedule (e.g. 90d, quarterly)")
-  .option("--rate-limit <limit>", "Rate limit info (e.g. 1000/min)")
-  .option("--model-hint <hint>", "Suggested model or tier")
-  .option("--source <source>", "Where the value originates (e.g. vault, ci)")
-  .option("--required", "Mark this secret as required")
-  .option("--rotation-url <url>", "URL for secret rotation procedure")
-  .option("--tags <tags>", "Comma-separated key=value tags (e.g. env=prod,team=payments)")
-  .option("--dry-run", "Preview the TOML block without writing")
-  .action((name, options) => {
-    runAdd(name, options)
-  })
-
-program
-  .command("add-env")
-  .description("Add a new environment default entry to envpkt.toml")
-  .argument("<name>", "Environment variable name")
-  .argument("<value>", "Default value")
-  .option("-c, --config <path>", "Path to envpkt.toml")
-  .option("--purpose <purpose>", "Why this env var exists")
-  .option("--comment <comment>", "Free-form annotation")
-  .option("--tags <tags>", "Comma-separated key=value tags (e.g. env=prod,team=payments)")
-  .option("--dry-run", "Preview the TOML block without writing")
-  .action((name, value, options) => {
-    runAddEnv(name, value, options)
-  })
 
 program
   .command("init")
@@ -182,43 +145,8 @@ program
     runMcp(options)
   })
 
-const env = program.command("env").description("Discover and check credentials in your shell environment")
-
-env
-  .command("scan")
-  .description(
-    "Auto-discover credentials from process.env and scaffold TOML entries — first step in the developer workflow",
-  )
-  .option("-c, --config <path>", "Path to envpkt.toml (write target for --write)")
-  .option("--format <format>", "Output format: table | json", "table")
-  .option("--write", "Write discovered credentials to envpkt.toml")
-  .option("--dry-run", "Preview TOML that would be written (implies --write)")
-  .option("--include-unknown", "Include vars where service could not be inferred")
-  .action((options) => {
-    runEnvScan(options)
-  })
-
-env
-  .command("check")
-  .description("Bidirectional drift detection between envpkt.toml and live environment")
-  .option("-c, --config <path>", "Path to envpkt.toml")
-  .option("--format <format>", "Output format: table | json", "table")
-  .option("--strict", "Exit non-zero on any drift")
-  .action((options) => {
-    runEnvCheck(options)
-  })
-
-env
-  .command("export")
-  .description(
-    'Output export statements for eval-ing secrets into the current shell. Usage: eval "$(envpkt env export)"',
-  )
-  .option("-c, --config <path>", "Path to envpkt.toml")
-  .option("--profile <profile>", "fnox profile to use")
-  .option("--skip-audit", "Skip the pre-flight audit")
-  .action((options) => {
-    runEnvExport(options)
-  })
+registerSecretCommands(program)
+registerEnvCommands(program)
 
 program
   .command("shell-hook")

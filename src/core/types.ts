@@ -198,3 +198,9 @@ export type KeygenResult = {
   readonly identityPath: string
   readonly configUpdated: boolean
 }
+
+// --- TOML editing types ---
+
+export type TomlEditError =
+  | { readonly _tag: "SectionNotFound"; readonly section: string }
+  | { readonly _tag: "SectionAlreadyExists"; readonly section: string }
