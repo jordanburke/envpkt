@@ -193,6 +193,8 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
             }
           },
         )
+      } else if (hasSealedValues && !identityFilePath) {
+        warnings.push("Sealed values found but no identity file available for decryption")
       }
 
       // Phase 2: fnox for remaining keys
@@ -221,6 +223,8 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
         } else {
           if (!hasSealedValues) {
             warnings.push("fnox not available — no secrets injected")
+          } else {
+            warnings.push("fnox not available — unsealed secrets could not be resolved")
           }
           for (const key of remainingKeys) {
             skipped.push(key)
