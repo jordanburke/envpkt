@@ -1,7 +1,8 @@
-import { readFileSync, writeFileSync } from "node:fs"
+import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
 import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
+import { resolveKeyPath } from "../../core/keygen.js"
 import { resolveValues } from "../../core/resolve-values.js"
 import { sealSecrets, unsealSecrets } from "../../core/seal.js"
 import { unwrapAgentKey } from "../../fnox/identity.js"
@@ -215,16 +216,18 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     if (options.reseal && alreadySealed.length > 0) {
       const identityPath = config.identity?.key_file
         ? resolve(configDir, expandPath(config.identity.key_file))
-        : undefined
+        : (() => {
+            const defaultPath = resolveKeyPath()
+            return existsSync(defaultPath) ? defaultPath : undefined
+          })()
 
       if (!identityPath) {
-        console.error(
-          `${RED}Error:${RESET} identity.key_file is required for --reseal (needed to decrypt existing secrets)`,
-        )
+        console.error(`${RED}Error:${RESET} No identity key found for --reseal (needed to decrypt existing secrets)`)
         console.error("")
-        console.error(`${DIM}Add to your envpkt.toml:${RESET}`)
-        console.error(`${DIM}  [identity]${RESET}`)
-        console.error(`${DIM}  key_file = "path/to/identity.txt"${RESET}`)
+        console.error(`${DIM}Looked in:${RESET}`)
+        console.error(`${DIM}  1. identity.key_file in envpkt.toml${RESET}`)
+        console.error(`${DIM}  2. ENVPKT_AGE_KEY_FILE env var${RESET}`)
+        console.error(`${DIM}  3. ~/.envpkt/age-key.txt${RESET}`)
         process.exit(2)
       }
 
