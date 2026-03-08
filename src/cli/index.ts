@@ -16,6 +16,7 @@ import { runResolve } from "./commands/resolve.js"
 import { runSeal } from "./commands/seal.js"
 import { registerSecretCommands } from "./commands/secret.js"
 import { runShellHook } from "./commands/shell-hook.js"
+import { runUpgrade } from "./commands/upgrade.js"
 
 const program = new Command()
 
@@ -147,6 +148,13 @@ program
 
 registerSecretCommands(program)
 registerEnvCommands(program)
+
+program
+  .command("upgrade")
+  .description("Upgrade envpkt to the latest version (npm install -g envpkt@latest)")
+  .action(() => {
+    runUpgrade()
+  })
 
 program
   .command("shell-hook")
