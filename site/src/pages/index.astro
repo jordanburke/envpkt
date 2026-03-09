@@ -1,0 +1,18 @@
+---
+import Layout from "../layouts/Layout.astro"
+import Navigation from "../components/landing/Navigation"
+import Hero from "../components/landing/Hero"
+import Features from "../components/landing/Features"
+import QuickStart from "../components/landing/QuickStart"
+import Footer from "../components/landing/Footer"
+---
+
+<Layout title="envpkt — Credentials your agents actually understand">
+  <Navigation client:load />
+  <div class="pt-16">
+    <Hero client:load />
+    <Features client:load />
+    <QuickStart client:load />
+    <Footer client:load />
+  </div>
+</Layout>

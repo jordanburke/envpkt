@@ -1,53 +1,29 @@
 ---
-title: envpacket
+title: Welcome to envpkt
 description: Credentials your agents actually understand
-template: splash
-hero:
-  tagline: Structured metadata for every secret — capabilities, constraints, expiration, and fleet health — so agents operate within their boundaries instead of flying blind.
-  actions:
-    - text: Get Started
-      link: /getting-started/installation/
-      icon: right-arrow
-      variant: primary
-    - text: View on GitHub
-      link: https://github.com/jordanburke/envpkt
-      icon: external
-      variant: minimal
 ---
 
-import { Card, CardGrid } from "@astrojs/starlight/components"
+import { Card, CardGrid, LinkCard } from "@astrojs/starlight/components"
 
-<CardGrid stagger>
-  <Card title="Developer Workflow" icon="laptop">
-    Scan your environment, build a catalog, sync via cloud drive, and load secrets per terminal with `eval "$(envpkt env
-    export)"`. [Get started →](/guides/developer-workflow/)
-  </Card>
-  <Card title="Agent & CI Deployment" icon="rocket">
-    Gate deployments with `audit --strict`, encrypt with `seal`, deploy with `exec --strict`, and monitor with `fleet`.
-    [Get started →](/guides/agent-ci-workflow/)
-  </Card>
-  <Card title="MCP Integration" icon="puzzle">
-    Built-in MCP server gives AI agents structured awareness of their credentials — capabilities, constraints,
-    expiration, rotation — without exposing secret values. Works with Claude, Cursor, VS Code, and any MCP client.
-  </Card>
-  <Card title="Three-Tier Security" icon="approve-check">
-    Architecturally enforced trust boundaries. The MCP server never has access to secret values. Runtime injection stays
-    outside the LLM context. Fleet-wide audit trails for full visibility.
-  </Card>
-  <Card title="Metadata + Sealed Secrets" icon="information">
-    Every credential gets structured metadata — service, purpose, capabilities, expiration, rotation URL — plus optional
-    age-encrypted sealed packets, safe to commit to git.
-  </Card>
-  <Card title="Environment Scanning" icon="magnifier">
-    Auto-discover credentials from your shell with `envpkt env scan`. Matches ~45 known services, ~13 suffix patterns,
-    and ~29 value shapes with confidence scoring.
-  </Card>
-  <Card title="Fleet Health" icon="heart">
-    Scan an entire directory tree of agents with `envpkt fleet`. Get aggregated health status, expiration warnings, and
-    stale credential detection across your fleet.
-  </Card>
-  <Card title="Functional API" icon="seti:typescript">
-    TypeScript library built on functype. All functions return `Either` or `Option` — no thrown exceptions. Use
-    programmatically for boot, audit, fleet scan, and more.
-  </Card>
+Welcome to the envpkt documentation. Use the sidebar to navigate through guides, CLI reference, and integrations.
+
+## Where to start
+
+<CardGrid>
+  <LinkCard
+    title="Installation"
+    href="/getting-started/installation/"
+    description="Install envpkt and get set up in minutes"
+  />
+  <LinkCard
+    title="Quick Start"
+    href="/getting-started/quick-start/"
+    description="Walk through the core workflow from init to deploy"
+  />
+  <LinkCard
+    title="The TOML File"
+    href="/getting-started/the-toml-file/"
+    description="Understand the envpkt.toml configuration"
+  />
+  <LinkCard title="CLI Reference" href="/cli/" description="Full reference for every CLI command" />
 </CardGrid>

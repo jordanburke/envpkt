@@ -1,12 +1,18 @@
 import starlight from "@astrojs/starlight"
+import react from "@astrojs/react"
+import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from "astro/config"
 
 export default defineConfig({
+  site: "https://envpkt.dev",
   integrations: [
     starlight({
       title: "envpacket / envpkt",
       description: "Credential lifecycle and fleet management for General Env and AI agents",
       social: [{ icon: "github", label: "GitHub", href: "https://github.com/jordanburke/envpkt" }],
+      components: {
+        SiteTitle: "./src/components/starlight/SiteTitle.astro",
+      },
       sidebar: [
         {
           label: "Getting Started",
@@ -68,8 +74,10 @@ export default defineConfig({
         },
       ],
     }),
+    react(),
   ],
   vite: {
+    plugins: [tailwindcss()],
     ssr: {
       noExternal: ["postcss", "nanoid"],
     },
