@@ -52,6 +52,96 @@ if [ $? -ne 0 ]; then
 fi
 ```
 
+## Secret CRUD Workflow
+
+```bash
+# Add a new secret with metadata
+envpkt secret add STRIPE_API_KEY \
+  --service stripe \
+  --purpose "Payment processing" \
+  --expires 2026-06-30 \
+  --capabilities "charges,refunds" \
+  --rotates 90d \
+  --required
+
+# Preview before writing
+envpkt secret add STRIPE_API_KEY --service stripe --dry-run
+
+# Edit metadata on an existing secret
+envpkt secret edit STRIPE_API_KEY --expires 2026-12-31 --rotates 60d
+
+# Unset required flag
+envpkt secret edit STRIPE_API_KEY --no-required
+
+# Rename a secret (preserves all metadata)
+envpkt secret rename STRIPE_API_KEY STRIPE_SECRET_KEY
+
+# Remove a secret
+envpkt secret rm STRIPE_SECRET_KEY
+
+# All CRUD commands support --dry-run for preview
+envpkt secret rm STRIPE_SECRET_KEY --dry-run
+```
+
+## Env Defaults CRUD Workflow
+
+```bash
+# Add a non-secret environment default
+envpkt env add NODE_ENV production \
+  --purpose "Runtime environment mode" \
+  --comment "Override to 'development' for local testing"
+
+# Add with tags
+envpkt env add LOG_LEVEL info --tags "env=prod,team=platform"
+
+# Update value
+envpkt env edit NODE_ENV --value development
+
+# Update metadata
+envpkt env edit NODE_ENV --purpose "Controls debug logging" --tags "env=dev"
+
+# Rename
+envpkt env rename NODE_ENV APP_ENV
+
+# Remove
+envpkt env rm APP_ENV
+
+# Preview any change
+envpkt env edit NODE_ENV --value staging --dry-run
+```
+
+## Seal Edit Workflow (Rotate Specific Secrets)
+
+```bash
+# Re-seal specific keys with new values (interactive prompt)
+envpkt seal --edit OPENAI_API_KEY
+
+# Re-seal multiple keys at once
+envpkt seal --edit OPENAI_API_KEY,STRIPE_API_KEY
+
+# Typical rotation flow:
+# 1. Rotate key in provider dashboard
+# 2. Re-seal with new value
+envpkt seal --edit OPENAI_API_KEY
+# 3. Commit updated envpkt.toml
+git add envpkt.toml && git commit -m "rotate: OPENAI_API_KEY"
+```
+
+## Reseal Workflow (Key Rotation)
+
+```bash
+# Re-encrypt ALL secrets (e.g. after rotating the age keypair)
+envpkt seal --reseal
+
+# Typical key rotation flow:
+# 1. Generate new age keypair
+envpkt keygen --force
+# 2. Re-encrypt all secrets with new key
+envpkt seal --reseal
+# 3. Commit
+git add envpkt.toml && git commit -m "rotate: age keypair"
+```
+
 ## Sealed Workflow
 
 ```bash

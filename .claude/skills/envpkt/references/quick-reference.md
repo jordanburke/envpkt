@@ -2,20 +2,28 @@
 
 ## CLI Commands
 
-| Command                  | Description                   | Key Options                                             |
-| ------------------------ | ----------------------------- | ------------------------------------------------------- | ------------------ |
-| `envpkt init`            | Initialize `envpkt.toml`      | `--from-fnox`, `--identity`, `--name`, `--force`        |
-| `envpkt audit`           | Audit credential health       | `--strict`, `--format`, `--expiring <days>`, `--status` |
-| `envpkt inspect`         | Display config view           | `--resolved`, `--secrets`, `--plaintext`, `--format`    |
-| `envpkt exec <cmd>`      | Audit + run with injected env | `--skip-audit`, `--warn-only`, `--strict`, `--profile`  |
-| `envpkt seal`            | Encrypt values with age       | `--profile`                                             |
-| `envpkt resolve`         | Flatten catalog references    | `-o <path>`, `--format toml                             | json`, `--dry-run` |
-| `envpkt fleet`           | Scan directory tree health    | `-d <path>`, `--depth`, `--status`, `--format`          |
-| `envpkt mcp`             | Start MCP server (stdio)      | `-c <path>`                                             |
-| `envpkt env scan`        | Discover credentials in env   | `--write`, `--dry-run`, `--include-unknown`             |
-| `envpkt env check`       | Drift detection vs live env   | `--strict`, `--format`                                  |
-| `envpkt env export`      | Output `export` statements    | `--profile`, `--skip-audit`                             |
-| `envpkt shell-hook <sh>` | Shell cd-hook for warnings    | `zsh` or `bash`                                         |
+| Command                            | Description                   | Key Options                                                  |
+| ---------------------------------- | ----------------------------- | ------------------------------------------------------------ | ------------------ |
+| `envpkt init`                      | Initialize `envpkt.toml`      | `--from-fnox`, `--identity`, `--name`, `--force`             |
+| `envpkt audit`                     | Audit credential health       | `--strict`, `--format`, `--expiring <days>`, `--status`      |
+| `envpkt inspect`                   | Display config view           | `--resolved`, `--secrets`, `--plaintext`, `--format`         |
+| `envpkt exec <cmd>`                | Audit + run with injected env | `--skip-audit`, `--warn-only`, `--strict`, `--profile`       |
+| `envpkt seal`                      | Encrypt values with age       | `--profile`, `--reseal`, `--edit <keys>`                     |
+| `envpkt resolve`                   | Flatten catalog references    | `-o <path>`, `--format toml                                  | json`, `--dry-run` |
+| `envpkt fleet`                     | Scan directory tree health    | `-d <path>`, `--depth`, `--status`, `--format`               |
+| `envpkt mcp`                       | Start MCP server (stdio)      | `-c <path>`                                                  |
+| `envpkt env scan`                  | Discover credentials in env   | `--write`, `--dry-run`, `--include-unknown`                  |
+| `envpkt env check`                 | Drift detection vs live env   | `--strict`, `--format`                                       |
+| `envpkt env export`                | Output `export` statements    | `--profile`, `--skip-audit`                                  |
+| `envpkt shell-hook <sh>`           | Shell cd-hook for warnings    | `zsh` or `bash`                                              |
+| `envpkt secret add <name>`         | Add secret entry              | `--service`, `--purpose`, `--expires`, `--tags`, `--dry-run` |
+| `envpkt secret edit <name>`        | Update secret metadata        | `--service`, `--purpose`, `--expires`, `--tags`, `--dry-run` |
+| `envpkt secret rm <name>`          | Remove secret entry           | `-c`, `--dry-run`                                            |
+| `envpkt secret rename <old> <new>` | Rename secret entry           | `-c`, `--dry-run`                                            |
+| `envpkt env add <name> <value>`    | Add env default entry         | `--purpose`, `--comment`, `--tags`, `--dry-run`              |
+| `envpkt env edit <name>`           | Update env entry fields       | `--value`, `--purpose`, `--comment`, `--tags`, `--dry-run`   |
+| `envpkt env rm <name>`             | Remove env entry              | `-c`, `--dry-run`                                            |
+| `envpkt env rename <old> <new>`    | Rename env entry              | `-c`, `--dry-run`                                            |
 
 ## Library Functions
 

@@ -197,11 +197,45 @@ See `references/quick-reference.md` for a compact cheat sheet.
 
 **exec options**: `-c <path>`, `--profile <profile>`, `--skip-audit` / `--no-check`, `--warn-only`, `--strict`
 
-**seal options**: `-c <path>`, `--profile <profile>`
+**seal options**: `-c <path>`, `--profile <profile>`, `--reseal` (re-encrypt all including already sealed), `--edit <keys>` (comma-separated keys to re-seal with new interactively-prompted values)
 
 **resolve options**: `-c <path>`, `-o <path>`, `--format toml|json`, `--dry-run`
 
 **env export options**: `-c <path>`, `--profile <profile>`, `--skip-audit`
+
+### Secret Management (CRUD)
+
+| Command                            | Description                                  |
+| ---------------------------------- | -------------------------------------------- |
+| `envpkt secret add <name>`         | Add a new secret entry to `envpkt.toml`      |
+| `envpkt secret edit <name>`        | Update metadata fields on an existing secret |
+| `envpkt secret rm <name>`          | Remove a secret entry from `envpkt.toml`     |
+| `envpkt secret rename <old> <new>` | Rename a secret entry, preserving metadata   |
+
+**secret add options**: `-c <path>`, `--service`, `--purpose`, `--comment`, `--expires <YYYY-MM-DD>`, `--capabilities <comma-separated>`, `--rotates <schedule>`, `--rate-limit`, `--model-hint`, `--source`, `--rotation-url`, `--tags <key=val,...>`, `--required`, `--dry-run`
+
+**secret edit options**: Same as add, plus `--no-required` to unset required flag
+
+**secret rm options**: `-c <path>`, `--dry-run`
+
+**secret rename options**: `-c <path>`, `--dry-run`
+
+### Env Defaults Management (CRUD)
+
+| Command                         | Description                                |
+| ------------------------------- | ------------------------------------------ |
+| `envpkt env add <name> <value>` | Add a new env default entry                |
+| `envpkt env edit <name>`        | Update fields on an existing env entry     |
+| `envpkt env rm <name>`          | Remove an env entry from `envpkt.toml`     |
+| `envpkt env rename <old> <new>` | Rename an env entry, preserving all fields |
+
+**env add options**: `-c <path>`, `--purpose`, `--comment`, `--tags <key=val,...>`, `--dry-run`
+
+**env edit options**: `-c <path>`, `--value <new-value>`, `--purpose`, `--comment`, `--tags <key=val,...>`, `--dry-run`
+
+**env rm options**: `-c <path>`, `--dry-run`
+
+**env rename options**: `-c <path>`, `--dry-run`
 
 ### Fleet & Integration
 
@@ -475,6 +509,71 @@ eval "$(envpkt env export)"
 
 # With specific fnox profile
 eval "$(envpkt env export --profile prod)"
+```
+
+## Common Workflows
+
+### New Project Setup
+
+```bash
+envpkt init --identity --name "my-agent"    # 1. Create envpkt.toml
+envpkt env scan --write                      # 2. Discover existing credentials
+envpkt keygen                                # 3. Generate age keypair
+envpkt secret add OPENAI_API_KEY \           # 4. Add secrets with metadata
+  --service openai --expires 2025-12-31 \
+  --capabilities "chat,embeddings"
+envpkt seal                                  # 5. Encrypt values into config
+```
+
+### Adding a New Secret
+
+```bash
+envpkt secret add NEW_API_KEY --service stripe --purpose "Payment processing"
+envpkt seal --edit NEW_API_KEY               # Prompts for value, encrypts it
+```
+
+### Rotating a Secret Value
+
+```bash
+# Re-seal a specific key with a new value (interactive prompt)
+envpkt seal --edit OPENAI_API_KEY
+
+# Re-encrypt ALL secrets (e.g. after rotating the age keypair)
+envpkt seal --reseal
+```
+
+### Editing Secret Metadata
+
+```bash
+# Update expiration and rotation schedule
+envpkt secret edit OPENAI_API_KEY --expires 2026-06-30 --rotates 90d
+
+# Preview changes without writing
+envpkt secret edit OPENAI_API_KEY --expires 2026-06-30 --dry-run
+```
+
+### Managing Env Defaults
+
+```bash
+# Add a non-secret environment default
+envpkt env add NODE_ENV production --purpose "Runtime environment mode"
+
+# Update value
+envpkt env edit NODE_ENV --value development
+
+# Rename
+envpkt env rename NODE_ENV APP_ENV
+
+# Remove
+envpkt env rm APP_ENV
+```
+
+### Pre-deploy Audit
+
+```bash
+envpkt audit --strict                        # Fail on any non-healthy secret
+envpkt env check --strict                    # Fail on config/env drift
+envpkt exec --strict -- ./deploy.sh          # Audit + run in one step
 ```
 
 ## Error Handling
