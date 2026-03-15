@@ -30,8 +30,8 @@ importers:
         specifier: ^24.12.0
         version: 24.12.0
       ts-builds:
-        specifier: ^2.5.1
-        version: 2.5.1(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint@10.0.3)(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@10.0.3))(tsdown@0.20.3(synckit@0.11.12)(typescript@5.9.3))(vite@7.3.1(@types/node@24.12.0)(tsx@4.21.0))
+        specifier: ^2.5.2
+        version: 2.5.2(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint@10.0.3)(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@10.0.3))(tsdown@0.20.3(synckit@0.11.12)(typescript@5.9.3))(vite@7.3.1(@types/node@24.12.0)(tsx@4.21.0))
       tsdown:
         specifier: ^0.20.3
         version: 0.20.3(synckit@0.11.12)(typescript@5.9.3)
@@ -336,11 +336,6 @@ packages:
     peerDependenciesMeta:
       eslint:
         optional: true
-
-  "@eslint/js@9.39.4":
-    resolution:
-      { integrity: sha512-nE7DEIchvtiFTwBw4Lfbu59PG+kCofhjsKaCWzxTpt4lfRjRMqG6uMBzKXuEcyXhOHoUp9riAm7/aWYGhXZ9cw== }
-    engines: { node: ^18.18.0 || ^20.9.0 || >=21.1.0 }
 
   "@eslint/object-schema@3.0.3":
     resolution:
@@ -1269,15 +1264,15 @@ packages:
       { integrity: sha512-/veY75JbMK4j1yjvuUxuVsiS/hr/4iHs9FTT6cgTexxdE0Ly/glccBAkloH/DofkjRbZU3bnoj38mOmhkZ0lHw== }
     engines: { node: ">=12" }
 
-  eslint-config-functype@2.0.0:
+  eslint-config-functype@2.0.4:
     resolution:
-      { integrity: sha512-XalC5g5KX0a2b1zxnS9mxynqwfXfHmgFMVUIqVTlpKWrop5p48oyWTzfHOdFtvpPx83apU/sh6EzxgIy90EwwA== }
+      { integrity: sha512-ynBMgaO2E9SVUmiciEF2lwiF15A8fyl0QHYvyABEX/eo4yJLVg1P/vYv08srYe6YDWBySIbH1KPmkRJeVkywgQ== }
     engines: { node: ">=22.0.0" }
     hasBin: true
     peerDependencies:
       "@typescript-eslint/eslint-plugin": ^8.38.0 || ^8.39.0 || ^9.0.0
       "@typescript-eslint/parser": ^8.38.0 || ^8.39.0 || ^9.0.0
-      eslint: ^10.0.1
+      eslint: ^10.0.3
       eslint-plugin-functional: ^9.0.2
       eslint-plugin-prettier: ^5.0.0
       eslint-plugin-simple-import-sort: ^12.0.0
@@ -1301,13 +1296,13 @@ packages:
       typescript:
         optional: true
 
-  eslint-plugin-functype@2.0.0:
+  eslint-plugin-functype@2.0.4:
     resolution:
-      { integrity: sha512-ZnMXcPKHw2fcaI1RluqNnL0SdSWwTUXFeEttMVhavgAy+SXRPNJj3QoXGTleDWMqhJownBH8R1KjuCCx6osFow== }
+      { integrity: sha512-2YpOh/KZRdSHnIh6HfNsmwunGtqRW4/dDeUlAufJCo/3BYlB8PMoGe6fBoAzu2wdYu/jiuIKqaMGEPtx4V1cAg== }
     engines: { node: ">=22.0.0" }
     hasBin: true
     peerDependencies:
-      eslint: ^10.0.1
+      eslint: ^10.0.3
 
   eslint-plugin-prettier@5.5.5:
     resolution:
@@ -1580,9 +1575,9 @@ packages:
       { integrity: sha512-VJCEvtrezO1IAR+kqEYnxUOoStaQPGrCmX3j4wDTNOcD1uRPFpGlwQUIW8niPuvHXaTUxeOUl5MMDGrl+tmO9A== }
     engines: { node: ">=16.9.0" }
 
-  hookable@6.0.1:
+  hookable@6.1.0:
     resolution:
-      { integrity: sha512-uKGyY8BuzN/a5gvzvA+3FVWo0+wUjgtfSdnmjtrOVwQCZPHpHDH2WRO3VZSOeluYrHoDCiXFffZXs8Dj1ULWtw== }
+      { integrity: sha512-ZoKZSJgu8voGK2geJS+6YtYjvIzu9AOM/KZXsBxr83uhLL++e9pEv/dlgwgy3dvHg06kTz6JOh1hk3C8Ceiymw== }
 
   html-escaper@2.0.2:
     resolution:
@@ -2159,9 +2154,9 @@ packages:
     peerDependencies:
       typescript: ">=4.8.4"
 
-  ts-builds@2.5.1:
+  ts-builds@2.5.2:
     resolution:
-      { integrity: sha512-VwmsXDKLMMo2poYoDd7M/BiIzcoU5NDD/wJvr981Z3mEnUU+OzGpOsdyInuqXVjoqAJl6ZG/mOaHnJt7muZ1GQ== }
+      { integrity: sha512-S2LCYrVHNs0XPhJPfi8/bo6MN50niHs0jIvOOEofpU+YkN3oBt1kF40xiAPgexhR1ce0w8oGh2D8+BAjdEsZIw== }
     hasBin: true
     peerDependencies:
       tsdown: ^0.x
@@ -2586,8 +2581,6 @@ snapshots:
   "@eslint/js@10.0.1(eslint@10.0.3)":
     optionalDependencies:
       eslint: 10.0.3
-
-  "@eslint/js@9.39.4": {}
 
   "@eslint/object-schema@3.0.3": {}
 
@@ -3240,10 +3233,10 @@ snapshots:
 
   escape-string-regexp@5.0.0: {}
 
-  eslint-config-functype@2.0.0(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint@10.0.3)(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint-plugin-functional@9.0.4(eslint@10.0.3)(typescript@5.9.3))(eslint-plugin-prettier@5.5.5(eslint-config-prettier@10.1.8(eslint@10.0.3))(eslint@10.0.3)(prettier@3.8.1))(eslint-plugin-simple-import-sort@12.1.1(eslint@10.0.3))(eslint@10.0.3)(prettier@3.8.1):
+  eslint-config-functype@2.0.4(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint@10.0.3)(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint-plugin-functional@9.0.4(eslint@10.0.3)(typescript@5.9.3))(eslint-plugin-prettier@5.5.5(eslint-config-prettier@10.1.8(eslint@10.0.3))(eslint@10.0.3)(prettier@3.8.1))(eslint-plugin-simple-import-sort@12.1.1(eslint@10.0.3))(eslint@10.0.3)(prettier@3.8.1):
     dependencies:
       "@eslint/eslintrc": 3.3.5
-      "@eslint/js": 9.39.4
+      "@eslint/js": 10.0.1(eslint@10.0.3)
       "@typescript-eslint/eslint-plugin": 8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint@10.0.3)(typescript@5.9.3)
       "@typescript-eslint/parser": 8.57.0(eslint@10.0.3)(typescript@5.9.3)
       eslint: 10.0.3
@@ -3273,7 +3266,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  eslint-plugin-functype@2.0.0(eslint@10.0.3):
+  eslint-plugin-functype@2.0.4(eslint@10.0.3):
     dependencies:
       eslint: 10.0.3
 
@@ -3522,7 +3515,7 @@ snapshots:
 
   hono@4.12.8: {}
 
-  hookable@6.0.1: {}
+  hookable@6.1.0: {}
 
   html-escaper@2.0.2: {}
 
@@ -3990,7 +3983,7 @@ snapshots:
     dependencies:
       typescript: 5.9.3
 
-  ts-builds@2.5.1(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint@10.0.3)(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@10.0.3))(tsdown@0.20.3(synckit@0.11.12)(typescript@5.9.3))(vite@7.3.1(@types/node@24.12.0)(tsx@4.21.0)):
+  ts-builds@2.5.2(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint@10.0.3)(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint-config-prettier@10.1.8(eslint@10.0.3))(tsdown@0.20.3(synckit@0.11.12)(typescript@5.9.3))(vite@7.3.1(@types/node@24.12.0)(tsx@4.21.0)):
     dependencies:
       "@eslint/js": 10.0.1(eslint@10.0.3)
       "@types/node": 24.10.15
@@ -3998,9 +3991,9 @@ snapshots:
       "@vitest/ui": 4.1.0(vitest@4.1.0)
       cross-env: 10.1.0
       eslint: 10.0.3
-      eslint-config-functype: 2.0.0(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint@10.0.3)(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint-plugin-functional@9.0.4(eslint@10.0.3)(typescript@5.9.3))(eslint-plugin-prettier@5.5.5(eslint-config-prettier@10.1.8(eslint@10.0.3))(eslint@10.0.3)(prettier@3.8.1))(eslint-plugin-simple-import-sort@12.1.1(eslint@10.0.3))(eslint@10.0.3)(prettier@3.8.1)
+      eslint-config-functype: 2.0.4(@typescript-eslint/eslint-plugin@8.57.0(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint@10.0.3)(typescript@5.9.3))(@typescript-eslint/parser@8.57.0(eslint@10.0.3)(typescript@5.9.3))(eslint-plugin-functional@9.0.4(eslint@10.0.3)(typescript@5.9.3))(eslint-plugin-prettier@5.5.5(eslint-config-prettier@10.1.8(eslint@10.0.3))(eslint@10.0.3)(prettier@3.8.1))(eslint-plugin-simple-import-sort@12.1.1(eslint@10.0.3))(eslint@10.0.3)(prettier@3.8.1)
       eslint-plugin-functional: 9.0.4(eslint@10.0.3)(typescript@5.9.3)
-      eslint-plugin-functype: 2.0.0(eslint@10.0.3)
+      eslint-plugin-functype: 2.0.4(eslint@10.0.3)
       eslint-plugin-prettier: 5.5.5(eslint-config-prettier@10.1.8(eslint@10.0.3))(eslint@10.0.3)(prettier@3.8.1)
       eslint-plugin-simple-import-sort: 12.1.1(eslint@10.0.3)
       globals: 17.4.0
@@ -4061,7 +4054,7 @@ snapshots:
       cac: 6.7.14
       defu: 6.1.4
       empathic: 2.0.0
-      hookable: 6.0.1
+      hookable: 6.1.0
       import-without-cache: 0.2.5
       obug: 2.1.1
       picomatch: 4.0.3
