@@ -43,7 +43,7 @@
     "@sinclair/typebox": "^0.34.48",
     "commander": "^14.0.3",
     "functype": "^0.49.0",
-    "functype-os": "^0.3.0",
+    "functype-os": "^0.4.0",
     "smol-toml": "^1.6.0"
   },
   "devDependencies": {
