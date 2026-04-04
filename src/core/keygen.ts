@@ -82,7 +82,6 @@ export const generateKeypair = (options?: {
   )
 }
 
-/* eslint-disable functional/no-let -- line-by-line TOML update */
 /** Update identity.recipient in an envpkt.toml file, preserving structure */
 export const updateConfigRecipient = (configPath: string, recipient: string): Either<KeygenError, true> => {
   const readResult = Try(() => readFileSync(configPath, "utf-8"))
@@ -147,4 +146,3 @@ export const updateConfigRecipient = (configPath: string, recipient: string): Ei
     },
   )
 }
-/* eslint-enable functional/no-let */

@@ -6,6 +6,13 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { callTool, toolDefinitions } from "../../src/mcp/tools.js"
 
+/** ISO date string offset from today by `days` */
+const daysFromNow = (days: number): string => {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 let tmpDir: string
 
 beforeEach(() => {
@@ -35,8 +42,8 @@ capabilities = ["read", "write"]
 [secret.API_KEY]
 service = "stripe"
 purpose = "Payment processing"
-created = "2026-01-01"
-expires = "2027-12-31"
+created = "${daysFromNow(-30)}"
+expires = "${daysFromNow(365)}"
 capabilities = ["charge", "refund"]
 source = "vault"
 rotation_url = "https://dashboard.stripe.com/apikeys"
@@ -44,7 +51,7 @@ rotation_url = "https://dashboard.stripe.com/apikeys"
 [secret.DB_PASS]
 service = "postgres"
 purpose = "Main database access"
-created = "2026-01-01"
+created = "${daysFromNow(-30)}"
 capabilities = ["read", "write"]
 source = "manual"
 `

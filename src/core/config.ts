@@ -201,7 +201,11 @@ export const loadConfigFromCwd = (
   cwd?: string,
 ): Either<ConfigError, { path: string; source: "cwd" | "search"; config: EnvpktConfig }> =>
   discoverConfig(cwd).fold(
-    () => Left({ _tag: "FileNotFound", path: join(cwd ?? process.cwd(), CONFIG_FILENAME) } as const),
+    () =>
+      Left<ConfigError, { path: string; source: "cwd" | "search"; config: EnvpktConfig }>({
+        _tag: "FileNotFound",
+        path: join(cwd ?? process.cwd(), CONFIG_FILENAME),
+      }),
     ({ path, source }) => loadConfig(path).map((config) => ({ path, source, config })),
   )
 

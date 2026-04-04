@@ -6,6 +6,13 @@ import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
+/** ISO date string offset from today by `days` */
+const daysFromNow = (days: number): string => {
+  const d = new Date()
+  d.setDate(d.getDate() + days)
+  return d.toISOString().slice(0, 10)
+}
+
 const __testDir = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__testDir, "../..")
 const CLI_SRC = resolve(PROJECT_ROOT, "src/cli/index.ts")
@@ -57,14 +64,14 @@ require_service = true
 [secret.API_KEY]
 service = "internal"
 purpose = "API authentication"
-created = "2026-01-01"
-expires = "2027-01-01"
+created = "${daysFromNow(-30)}"
+expires = "${daysFromNow(365)}"
 
 [secret.DB_URL]
 service = "postgres"
 purpose = "Database connection"
-created = "2026-01-01"
-expires = "2027-01-01"
+created = "${daysFromNow(-30)}"
+expires = "${daysFromNow(365)}"
 `
 
 const expiredCatalog = `version = 1

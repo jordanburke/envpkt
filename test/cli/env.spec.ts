@@ -261,7 +261,9 @@ describe("envpkt env export", () => {
 
 describe("envpkt audit --format minimal", () => {
   it("outputs single-line status for healthy audit", () => {
-    const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\ncreated = "2026-01-01"\nexpires = "2027-01-01"\n`
+    const created = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)
+    const expires = new Date(Date.now() + 365 * 86_400_000).toISOString().slice(0, 10)
+    const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\ncreated = "${created}"\nexpires = "${expires}"\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["audit", "--format", "minimal"], { cwd: tmpDir })

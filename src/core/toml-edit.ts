@@ -2,8 +2,6 @@ import { Either } from "functype"
 
 import type { TomlEditError } from "./types.js"
 
-/* eslint-disable functional/no-let -- line-by-line TOML editing requires mutation */
-
 const SECTION_RE = /^\[.+\]\s*$/
 const MULTILINE_OPEN = '"""'
 
@@ -203,4 +201,3 @@ export const updateSectionFields = (
  * Ensures proper spacing (double newline before the block).
  */
 export const appendSection = (raw: string, block: string): string => `${raw.trimEnd()}\n\n${block}`
-/* eslint-enable functional/no-let */

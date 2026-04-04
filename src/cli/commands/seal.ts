@@ -15,7 +15,6 @@ type SealOptions = {
   readonly edit?: string
 }
 
-/* eslint-disable functional/no-let -- stateful line-by-line TOML parser */
 /** Write sealed values back into the TOML file, preserving structure */
 const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encrypted_value?: string }>): void => {
   const raw = readFileSync(configPath, "utf-8")
@@ -116,7 +115,6 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
 
   writeFileSync(configPath, output.join("\n"))
 }
-/* eslint-enable functional/no-let */
 
 export const runSeal = async (options: SealOptions): Promise<void> => {
   const configResult = resolveConfigPath(options.config)
