@@ -8,6 +8,8 @@ const DIM = "\x1b[2m"
 const RED = "\x1b[31m"
 const GREEN = "\x1b[32m"
 const YELLOW = "\x1b[33m"
+const BLUE = "\x1b[34m"
+const MAGENTA = "\x1b[35m"
 const CYAN = "\x1b[36m"
 
 const statusColor = (status: HealthStatus): string => {
@@ -365,4 +367,4 @@ export const formatConfigSource = (path: string, source: string): string => {
   return `${DIM}envpkt: loaded ${path}${RESET}`
 }
 
-export { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW }
+export { BLUE, BOLD, CYAN, DIM, GREEN, MAGENTA, RED, RESET, YELLOW }

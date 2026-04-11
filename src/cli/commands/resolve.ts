@@ -5,7 +5,7 @@ import { stringify } from "smol-toml"
 
 import { resolveConfig } from "../../core/catalog.js"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
-import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
+import { BLUE, BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 
 type ResolveOptions = {
   readonly config?: string
@@ -61,10 +61,10 @@ export const runResolve = (options: ResolveOptions): void => {
               if (result.catalogPath) {
                 const summaryTarget = options.output ? process.stdout : process.stderr
                 summaryTarget.write(
-                  `\n${CYAN}Catalog:${RESET} ${result.catalogPath}\n` +
-                    `${GREEN}Merged:${RESET} ${result.merged.length} key(s)${
+                  `\n${BOLD}${CYAN}Catalog:${RESET} ${BLUE}${result.catalogPath}${RESET}\n` +
+                    `${GREEN}Merged:${RESET} ${BOLD}${result.merged.length}${RESET} key(s)${
                       result.overridden.length > 0
-                        ? ` ${YELLOW}(${result.overridden.length} overridden: ${result.overridden.join(", ")})${RESET}`
+                        ? ` ${YELLOW}(${result.overridden.length} overridden: ${BOLD}${result.overridden.join(`${RESET}${YELLOW}, ${BOLD}`)}${RESET}${YELLOW})${RESET}`
                         : ""
                     }\n`,
                 )

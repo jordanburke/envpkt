@@ -10,7 +10,7 @@ import { maskValue } from "../../core/format.js"
 import { resolveKeyPath } from "../../core/keygen.js"
 import { unsealSecrets } from "../../core/seal.js"
 import type { EnvpktConfig, ResolveResult, SecretMeta } from "../../core/types.js"
-import { BOLD, CYAN, DIM, formatConfigSource, formatError, RESET, YELLOW } from "../output.js"
+import { BLUE, BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, MAGENTA, RESET, YELLOW } from "../output.js"
 
 type InspectOptions = {
   readonly config?: string
@@ -21,29 +21,33 @@ type InspectOptions = {
 }
 
 const printSecretMeta = (meta: SecretMeta, indent: string): void => {
-  if (meta.purpose) console.log(`${indent}purpose: ${meta.purpose}`)
-  if (meta.comment) console.log(`${indent}comment: ${DIM}${meta.comment}${RESET}`)
-  if (meta.capabilities) console.log(`${indent}capabilities: ${DIM}${meta.capabilities.join(", ")}${RESET}`)
+  if (meta.purpose) console.log(`${indent}${DIM}purpose:${RESET} ${meta.purpose}`)
+  if (meta.comment) console.log(`${indent}${DIM}comment:${RESET} ${DIM}${meta.comment}${RESET}`)
+  if (meta.capabilities)
+    console.log(
+      `${indent}${DIM}capabilities:${RESET} ${meta.capabilities.map((c) => `${MAGENTA}${c}${RESET}`).join(", ")}`,
+    )
 
   const dateParts: string[] = []
-  if (meta.created) dateParts.push(`created: ${meta.created}`)
-  if (meta.expires) dateParts.push(`expires: ${meta.expires}`)
+  if (meta.created) dateParts.push(`${DIM}created:${RESET} ${BLUE}${meta.created}${RESET}`)
+  if (meta.expires) dateParts.push(`${DIM}expires:${RESET} ${YELLOW}${meta.expires}${RESET}`)
   if (dateParts.length > 0) console.log(`${indent}${dateParts.join("  ")}`)
 
   const opsParts: string[] = []
-  if (meta.rotates) opsParts.push(`rotates: ${meta.rotates}`)
-  if (meta.rate_limit) opsParts.push(`rate_limit: ${meta.rate_limit}`)
+  if (meta.rotates) opsParts.push(`${DIM}rotates:${RESET} ${CYAN}${meta.rotates}${RESET}`)
+  if (meta.rate_limit) opsParts.push(`${DIM}rate_limit:${RESET} ${CYAN}${meta.rate_limit}${RESET}`)
   if (opsParts.length > 0) console.log(`${indent}${opsParts.join("  ")}`)
 
-  if (meta.source) console.log(`${indent}source: ${meta.source}`)
-  if (meta.model_hint) console.log(`${indent}model_hint: ${meta.model_hint}`)
-  if (meta.rotation_url) console.log(`${indent}rotation_url: ${DIM}${meta.rotation_url}${RESET}`)
-  if (meta.required !== undefined) console.log(`${indent}required: ${meta.required}`)
+  if (meta.source) console.log(`${indent}${DIM}source:${RESET} ${BLUE}${meta.source}${RESET}`)
+  if (meta.model_hint) console.log(`${indent}${DIM}model_hint:${RESET} ${MAGENTA}${meta.model_hint}${RESET}`)
+  if (meta.rotation_url) console.log(`${indent}${DIM}rotation_url:${RESET} ${DIM}${meta.rotation_url}${RESET}`)
+  if (meta.required !== undefined)
+    console.log(`${indent}${DIM}required:${RESET} ${meta.required ? `${GREEN}true${RESET}` : `${DIM}false${RESET}`}`)
   if (meta.tags) {
     const tagStr = Object.entries(meta.tags)
-      .map(([k, v]) => `${k}=${v}`)
+      .map(([k, v]) => `${CYAN}${k}${RESET}=${DIM}${v}${RESET}`)
       .join(", ")
-    console.log(`${indent}tags: ${tagStr}`)
+    console.log(`${indent}${DIM}tags:${RESET} ${tagStr}`)
   }
 }
 
@@ -57,17 +61,22 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
   if (resolveResult?.catalogPath) {
     console.log(`${DIM}Catalog: ${CYAN}${resolveResult.catalogPath}${RESET}`)
   }
-  console.log(`version: ${config.version}`)
+  console.log(`${DIM}version:${RESET} ${config.version}`)
   console.log("")
 
   if (config.identity) {
-    console.log(`${BOLD}Identity:${RESET} ${config.identity.name}`)
-    if (config.identity.consumer) console.log(`  consumer: ${config.identity.consumer}`)
-    if (config.identity.description) console.log(`  description: ${config.identity.description}`)
-    if (config.identity.capabilities) console.log(`  capabilities: ${config.identity.capabilities.join(", ")}`)
-    if (config.identity.expires) console.log(`  expires: ${config.identity.expires}`)
-    if (config.identity.services) console.log(`  services: ${config.identity.services.join(", ")}`)
-    if (config.identity.secrets) console.log(`  secrets: ${config.identity.secrets.join(", ")}`)
+    console.log(`${BOLD}Identity:${RESET} ${GREEN}${config.identity.name}${RESET}`)
+    if (config.identity.consumer) console.log(`  ${DIM}consumer:${RESET} ${MAGENTA}${config.identity.consumer}${RESET}`)
+    if (config.identity.description) console.log(`  ${DIM}description:${RESET} ${config.identity.description}`)
+    if (config.identity.capabilities)
+      console.log(
+        `  ${DIM}capabilities:${RESET} ${config.identity.capabilities.map((c) => `${MAGENTA}${c}${RESET}`).join(", ")}`,
+      )
+    if (config.identity.expires) console.log(`  ${DIM}expires:${RESET} ${YELLOW}${config.identity.expires}${RESET}`)
+    if (config.identity.services)
+      console.log(`  ${DIM}services:${RESET} ${config.identity.services.map((s) => `${CYAN}${s}${RESET}`).join(", ")}`)
+    if (config.identity.secrets)
+      console.log(`  ${DIM}secrets:${RESET} ${config.identity.secrets.map((s) => `${BOLD}${s}${RESET}`).join(", ")}`)
     console.log("")
   }
 
@@ -91,9 +100,9 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
     console.log("")
     console.log(`${BOLD}Environment Defaults:${RESET} ${envKeys.length}`)
     Object.entries(envEntries).forEach(([key, entry]) => {
-      console.log(`  ${BOLD}${key}${RESET} = "${entry.value}"`)
-      if (entry.purpose) console.log(`    purpose: ${entry.purpose}`)
-      if (entry.comment) console.log(`    comment: ${DIM}${entry.comment}${RESET}`)
+      console.log(`  ${BOLD}${key}${RESET} = ${GREEN}"${entry.value}"${RESET}`)
+      if (entry.purpose) console.log(`    ${DIM}purpose:${RESET} ${entry.purpose}`)
+      if (entry.comment) console.log(`    ${DIM}comment:${RESET} ${DIM}${entry.comment}${RESET}`)
     })
   }
 
@@ -101,22 +110,28 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
     console.log("")
     console.log(`${BOLD}Lifecycle:${RESET}`)
     if (config.lifecycle.stale_warning_days !== undefined)
-      console.log(`  stale_warning_days: ${config.lifecycle.stale_warning_days}`)
+      console.log(`  ${DIM}stale_warning_days:${RESET} ${YELLOW}${config.lifecycle.stale_warning_days}${RESET}`)
     if (config.lifecycle.require_expiration !== undefined)
-      console.log(`  require_expiration: ${config.lifecycle.require_expiration}`)
+      console.log(
+        `  ${DIM}require_expiration:${RESET} ${config.lifecycle.require_expiration ? `${GREEN}true${RESET}` : `${DIM}false${RESET}`}`,
+      )
     if (config.lifecycle.require_service !== undefined)
-      console.log(`  require_service: ${config.lifecycle.require_service}`)
+      console.log(
+        `  ${DIM}require_service:${RESET} ${config.lifecycle.require_service ? `${GREEN}true${RESET}` : `${DIM}false${RESET}`}`,
+      )
   }
 
   // Catalog resolution summary
   if (resolveResult?.catalogPath) {
     console.log("")
     console.log(`${BOLD}Catalog Resolution:${RESET}`)
-    console.log(`  merged: ${resolveResult.merged.length} keys`)
+    console.log(`  ${DIM}merged:${RESET} ${GREEN}${resolveResult.merged.length}${RESET} keys`)
     if (resolveResult.overridden.length > 0) {
-      console.log(`  overridden: ${resolveResult.overridden.join(", ")}`)
+      console.log(
+        `  ${DIM}overridden:${RESET} ${resolveResult.overridden.map((k) => `${YELLOW}${k}${RESET}`).join(", ")}`,
+      )
     } else {
-      console.log(`  overridden: ${DIM}(none)${RESET}`)
+      console.log(`  ${DIM}overridden: (none)${RESET}`)
     }
     resolveResult.warnings.forEach((w) => {
       console.log(`  ${YELLOW}warning:${RESET} ${w}`)
