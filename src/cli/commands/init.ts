@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import type { Either } from "functype"
-import { Left, Right, Try } from "functype"
+import { Left, Option, Right, Try } from "functype"
 import { parse } from "smol-toml"
 
 import type { ConfigError } from "../../core/types.js"
@@ -91,9 +91,7 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
 
     if (fnoxKeys && fnoxKeys.length > 0) {
       lines.push(`# Secrets detected from fnox.toml`)
-      for (const key of fnoxKeys) {
-        lines.push(generateSecretBlock(key))
-      }
+      lines.push(...fnoxKeys.map((key) => generateSecretBlock(key)))
     } else {
       lines.push(`# Add your secret metadata below.`)
       lines.push(`# Each [secret.<key>] describes a secret your agent needs.`)
@@ -110,11 +108,13 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
 }
 
 const readFnoxKeys = (fnoxPath: string): Either<ConfigError, ReadonlyArray<string>> =>
+  // eslint-disable-next-line functype/prefer-do-notation -- nested Try().fold() is clearer here than Do notation
   Try(() => readFileSync(fnoxPath, "utf-8")).fold<Either<ConfigError, ReadonlyArray<string>>>(
-    (err) => Left({ _tag: "ReadError" as const, message: String(err) }),
+    (err) => Left({ _tag: "ReadError" as const, message: String(err) } as ConfigError),
     (content) =>
+      // eslint-disable-next-line functype/prefer-do-notation -- nested Try().fold() is clearer here than Do notation
       Try(() => parse(content)).fold<Either<ConfigError, ReadonlyArray<string>>>(
-        (err) => Left({ _tag: "ParseError" as const, message: String(err) }),
+        (err) => Left({ _tag: "ParseError" as const, message: String(err) } as ConfigError),
         (data) => Right(Object.keys(data) as ReadonlyArray<string>),
       ),
   )
@@ -140,28 +140,25 @@ export const runInit = (dir: string, options: InitOptions): void => {
     process.exit(1)
   }
 
-  const fnoxKeys: ReadonlyArray<string> | undefined = options.fromFnox
-    ? (() => {
-        const fnoxPath =
-          options.fromFnox === "true" || options.fromFnox === "" ? join(dir, "fnox.toml") : options.fromFnox
+  const fnoxKeys: Option<ReadonlyArray<string>> = Option(options.fromFnox).map((fromFnox) => {
+    const fnoxPath = fromFnox === "true" || fromFnox === "" ? join(dir, "fnox.toml") : fromFnox
 
-        if (!existsSync(fnoxPath)) {
-          console.error(`${RED}Error:${RESET} fnox.toml not found at ${fnoxPath}`)
-          process.exit(1)
-        }
+    if (!existsSync(fnoxPath)) {
+      console.error(`${RED}Error:${RESET} fnox.toml not found at ${fnoxPath}`)
+      process.exit(1)
+    }
 
-        return readFnoxKeys(fnoxPath).fold(
-          (err) => {
-            console.error(`${RED}Error:${RESET} Failed to read fnox.toml: ${formatConfigError(err)}`)
-            process.exit(1)
-            return undefined // unreachable
-          },
-          (keys) => keys,
-        )
-      })()
-    : undefined
+    return readFnoxKeys(fnoxPath).fold(
+      (err) => {
+        console.error(`${RED}Error:${RESET} Failed to read fnox.toml: ${formatConfigError(err)}`)
+        process.exit(1)
+        return [] as ReadonlyArray<string> // unreachable
+      },
+      (keys) => keys,
+    )
+  })
 
-  const content = generateTemplate(options, fnoxKeys)
+  const content = generateTemplate(options, fnoxKeys.orUndefined())
 
   const writeResult = Try(() => writeFileSync(outPath, content, "utf-8"))
   writeResult.fold(
@@ -171,9 +168,9 @@ export const runInit = (dir: string, options: InitOptions): void => {
     },
     () => {
       console.log(`${GREEN}✓${RESET} Created ${BOLD}${CONFIG_FILENAME}${RESET} in ${CYAN}${dir}${RESET}`)
-      if (fnoxKeys) {
-        console.log(`  Scaffolded ${fnoxKeys.length} secret(s) from fnox.toml`)
-      }
+      fnoxKeys.forEach((keys) => {
+        console.log(`  Scaffolded ${keys.length} secret(s) from fnox.toml`)
+      })
       console.log(`  ${BOLD}Next:${RESET} Fill in metadata for each secret`)
     },
   )

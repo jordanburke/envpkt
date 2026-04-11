@@ -10,20 +10,21 @@ export const fnoxExport = (profile?: string, agentKey?: string): Either<FnoxErro
   const args = profile ? ["export", "--profile", profile] : ["export"]
   const env = agentKey ? { ...process.env, FNOX_AGE_KEY: agentKey } : undefined
 
+  // eslint-disable-next-line functype/prefer-do-notation -- Do notation is not available in functype; Try→Either fold is the idiomatic pattern
   return Try(() => execFileSync("fnox", args, { stdio: "pipe", encoding: "utf-8", env })).fold<
     Either<FnoxError, Record<string, string>>
   >(
     (err) => Left({ _tag: "FnoxCliError", message: `fnox export failed: ${err}` }),
     (output) => {
       const entries: Record<string, string> = {}
-      for (const line of output.split("\n")) {
+      output.split("\n").forEach((line) => {
         const eq = line.indexOf("=")
         if (eq > 0) {
           const key = line.slice(0, eq).trim()
           const value = line.slice(eq + 1).trim()
           entries[key] = value
         }
-      }
+      })
       return Right(entries)
     },
   )
@@ -34,6 +35,7 @@ export const fnoxGet = (key: string, profile?: string, agentKey?: string): Eithe
   const args = profile ? ["get", key, "--profile", profile] : ["get", key]
   const env = agentKey ? { ...process.env, FNOX_AGE_KEY: agentKey } : undefined
 
+  // eslint-disable-next-line functype/prefer-do-notation -- Do notation is not available in functype; Try→Either fold is the idiomatic pattern
   return Try(() => execFileSync("fnox", args, { stdio: "pipe", encoding: "utf-8", env })).fold<
     Either<FnoxError, string>
   >(

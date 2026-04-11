@@ -466,12 +466,8 @@ const VALUE_SHAPE_PATTERNS: ReadonlyArray<ValuePattern> = [
 
 /** Detect service from value prefix/shape */
 export const matchValueShape = (value: string): Option<{ service: string; description: string }> => {
-  for (const vp of VALUE_SHAPE_PATTERNS) {
-    if (value.startsWith(vp.prefix)) {
-      return Option({ service: vp.service, description: vp.description })
-    }
-  }
-  return Option<{ service: string; description: string }>(undefined)
+  const match = VALUE_SHAPE_PATTERNS.find((vp) => value.startsWith(vp.prefix))
+  return Option(match).map((vp) => ({ service: vp.service, description: vp.description }))
 }
 
 /** Strip common suffixes and derive a service name from an env var name */
@@ -507,34 +503,29 @@ export const matchEnvVar = (name: string, value: string): Option<MatchResult> =>
   if (EXCLUDED_VARS.has(name)) return Option<MatchResult>(undefined)
 
   // Layer 1: Exact name match (high confidence)
-  for (const p of EXACT_NAME_PATTERNS) {
-    if (name === p.pattern) {
-      return Option<MatchResult>({
-        envVar: name,
-        value,
-        service: Option(p.service),
-        confidence: p.confidence,
-        matchedBy: `exact:${p.pattern}`,
-      })
-    }
+  const exactMatch = EXACT_NAME_PATTERNS.find((p) => name === p.pattern)
+  if (exactMatch) {
+    return Option<MatchResult>({
+      envVar: name,
+      value,
+      service: Option(exactMatch.service),
+      confidence: exactMatch.confidence,
+      matchedBy: `exact:${exactMatch.pattern}`,
+    })
   }
 
   // Layer 2: Value shape match (high confidence — service from value, not name)
   return matchValueShape(value).fold(
     () => {
       // Layer 3: Generic suffix match (medium confidence)
-      for (const sp of SUFFIX_PATTERNS) {
-        if (name.endsWith(sp.suffix)) {
-          return Option<MatchResult>({
-            envVar: name,
-            value,
-            service: Option(deriveServiceFromName(name)),
-            confidence: "medium",
-            matchedBy: `suffix:${sp.suffix}`,
-          })
-        }
-      }
-      return Option<MatchResult>(undefined)
+      const suffixMatch = SUFFIX_PATTERNS.find((sp) => name.endsWith(sp.suffix))
+      return Option(suffixMatch).map<MatchResult>((sp) => ({
+        envVar: name,
+        value,
+        service: Option(deriveServiceFromName(name)),
+        confidence: "medium",
+        matchedBy: `suffix:${sp.suffix}`,
+      }))
     },
     (vm) =>
       Option<MatchResult>({
@@ -548,16 +539,15 @@ export const matchEnvVar = (name: string, value: string): Option<MatchResult> =>
 }
 
 /** Scan full env, sorted by confidence (high first) then alphabetically */
+// eslint-disable-next-line functype/prefer-option
 export const scanEnv = (env: Readonly<Record<string, string | undefined>>): ReadonlyArray<MatchResult> => {
-  const results: MatchResult[] = []
-
-  for (const [name, value] of Object.entries(env)) {
-    if (value === undefined || value === "") continue
-    matchEnvVar(name, value).fold(
-      () => {},
-      (m) => results.push(m),
+  const results = Object.entries(env).flatMap(([name, value]) => {
+    if (value === undefined || value === "") return []
+    return matchEnvVar(name, value).fold<MatchResult[]>(
+      () => [],
+      (m) => [m],
     )
-  }
+  })
 
   const confidenceOrder: Record<ConfidenceLevel, number> = { high: 0, medium: 1, low: 2 }
 

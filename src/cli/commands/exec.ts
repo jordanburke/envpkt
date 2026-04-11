@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process"
 
+import { Try } from "functype"
+
 import { bootSafe } from "../../core/boot.js"
 import { BOLD, exitCodeForAudit, formatAudit, formatConfigSource, formatError, RED, RESET, YELLOW } from "../output.js"
 
@@ -66,31 +68,32 @@ export const runExec = (args: ReadonlyArray<string>, options: ExecOptions): void
     }
   }
 
-  for (const warning of boot.warnings) {
+  boot.warnings.forEach((warning) => {
     console.error(`${YELLOW}Warning:${RESET} ${warning}`)
-  }
+  })
 
   // Build environment: current env + env defaults + resolved secrets
   const env = { ...process.env }
 
   // Apply env defaults (only if key not already set)
-  for (const [key, value] of Object.entries(boot.envDefaults)) {
+  Object.entries(boot.envDefaults).forEach(([key, value]) => {
     if (!(key in env)) {
       env[key] = value
     }
-  }
+  })
 
   // Apply secrets (always override)
-  for (const [key, value] of Object.entries(boot.secrets)) {
+  Object.entries(boot.secrets).forEach(([key, value]) => {
     env[key] = value
-  }
+  })
 
   // Execute the command
   const [cmd, ...cmdArgs] = args
-  try {
-    execFileSync(cmd!, cmdArgs, { env, stdio: "inherit" })
-  } catch (err: unknown) {
-    const exitCode = (err as { status?: number }).status ?? 1
-    process.exit(exitCode)
-  }
+  Try(() => execFileSync(cmd!, cmdArgs, { env, stdio: "inherit" })).fold(
+    (err) => {
+      const exitCode = (err as { status?: number }).status ?? 1
+      process.exit(exitCode)
+    },
+    () => {},
+  )
 }

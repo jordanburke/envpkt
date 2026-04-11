@@ -58,8 +58,10 @@ export type EnvDriftStatus = "default" | "overridden" | "missing"
 export type EnvDriftEntry = {
   readonly key: string
   readonly defaultValue: string
+  // eslint-disable-next-line functype/prefer-option
   readonly currentValue: string | undefined
   readonly status: EnvDriftStatus
+  // eslint-disable-next-line functype/prefer-option
   readonly purpose: string | undefined
 }
 

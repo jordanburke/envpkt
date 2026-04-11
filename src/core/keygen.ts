@@ -43,6 +43,7 @@ export const generateKeypair = (options?: {
     }),
   )
 
+  // eslint-disable-next-line functype/prefer-do-notation -- functype does not provide Either.Do notation
   return keygenResult.fold<Either<KeygenError, KeygenResult>>(
     (err) => Left({ _tag: "KeygenFailed", message: `age-keygen failed: ${err}` } as const),
     (output) => {
@@ -86,57 +87,49 @@ export const generateKeypair = (options?: {
 export const updateConfigRecipient = (configPath: string, recipient: string): Either<KeygenError, true> => {
   const readResult = Try(() => readFileSync(configPath, "utf-8"))
 
+  // eslint-disable-next-line functype/prefer-do-notation -- functype does not provide Either.Do notation
   return readResult.fold<Either<KeygenError, true>>(
     (err) => Left({ _tag: "ConfigUpdateError", message: `Failed to read config: ${err}` } as const),
     (raw) => {
       const lines = raw.split("\n")
-      const output: string[] = []
-      let inIdentitySection = false
-      let recipientUpdated = false
-      let hasIdentitySection = false
 
-      for (const line of lines) {
-        // Detect [identity] section
-        if (/^\[identity\]\s*$/.test(line)) {
-          inIdentitySection = true
-          hasIdentitySection = true
-          output.push(line)
-          continue
-        }
-
-        // Detect new section (leaving [identity])
-        if (/^\[/.test(line) && !/^\[identity\]\s*$/.test(line)) {
-          // If we were in [identity] and didn't update recipient, insert it
-          if (inIdentitySection && !recipientUpdated) {
-            output.push(`recipient = "${recipient}"`)
-            recipientUpdated = true
+      const acc = lines.reduce(
+        (state, line) => {
+          // Detect [identity] section
+          if (/^\[identity\]\s*$/.test(line)) {
+            return { ...state, output: [...state.output, line], inIdentitySection: true, hasIdentitySection: true }
           }
-          inIdentitySection = false
-          output.push(line)
-          continue
-        }
 
-        // Update existing recipient line
-        if (inIdentitySection && /^recipient\s*=/.test(line)) {
-          output.push(`recipient = "${recipient}"`)
-          recipientUpdated = true
-          continue
-        }
+          // Detect new section (leaving [identity])
+          if (/^\[/.test(line) && !/^\[identity\]\s*$/.test(line)) {
+            const inserted =
+              state.inIdentitySection && !state.recipientUpdated
+                ? [...state.output, `recipient = "${recipient}"`, line]
+                : [...state.output, line]
+            return {
+              ...state,
+              output: inserted,
+              inIdentitySection: false,
+              recipientUpdated: state.recipientUpdated || (state.inIdentitySection && !state.recipientUpdated),
+            }
+          }
 
-        output.push(line)
-      }
+          // Update existing recipient line
+          if (state.inIdentitySection && /^recipient\s*=/.test(line)) {
+            return { ...state, output: [...state.output, `recipient = "${recipient}"`], recipientUpdated: true }
+          }
+
+          return { ...state, output: [...state.output, line] }
+        },
+        { output: [] as string[], inIdentitySection: false, recipientUpdated: false, hasIdentitySection: false },
+      )
 
       // If still in [identity] at EOF and didn't update
-      if (inIdentitySection && !recipientUpdated) {
-        output.push(`recipient = "${recipient}"`)
-      }
+      const afterEof =
+        acc.inIdentitySection && !acc.recipientUpdated ? [...acc.output, `recipient = "${recipient}"`] : acc.output
 
       // If no [identity] section at all, append one
-      if (!hasIdentitySection) {
-        output.push("")
-        output.push("[identity]")
-        output.push(`recipient = "${recipient}"`)
-      }
+      const output = !acc.hasIdentitySection ? [...afterEof, "", "[identity]", `recipient = "${recipient}"`] : afterEof
 
       const writeResult = Try(() => writeFileSync(configPath, output.join("\n")))
       return writeResult.fold<Either<KeygenError, true>>(

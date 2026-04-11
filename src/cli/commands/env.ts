@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 
 import type { Command } from "commander"
-import { Try } from "functype"
+import { Option, Try } from "functype"
 
 import { bootSafe } from "../../core/boot.js"
 import { resolveConfig } from "../../core/catalog.js"
@@ -217,13 +217,13 @@ const runEnvExport = (options: ExportOptions): void => {
       const sourceMsg = formatConfigSource(boot.configPath, boot.configSource)
       if (sourceMsg) console.error(sourceMsg)
 
-      for (const warning of boot.warnings) {
+      boot.warnings.forEach((warning) => {
         console.error(`${YELLOW}Warning:${RESET} ${warning}`)
-      }
+      })
 
-      for (const [key, value] of Object.entries(boot.envDefaults)) {
+      Object.entries(boot.envDefaults).forEach(([key, value]) => {
         console.log(`export ${key}='${shellEscape(value)}'`)
-      }
+      })
 
       // Emit env entries that boot skipped (already in process.env)
       if (boot.overridden.length > 0) {
@@ -231,18 +231,18 @@ const runEnvExport = (options: ExportOptions): void => {
           () => {},
           (config) => {
             const envEntries = config.env ?? {}
-            for (const key of boot.overridden) {
+            boot.overridden.forEach((key) => {
               if (key in envEntries) {
                 console.log(`export ${key}='${shellEscape(envEntries[key]!.value)}'`)
               }
-            }
+            })
           },
         )
       }
 
-      for (const [key, value] of Object.entries(boot.secrets)) {
+      Object.entries(boot.secrets).forEach(([key, value]) => {
         console.log(`export ${key}='${shellEscape(value)}'`)
-      }
+      })
     },
   )
 }
@@ -265,8 +265,8 @@ const buildEnvBlock = (name: string, value: string, options: AddEnvOptions): str
   return `${lines.join("\n")}\n`
 }
 
-const withConfig = (configFlag: string | undefined, fn: (configPath: string, raw: string) => void): void => {
-  const configResult = resolveConfigPath(configFlag)
+const withConfig = (configFlag: Option<string>, fn: (configPath: string, raw: string) => void): void => {
+  const configResult = resolveConfigPath(configFlag.orUndefined())
   configResult.fold(
     (err) => {
       console.error(formatError(err))
@@ -326,7 +326,7 @@ const runEnvAdd = (name: string, value: string, options: AddEnvOptions): void =>
 }
 
 const runEnvEdit = (name: string, options: EditEnvOptions): void => {
-  withConfig(options.config, (configPath, raw) => {
+  withConfig(Option(options.config), (configPath, raw) => {
     const loadResult = loadConfig(configPath)
     loadResult.fold(
       (err) => {
@@ -378,7 +378,7 @@ const runEnvEdit = (name: string, options: EditEnvOptions): void => {
 }
 
 const runEnvRm = (name: string, options: RmEnvOptions): void => {
-  withConfig(options.config, (configPath, raw) => {
+  withConfig(Option(options.config), (configPath, raw) => {
     const result = removeSection(raw, `[env.${name}]`)
     result.fold(
       (err) => {
@@ -399,7 +399,7 @@ const runEnvRm = (name: string, options: RmEnvOptions): void => {
 }
 
 const runEnvRename = (oldName: string, newName: string, options: RenameEnvOptions): void => {
-  withConfig(options.config, (configPath, raw) => {
+  withConfig(Option(options.config), (configPath, raw) => {
     const result = renameSection(raw, `[env.${oldName}]`, `[env.${newName}]`)
     result.fold(
       (err) => {

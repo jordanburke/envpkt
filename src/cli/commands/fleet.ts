@@ -1,5 +1,7 @@
 import { resolve } from "node:path"
 
+import { Option } from "functype"
+
 import { scanFleet } from "../../core/fleet.js"
 import type { HealthStatus } from "../../core/types.js"
 import { BOLD, DIM, formatFleetJson, GREEN, RED, RESET, YELLOW } from "../output.js"
@@ -32,8 +34,11 @@ export const runFleet = (options: FleetOptions): void => {
     return
   }
 
-  const statusFilter = options.status as HealthStatus | undefined
-  const agents = statusFilter ? fleet.agents.filter((a) => a.audit.status === statusFilter) : fleet.agents
+  const statusFilter: Option<HealthStatus> = Option(options.status as HealthStatus)
+  const agents = statusFilter.fold(
+    () => fleet.agents,
+    (s) => fleet.agents.filter((a) => a.audit.status === s),
+  )
 
   console.log(
     `${statusIcon(fleet.status)} ${BOLD}Fleet: ${fleet.status.toUpperCase()}${RESET} — ${fleet.total_agents} agents, ${fleet.total_secrets} secrets`,
@@ -44,11 +49,11 @@ export const runFleet = (options: FleetOptions): void => {
 
   console.log("")
 
-  for (const agent of agents) {
+  agents.forEach((agent) => {
     const name = agent.identity?.name ? BOLD + agent.identity.name + RESET : DIM + agent.path + RESET
     const icon = statusIcon(agent.audit.status)
     console.log(`  ${icon} ${name} ${DIM}(${agent.audit.total} secrets)${RESET}`)
-  }
+  })
 
   process.exit(fleet.status === "critical" ? 2 : 0)
 }

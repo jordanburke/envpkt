@@ -11,7 +11,6 @@ export const ageEncrypt = (plaintext: string, recipient: string): Either<SealErr
   if (!ageAvailable()) {
     return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
   }
-
   return Try(() =>
     execFileSync("age", ["--encrypt", "--recipient", recipient, "--armor"], {
       input: plaintext,
@@ -30,6 +29,7 @@ export const ageDecrypt = (ciphertext: string, identityPath: string): Either<Sea
     return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
   }
 
+  // eslint-disable-next-line functype/prefer-do-notation
   return Try(() =>
     execFileSync("age", ["--decrypt", "--identity", identityPath], {
       input: ciphertext,
@@ -52,37 +52,19 @@ export const sealSecrets = (
     return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
   }
 
-  const result: Record<string, SecretMeta> = {}
+  return Object.entries(meta).reduce<Either<SealError, Record<string, SecretMeta>>>(
+    (acc, [key, secretMeta]) =>
+      acc.flatMap((result) => {
+        if (!(key in values)) {
+          return Right({ ...result, [key]: secretMeta })
+        }
 
-  for (const [key, secretMeta] of Object.entries(meta)) {
-    const plaintext = values[key]
-    if (plaintext === undefined) {
-      result[key] = secretMeta
-      continue
-    }
-
-    const encrypted = ageEncrypt(plaintext, recipient)
-    const outcome = encrypted.fold<Either<SealError, string>>(
-      (err) => Left({ _tag: "EncryptFailed", key, message: err.message } as const),
-      (ciphertext) => Right(ciphertext),
-    )
-
-    const failed = outcome.fold(
-      (err) => err,
-      () => undefined,
-    )
-    if (failed) {
-      return Left(failed)
-    }
-
-    const ciphertext = outcome.fold(
-      () => "",
-      (v) => v,
-    )
-    result[key] = { ...secretMeta, encrypted_value: ciphertext }
-  }
-
-  return Right(result)
+        return ageEncrypt(values[key], recipient)
+          .mapLeft((err) => ({ _tag: "EncryptFailed" as const, key, message: err.message }))
+          .map((ciphertext) => ({ ...result, [key]: { ...secretMeta, encrypted_value: ciphertext } }))
+      }),
+    Right({}),
+  )
 }
 
 /** Unseal secrets: decrypt encrypted_value for each meta entry that has one */
@@ -94,30 +76,15 @@ export const unsealSecrets = (
     return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
   }
 
-  const result: Record<string, string> = {}
-
-  for (const [key, secretMeta] of Object.entries(meta)) {
-    if (!secretMeta.encrypted_value) continue
-
-    const decrypted = ageDecrypt(secretMeta.encrypted_value, identityPath)
-    const outcome = decrypted.fold<Either<SealError, string>>(
-      (err) => Left({ _tag: "DecryptFailed", key, message: err.message } as const),
-      (plaintext) => Right(plaintext),
+  return Object.entries(meta)
+    .filter(([, secretMeta]) => secretMeta.encrypted_value !== undefined && secretMeta.encrypted_value !== "")
+    .reduce<Either<SealError, Record<string, string>>>(
+      (acc, [key, secretMeta]) =>
+        acc.flatMap((result) =>
+          ageDecrypt(secretMeta.encrypted_value!, identityPath)
+            .mapLeft((err) => ({ _tag: "DecryptFailed" as const, key, message: err.message }))
+            .map((plaintext) => ({ ...result, [key]: plaintext })),
+        ),
+      Right({}),
     )
-
-    const failed = outcome.fold(
-      (err) => err,
-      () => undefined,
-    )
-    if (failed) {
-      return Left(failed)
-    }
-
-    result[key] = outcome.fold(
-      () => "",
-      (v) => v,
-    )
-  }
-
-  return Right(result)
 }

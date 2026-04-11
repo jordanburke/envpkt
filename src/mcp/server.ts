@@ -1,5 +1,6 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
+import type { ReadResourceResult } from "@modelcontextprotocol/sdk/types.js"
 import {
   CallToolRequestSchema,
   ListResourcesRequestSchema,
@@ -42,11 +43,10 @@ export const createServer = (): Server => {
 
   server.setRequestHandler(ReadResourceRequestSchema, (request) => {
     const { uri } = request.params
-    const result = readResource(uri)
-    if (!result) {
-      return { contents: [{ uri, mimeType: "text/plain", text: `Resource not found: ${uri}` }] }
-    }
-    return result
+    return readResource(uri).fold<ReadResourceResult>(
+      () => ({ contents: [{ uri, mimeType: "text/plain", text: `Resource not found: ${uri}` }] }),
+      (result) => result,
+    )
   })
 
   return server

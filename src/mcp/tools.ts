@@ -1,4 +1,5 @@
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
+import { Option } from "functype"
 
 import { computeAudit, computeEnvAudit } from "../core/audit.js"
 import { loadConfig, resolveConfigPath } from "../core/config.js"
@@ -26,8 +27,13 @@ const errorResult = (message: string): CallToolResult => ({
 type LoadedConfig = { readonly ok: true; readonly config: EnvpktConfig; readonly path: string }
 type LoadError = { readonly ok: false; readonly result: CallToolResult }
 
-const loadConfigForTool = (configPath?: string): LoadedConfig | LoadError => {
-  const resolved = resolveConfigPath(configPath)
+const loadConfigForTool = (configPath: Option<string>): LoadedConfig | LoadError => {
+  const resolved = resolveConfigPath(
+    configPath.fold(
+      () => undefined,
+      (v) => v,
+    ),
+  )
   return resolved.fold<LoadedConfig | LoadError>(
     (err) => ({
       ok: false,
@@ -108,10 +114,13 @@ export const toolDefinitions: readonly ToolDef[] = [
   },
 ] as const
 
+const configPathArg = (args: Record<string, unknown>): Option<string> =>
+  Option(typeof args.configPath === "string" ? args.configPath : null)
+
 // --- Tool handlers ---
 
 const handleGetPacketHealth = (args: Record<string, unknown>): CallToolResult => {
-  const loaded = loadConfigForTool(args.configPath as string | undefined)
+  const loaded = loadConfigForTool(configPathArg(args))
   if (!loaded.ok) return loaded.result
 
   const { config, path } = loaded
@@ -155,7 +164,7 @@ const handleGetPacketHealth = (args: Record<string, unknown>): CallToolResult =>
 }
 
 const handleListCapabilities = (args: Record<string, unknown>): CallToolResult => {
-  const loaded = loadConfigForTool(args.configPath as string | undefined)
+  const loaded = loadConfigForTool(configPathArg(args))
   if (!loaded.ok) return loaded.result
 
   const { config } = loaded
@@ -163,12 +172,11 @@ const handleListCapabilities = (args: Record<string, unknown>): CallToolResult =
   const agentCapabilities = config.identity?.capabilities ?? []
   const secretCapabilities: Record<string, readonly string[]> = {}
 
-  const secretEntries = config.secret ?? {}
-  for (const [key, meta] of Object.entries(secretEntries)) {
+  Object.entries(config.secret ?? {}).forEach(([key, meta]) => {
     if (meta.capabilities && meta.capabilities.length > 0) {
       secretCapabilities[key] = meta.capabilities
     }
-  }
+  })
 
   return textResult(
     JSON.stringify(
@@ -194,23 +202,25 @@ const handleGetSecretMeta = (args: Record<string, unknown>): CallToolResult => {
   const key = args.key as string
   if (!key) return errorResult("Missing required argument: key")
 
-  const loaded = loadConfigForTool(args.configPath as string | undefined)
+  const loaded = loadConfigForTool(configPathArg(args))
   if (!loaded.ok) return loaded.result
 
   const { config } = loaded
   const secretEntries = config.secret ?? {}
-  const meta = secretEntries[key]
-  if (!meta) return errorResult(`Secret not found: ${key}`)
-
-  const { encrypted_value: _, ...safeMeta } = meta
-  return textResult(JSON.stringify({ key, ...safeMeta }, null, 2))
+  return Option(secretEntries[key]).fold(
+    () => errorResult(`Secret not found: ${key}`),
+    (meta) => {
+      const { encrypted_value: _, ...safeMeta } = meta
+      return textResult(JSON.stringify({ key, ...safeMeta }, null, 2))
+    },
+  )
 }
 
 const handleCheckExpiration = (args: Record<string, unknown>): CallToolResult => {
   const key = args.key as string
   if (!key) return errorResult("Missing required argument: key")
 
-  const loaded = loadConfigForTool(args.configPath as string | undefined)
+  const loaded = loadConfigForTool(configPathArg(args))
   if (!loaded.ok) return loaded.result
 
   const { config } = loaded
@@ -248,7 +258,7 @@ const handleCheckExpiration = (args: Record<string, unknown>): CallToolResult =>
 }
 
 const handleGetEnvMeta = (args: Record<string, unknown>): CallToolResult => {
-  const loaded = loadConfigForTool(args.configPath as string | undefined)
+  const loaded = loadConfigForTool(configPathArg(args))
   if (!loaded.ok) return loaded.result
 
   const { config } = loaded
@@ -265,8 +275,8 @@ const handlers: Record<string, (args: Record<string, unknown>) => CallToolResult
   getEnvMeta: handleGetEnvMeta,
 }
 
-export const callTool = (name: string, args: Record<string, unknown>): CallToolResult => {
-  const handler = handlers[name]
-  if (!handler) return errorResult(`Unknown tool: ${name}`)
-  return handler(args)
-}
+export const callTool = (name: string, args: Record<string, unknown>): CallToolResult =>
+  Option(handlers[name]).fold(
+    () => errorResult(`Unknown tool: ${name}`),
+    (handler) => handler(args),
+  )

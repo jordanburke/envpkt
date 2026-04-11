@@ -38,6 +38,7 @@ export type ScanOptions = {
 // --- Core functions ---
 
 /** Scan env for credentials, returning structured results */
+// eslint-disable-next-line functype/prefer-option -- process.env uses string | undefined natively
 export const envScan = (env: Readonly<Record<string, string | undefined>>, options?: ScanOptions): ScanResult => {
   const allMatches = scanEnv(env)
 
@@ -58,51 +59,54 @@ export const envScan = (env: Readonly<Record<string, string | undefined>>, optio
 }
 
 /** Bidirectional drift detection between config and live environment */
+// eslint-disable-next-line functype/prefer-option -- process.env uses string | undefined natively
 export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, string | undefined>>): CheckResult => {
-  const entries: DriftEntry[] = []
   const secretEntries = config.secret ?? {}
   const metaKeys = Object.keys(secretEntries)
   const trackedSet = new Set(metaKeys)
 
   // Direction 1: TOML keys → check if present in env
-  for (const key of metaKeys) {
+  const secretDriftEntries: DriftEntry[] = metaKeys.map((key) => {
     const meta = secretEntries[key]
     const present = env[key] !== undefined && env[key] !== ""
-    entries.push({
+    return {
       envVar: key,
-      service: Option(meta?.service),
-      status: present ? "tracked" : "missing_from_env",
+      service: Option(meta.service),
+      status: (present ? "tracked" : "missing_from_env") as DriftStatus,
       confidence: Option<ConfidenceLevel>(undefined),
-    })
-  }
+    }
+  })
 
   // Direction 1b: [env.*] keys → check if present (non-secret defaults)
   const envDefaults = config.env ?? {}
-  for (const key of Object.keys(envDefaults)) {
-    if (!trackedSet.has(key)) {
+  const envDefaultEntries: DriftEntry[] = Object.keys(envDefaults)
+    .filter((key) => {
+      if (trackedSet.has(key)) return false
       trackedSet.add(key)
+      return true
+    })
+    .map((key) => {
       const present = env[key] !== undefined && env[key] !== ""
-      entries.push({
+      return {
         envVar: key,
         service: Option<string>(undefined),
-        status: present ? "tracked" : "missing_from_env",
+        status: (present ? "tracked" : "missing_from_env") as DriftStatus,
         confidence: Option<ConfidenceLevel>(undefined),
-      })
-    }
-  }
+      }
+    })
 
   // Direction 2: env vars → find credential-shaped vars not in TOML
   const envMatches = scanEnv(env)
-  for (const match of envMatches) {
-    if (!trackedSet.has(match.envVar)) {
-      entries.push({
-        envVar: match.envVar,
-        service: match.service,
-        status: "untracked",
-        confidence: Option(match.confidence),
-      })
-    }
-  }
+  const untrackedEntries: DriftEntry[] = envMatches
+    .filter((match) => !trackedSet.has(match.envVar))
+    .map((match) => ({
+      envVar: match.envVar,
+      service: match.service,
+      status: "untracked" as DriftStatus,
+      confidence: Option(match.confidence),
+    }))
+
+  const entries = [...secretDriftEntries, ...envDefaultEntries, ...untrackedEntries]
 
   const tracked_and_present = entries.filter((e) => e.status === "tracked").length
   const missing_from_env = entries.filter((e) => e.status === "missing_from_env").length
@@ -121,14 +125,12 @@ const todayIso = (): string => new Date().toISOString().split("T")[0]!
 
 /** Generate TOML [secret.*] blocks from scan results, mirroring init.ts pattern */
 export const generateTomlFromScan = (matches: ReadonlyArray<MatchResult>): string => {
-  const blocks: string[] = []
-
-  for (const match of matches) {
+  const blocks = matches.map((match) => {
     const svc = match.service.fold(
       () => match.envVar.toLowerCase().replace(/_/g, "-"),
       (s) => s,
     )
-    blocks.push(`[secret.${match.envVar}]
+    return `[secret.${match.envVar}]
 service = "${svc}"
 # purpose = ""               # Why: what this secret enables
 # capabilities = []          # What operations this grants
@@ -137,8 +139,8 @@ created = "${todayIso()}"
 # rotation_url = ""          # URL for rotation procedure
 # source = ""                # Where the value originates (e.g. vault, ci)
 # tags = {}
-`)
-  }
+`
+  })
 
   return blocks.join("\n")
 }

@@ -13,18 +13,14 @@ const MULTILINE_OPEN = '"""'
 const findSectionRange = (
   lines: ReadonlyArray<string>,
   sectionHeader: string,
+  // eslint-disable-next-line functype/prefer-option
 ): { start: number; end: number } | undefined => {
-  let start = -1
-  for (let i = 0; i < lines.length; i++) {
-    if (lines[i]!.trim() === sectionHeader) {
-      start = i
-      break
-    }
-  }
+  const start = lines.findIndex((l) => l.trim() === sectionHeader)
   if (start === -1) return undefined
 
   let end = lines.length
   let inMultiline = false
+  // eslint-disable-next-line functype/no-imperative-loops
   for (let i = start + 1; i < lines.length; i++) {
     const line = lines[i]!
 
@@ -65,6 +61,7 @@ export const removeSection = (raw: string, sectionHeader: string): Either<TomlEd
 
   // Also remove any trailing blank lines after the section
   let removeEnd = range.end
+  // eslint-disable-next-line functype/no-imperative-loops
   while (removeEnd > range.start && removeEnd - 1 >= range.start && lines[removeEnd - 1]!.trim() === "") {
     removeEnd--
   }
@@ -73,6 +70,7 @@ export const removeSection = (raw: string, sectionHeader: string): Either<TomlEd
   const after = lines.slice(range.end)
 
   // Remove trailing blank lines from `before`
+  // eslint-disable-next-line functype/no-imperative-loops
   while (before.length > 0 && before[before.length - 1]!.trim() === "") {
     before.pop()
   }
@@ -108,6 +106,7 @@ export const renameSection = (raw: string, oldHeader: string, newHeader: string)
 export const updateSectionFields = (
   raw: string,
   sectionHeader: string,
+  // eslint-disable-next-line functype/prefer-option
   updates: Readonly<Record<string, string | null>>,
 ): Either<TomlEditError, string> => {
   const lines = raw.split("\n")
@@ -124,6 +123,7 @@ export const updateSectionFields = (
 
   let inMultiline = false
   let multilineKey = ""
+  // eslint-disable-next-line functype/no-imperative-loops, functype/prefer-map
   for (let i = 0; i < sectionBody.length; i++) {
     const line = sectionBody[i]!
 
@@ -170,6 +170,7 @@ export const updateSectionFields = (
         remaining.push(`${key} = ${updates[key]}`)
         // If multiline was opening, skip through closing
         if (inMultiline) {
+          // eslint-disable-next-line functype/no-imperative-loops
           for (let j = i + 1; j < sectionBody.length; j++) {
             if (sectionBody[j]!.includes(MULTILINE_OPEN)) {
               i = j
@@ -186,11 +187,10 @@ export const updateSectionFields = (
   }
 
   // Add new fields that weren't already in the section
-  for (const [key, value] of Object.entries(updates)) {
-    if (value !== null && !updatedKeys.has(key)) {
-      remaining.push(`${key} = ${value}`)
-    }
-  }
+  const newFields = Object.entries(updates)
+    .filter(([key, value]) => value !== null && !updatedKeys.has(key))
+    .map(([key, value]) => `${key} = ${value}`)
+  remaining.push(...newFields)
 
   const result = [...before, ...remaining, ...after].join("\n")
   return Either.right(result)

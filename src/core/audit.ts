@@ -1,15 +1,7 @@
 import { Cond, List, Option } from "functype"
 
 import type { EnvpktConfig } from "./schema.js"
-import type {
-  AuditResult,
-  EnvAuditResult,
-  EnvDriftEntry,
-  EnvDriftStatus,
-  HealthStatus,
-  SecretHealth,
-  SecretStatus,
-} from "./types.js"
+import type { AuditResult, EnvAuditResult, EnvDriftStatus, HealthStatus, SecretHealth, SecretStatus } from "./types.js"
 
 const MS_PER_DAY = 86_400_000
 const WARN_BEFORE_DAYS = 30
@@ -32,11 +24,11 @@ const classifySecret = (
 ): SecretHealth => {
   const issues: string[] = []
 
-  const created = Option(meta?.created).flatMap(parseDate)
-  const expires = Option(meta?.expires).flatMap(parseDate)
-  const rotationUrl = Option(meta?.rotation_url)
-  const purpose = Option(meta?.purpose)
-  const service = Option(meta?.service)
+  const created = Option(meta.created).flatMap(parseDate)
+  const expires = Option(meta.expires).flatMap(parseDate)
+  const rotationUrl = Option(meta.rotation_url)
+  const purpose = Option(meta.purpose)
+  const service = Option(meta.service)
 
   const daysRemaining = expires.map((exp) => daysBetween(today, exp))
 
@@ -54,7 +46,7 @@ const classifySecret = (
     () => false,
     (d) => d > staleWarningDays,
   )
-  const hasSealed = !!meta?.encrypted_value
+  const hasSealed = !!meta.encrypted_value
   const isMissing = fnoxKeys.size > 0 && !fnoxKeys.has(key) && !hasSealed
 
   const isMissingMetadata = (requireExpiration && expires.isNone()) || (requireService && service.isNone())
@@ -90,8 +82,8 @@ const classifySecret = (
     days_remaining: daysRemaining,
     rotation_url: rotationUrl,
     purpose,
-    created: Option(meta?.created),
-    expires: Option(meta?.expires),
+    created: Option(meta.created),
+    expires: Option(meta.expires),
     issues: List(issues),
   }
 }
@@ -147,26 +139,26 @@ export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string
 
 export const computeEnvAudit = (
   config: EnvpktConfig,
+  // eslint-disable-next-line functype/prefer-option -- process.env uses string | undefined natively
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): EnvAuditResult => {
   const envEntries = config.env ?? {}
-  const entries: EnvDriftEntry[] = []
 
-  for (const [key, entry] of Object.entries(envEntries)) {
+  const entries = Object.entries(envEntries).map(([key, entry]) => {
     const currentValue = env[key]
     const status: EnvDriftStatus = Cond.of<EnvDriftStatus>()
       .when(currentValue === undefined, "missing")
       .elseWhen(currentValue !== entry.value, "overridden")
       .else("default")
 
-    entries.push({
+    return {
       key,
       defaultValue: entry.value,
       currentValue,
       status,
       purpose: entry.purpose,
-    })
-  }
+    }
+  })
 
   return {
     entries,

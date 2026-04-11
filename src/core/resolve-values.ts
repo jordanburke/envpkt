@@ -19,24 +19,26 @@ export const resolveValues = async (
         // fnox export failed — continue to next layer
       },
       (exported) => {
-        for (const key of [...remaining]) {
+        const snapshot = [...remaining]
+        snapshot.forEach((key) => {
           if (key in exported) {
             result[key] = exported[key]!
             remaining.delete(key)
           }
-        }
+        })
       },
     )
   }
 
   // Layer 2: try process.env
-  for (const key of [...remaining]) {
+  const envSnapshot = [...remaining]
+  envSnapshot.forEach((key) => {
     const envValue = process.env[key]
     if (envValue !== undefined && envValue !== "") {
       result[key] = envValue
       remaining.delete(key)
     }
-  }
+  })
 
   // Layer 3: interactive prompt for remaining keys
   if (remaining.size > 0 && process.stdin.isTTY) {
@@ -47,6 +49,7 @@ export const resolveValues = async (
         rl.question(question, (answer) => resolve(answer))
       })
 
+    // eslint-disable-next-line functype/no-imperative-loops
     for (const key of remaining) {
       const value = await prompt(`Enter value for ${key}: `)
       if (value !== "") {

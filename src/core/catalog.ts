@@ -24,22 +24,20 @@ export const resolveSecrets = (
   agentSecrets: ReadonlyArray<string>,
   catalogPath: string,
 ): Either<CatalogError, Record<string, SecretMeta>> => {
-  const resolved: Record<string, SecretMeta> = {}
-
-  for (const key of agentSecrets) {
-    const catalogEntry = catalogMeta[key]
-    if (!catalogEntry) {
-      return Left({ _tag: "SecretNotInCatalog", key, catalogPath })
-    }
-    const agentOverride = agentMeta[key]
-    if (agentOverride) {
-      resolved[key] = { ...catalogEntry, ...agentOverride }
-    } else {
-      resolved[key] = catalogEntry
-    }
-  }
-
-  return Right(resolved)
+  return agentSecrets.reduce<Either<CatalogError, Record<string, SecretMeta>>>(
+    (acc, key) =>
+      acc.flatMap((resolved) => {
+        if (!(key in catalogMeta)) {
+          return Left({ _tag: "SecretNotInCatalog", key, catalogPath })
+        }
+        const catalogEntry = catalogMeta[key]
+        return Right({
+          ...resolved,
+          [key]: key in agentMeta ? { ...catalogEntry, ...agentMeta[key] } : catalogEntry,
+        })
+      }),
+    Right({}),
+  )
 }
 
 /** Resolve an agent config against its catalog (if any), producing a flat self-contained config */
@@ -72,16 +70,9 @@ export const resolveConfig = (
   return loadCatalog(catalogPath).flatMap<ResolveResult>((catalogConfig) =>
     resolveSecrets(agentSecretEntries, catalogConfig.secret ?? {}, agentSecrets, catalogPath).map<ResolveResult>(
       (resolvedMeta) => {
-        const merged: string[] = []
-        const overridden: string[] = []
+        const merged = [...agentSecrets]
+        const overridden = agentSecrets.filter((key) => key in agentSecretEntries)
         const warnings: string[] = []
-
-        for (const key of agentSecrets) {
-          merged.push(key)
-          if (agentSecretEntries[key]) {
-            overridden.push(key)
-          }
-        }
 
         const { catalog: _catalog, ...agentWithoutCatalog } = agentConfig
         const identityData = agentConfig.identity

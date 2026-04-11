@@ -26,6 +26,7 @@ export const unwrapAgentKey = (identityPath: string): Either<IdentityError, stri
     return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
   }
 
+  // eslint-disable-next-line functype/prefer-do-notation -- Do notation is not available in functype; Try→Either fold is the idiomatic pattern
   return Try(() =>
     execFileSync("age", ["--decrypt", identityPath], {
       stdio: ["pipe", "pipe", "pipe"],

@@ -1,17 +1,18 @@
 import type { ReadResourceResult, Resource } from "@modelcontextprotocol/sdk/types.js"
+import { Option } from "functype"
 
 import { computeAudit } from "../core/audit.js"
 import { loadConfig, resolveConfigPath } from "../core/config.js"
 import type { EnvpktConfig } from "../core/types.js"
 
-const loadConfigSafe = (): { config: EnvpktConfig; path: string } | undefined => {
+const loadConfigSafe = (): Option<{ config: EnvpktConfig; path: string }> => {
   const resolved = resolveConfigPath()
   return resolved.fold(
-    () => undefined,
+    () => Option.none<{ config: EnvpktConfig; path: string }>(),
     ({ path }) =>
       loadConfig(path).fold(
-        () => undefined,
-        (config) => ({ config, path }),
+        () => Option.none<{ config: EnvpktConfig; path: string }>(),
+        (config) => Option({ config, path }),
       ),
   )
 }
@@ -31,10 +32,9 @@ export const resourceDefinitions: readonly Resource[] = [
   },
 ]
 
-const readHealth = (): ReadResourceResult => {
-  const loaded = loadConfigSafe()
-  if (!loaded) {
-    return {
+const readHealth = (): ReadResourceResult =>
+  loadConfigSafe().fold(
+    () => ({
       contents: [
         {
           uri: "envpkt://health",
@@ -42,40 +42,37 @@ const readHealth = (): ReadResourceResult => {
           text: JSON.stringify({ error: "No envpkt.toml found" }),
         },
       ],
-    }
-  }
-
-  const { config, path } = loaded
-  const audit = computeAudit(config)
-
-  return {
-    contents: [
-      {
-        uri: "envpkt://health",
-        mimeType: "application/json",
-        text: JSON.stringify(
+    }),
+    ({ config, path }) => {
+      const audit = computeAudit(config)
+      return {
+        contents: [
           {
-            path,
-            status: audit.status,
-            total: audit.total,
-            healthy: audit.healthy,
-            expiring_soon: audit.expiring_soon,
-            expired: audit.expired,
-            stale: audit.stale,
-            missing: audit.missing,
+            uri: "envpkt://health",
+            mimeType: "application/json",
+            text: JSON.stringify(
+              {
+                path,
+                status: audit.status,
+                total: audit.total,
+                healthy: audit.healthy,
+                expiring_soon: audit.expiring_soon,
+                expired: audit.expired,
+                stale: audit.stale,
+                missing: audit.missing,
+              },
+              null,
+              2,
+            ),
           },
-          null,
-          2,
-        ),
-      },
-    ],
-  }
-}
+        ],
+      }
+    },
+  )
 
-const readCapabilities = (): ReadResourceResult => {
-  const loaded = loadConfigSafe()
-  if (!loaded) {
-    return {
+const readCapabilities = (): ReadResourceResult =>
+  loadConfigSafe().fold(
+    () => ({
       contents: [
         {
           uri: "envpkt://capabilities",
@@ -83,51 +80,47 @@ const readCapabilities = (): ReadResourceResult => {
           text: JSON.stringify({ error: "No envpkt.toml found" }),
         },
       ],
-    }
-  }
+    }),
+    ({ config }) => {
+      const agentCapabilities = config.identity?.capabilities ?? []
+      const secretCapabilities: Record<string, readonly string[]> = {}
 
-  const { config } = loaded
-  const agentCapabilities = config.identity?.capabilities ?? []
-  const secretCapabilities: Record<string, readonly string[]> = {}
+      Object.entries(config.secret ?? {}).forEach(([key, meta]) => {
+        if (meta.capabilities && meta.capabilities.length > 0) {
+          secretCapabilities[key] = meta.capabilities
+        }
+      })
 
-  const secretEntries = config.secret ?? {}
-  for (const [key, meta] of Object.entries(secretEntries)) {
-    if (meta.capabilities && meta.capabilities.length > 0) {
-      secretCapabilities[key] = meta.capabilities
-    }
-  }
-
-  return {
-    contents: [
-      {
-        uri: "envpkt://capabilities",
-        mimeType: "application/json",
-        text: JSON.stringify(
+      return {
+        contents: [
           {
-            identity: config.identity
-              ? {
-                  name: config.identity.name,
-                  consumer: config.identity.consumer,
-                  description: config.identity.description,
-                  capabilities: agentCapabilities,
-                }
-              : null,
-            secrets: secretCapabilities,
+            uri: "envpkt://capabilities",
+            mimeType: "application/json",
+            text: JSON.stringify(
+              {
+                identity: config.identity
+                  ? {
+                      name: config.identity.name,
+                      consumer: config.identity.consumer,
+                      description: config.identity.description,
+                      capabilities: agentCapabilities,
+                    }
+                  : null,
+                secrets: secretCapabilities,
+              },
+              null,
+              2,
+            ),
           },
-          null,
-          2,
-        ),
-      },
-    ],
-  }
-}
+        ],
+      }
+    },
+  )
 
 const resourceHandlers: Record<string, () => ReadResourceResult> = {
   "envpkt://health": readHealth,
   "envpkt://capabilities": readCapabilities,
 }
 
-export const readResource = (uri: string): ReadResourceResult | undefined => {
-  const handler = resourceHandlers[uri]
-  return handler?.()
-}
+export const readResource = (uri: string): Option<ReadResourceResult> =>
+  Option(resourceHandlers[uri]).map((handler) => handler())

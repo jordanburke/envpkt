@@ -1,6 +1,8 @@
 import { existsSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
+import { Option } from "functype"
+
 import { resolveConfig } from "../../core/catalog.js"
 import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import type { SecretDisplay } from "../../core/format.js"
@@ -71,16 +73,16 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
 
   const secretEntries = config.secret ?? {}
   console.log(`${BOLD}Secrets:${RESET} ${Object.keys(secretEntries).length}`)
-  for (const [key, meta] of Object.entries(secretEntries)) {
-    const secretValue = opts?.secrets?.[key]
-    const valueSuffix =
-      secretValue !== undefined
-        ? ` = ${YELLOW}${(opts?.secretDisplay ?? "encrypted") === "plaintext" ? secretValue : maskValue(secretValue)}${RESET}`
-        : ""
+  Object.entries(secretEntries).forEach(([key, meta]) => {
+    const valueSuffix = Option(opts?.secrets?.[key]).fold(
+      () => "",
+      (secretValue) =>
+        ` = ${YELLOW}${(opts?.secretDisplay ?? "encrypted") === "plaintext" ? secretValue : maskValue(secretValue)}${RESET}`,
+    )
     const sealedTag = meta.encrypted_value ? ` ${CYAN}[sealed]${RESET}` : ""
     console.log(`  ${BOLD}${key}${RESET} → ${meta.service ?? key}${sealedTag}${valueSuffix}`)
     printSecretMeta(meta, "    ")
-  }
+  })
 
   // Environment Defaults
   const envEntries = config.env ?? {}
@@ -88,11 +90,11 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
   if (envKeys.length > 0) {
     console.log("")
     console.log(`${BOLD}Environment Defaults:${RESET} ${envKeys.length}`)
-    for (const [key, entry] of Object.entries(envEntries)) {
+    Object.entries(envEntries).forEach(([key, entry]) => {
       console.log(`  ${BOLD}${key}${RESET} = "${entry.value}"`)
       if (entry.purpose) console.log(`    purpose: ${entry.purpose}`)
       if (entry.comment) console.log(`    comment: ${DIM}${entry.comment}${RESET}`)
-    }
+    })
   }
 
   if (config.lifecycle) {
@@ -116,9 +118,9 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
     } else {
       console.log(`  overridden: ${DIM}(none)${RESET}`)
     }
-    for (const w of resolveResult.warnings) {
+    resolveResult.warnings.forEach((w) => {
       console.log(`  ${YELLOW}warning:${RESET} ${w}`)
-    }
+    })
   }
 }
 

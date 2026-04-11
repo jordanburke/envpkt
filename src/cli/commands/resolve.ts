@@ -68,9 +68,9 @@ export const runResolve = (options: ResolveOptions): void => {
                         : ""
                     }\n`,
                 )
-                for (const w of result.warnings) {
+                result.warnings.forEach((w) => {
                   summaryTarget.write(`${RED}Warning:${RESET} ${w}\n`)
-                }
+                })
               }
             },
           )

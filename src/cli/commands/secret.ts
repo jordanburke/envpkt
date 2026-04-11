@@ -1,6 +1,7 @@
 import { readFileSync, writeFileSync } from "node:fs"
 
 import type { Command } from "commander"
+import { Option } from "functype"
 
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import { appendSection, removeSection, renameSection, updateSectionFields } from "../../core/toml-edit.js"
@@ -85,7 +86,9 @@ const buildSecretBlock = (name: string, options: AddOptions): string => {
   return `${lines.join("\n")}\n`
 }
 
+// eslint-disable-next-line functype/prefer-option -- matches updateSectionFields API signature
 const buildFieldUpdates = (options: EditOptions): Record<string, string | null> => {
+  // eslint-disable-next-line functype/prefer-option -- matches updateSectionFields API signature
   const updates: Record<string, string | null> = {}
   if (options.service !== undefined) updates["service"] = `"${options.service}"`
   if (options.purpose !== undefined) updates["purpose"] = `"${options.purpose}"`
@@ -114,8 +117,8 @@ const buildFieldUpdates = (options: EditOptions): Record<string, string | null> 
   return updates
 }
 
-const withConfig = (configFlag: string | undefined, fn: (configPath: string, raw: string) => void): void => {
-  const configResult = resolveConfigPath(configFlag)
+const withConfig = (configFlag: Option<string>, fn: (configPath: string, raw: string) => void): void => {
+  const configResult = resolveConfigPath(configFlag.orUndefined())
   configResult.fold(
     (err) => {
       console.error(formatError(err))
@@ -185,7 +188,7 @@ const runSecretEdit = (name: string, options: EditOptions): void => {
     process.exit(1)
   }
 
-  withConfig(options.config, (configPath, raw) => {
+  withConfig(Option(options.config), (configPath, raw) => {
     const loadResult = loadConfig(configPath)
     loadResult.fold(
       (err) => {
@@ -226,7 +229,7 @@ const runSecretEdit = (name: string, options: EditOptions): void => {
 }
 
 const runSecretRm = (name: string, options: RmOptions): void => {
-  withConfig(options.config, (configPath, raw) => {
+  withConfig(Option(options.config), (configPath, raw) => {
     const result = removeSection(raw, `[secret.${name}]`)
     result.fold(
       (err) => {
@@ -247,7 +250,7 @@ const runSecretRm = (name: string, options: RmOptions): void => {
 }
 
 const runSecretRename = (oldName: string, newName: string, options: RenameOptions): void => {
-  withConfig(options.config, (configPath, raw) => {
+  withConfig(Option(options.config), (configPath, raw) => {
     const result = renameSection(raw, `[secret.${oldName}]`, `[secret.${newName}]`)
     result.fold(
       (err) => {

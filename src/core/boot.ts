@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
-import { type Either, Left, Right } from "functype"
+import { type Either, Left, Option, Right } from "functype"
 
 import { fnoxExport } from "../fnox/cli.js"
 import { detectFnox, fnoxAvailable } from "../fnox/detect.js"
@@ -37,31 +37,31 @@ const resolveAndLoad = (opts: BootOptions): Either<BootError, ResolvedConfig> =>
       ),
   )
 
-type IdentityKeyResult = Either<BootError, string | undefined>
+type IdentityKeyResult = Either<BootError, Option<string>>
 
 /** Resolve identity file path with explicit fallback control */
 const resolveIdentityFilePath = (
   config: EnvpktConfig,
   configDir: string,
   useDefaultFallback: boolean,
-): string | undefined => {
+): Option<string> => {
   if (config.identity?.key_file) {
-    return resolve(configDir, expandPath(config.identity.key_file))
+    return Option(resolve(configDir, expandPath(config.identity.key_file)))
   }
-  if (!useDefaultFallback) return undefined
+  if (!useDefaultFallback) return Option<string>(undefined)
   const defaultPath = resolveKeyPath()
-  return existsSync(defaultPath) ? defaultPath : undefined
+  return existsSync(defaultPath) ? Option(defaultPath) : Option<string>(undefined)
 }
 
 const resolveIdentityKey = (config: EnvpktConfig, configDir: string): IdentityKeyResult => {
   const identityPath = resolveIdentityFilePath(config, configDir, false)
-  if (!identityPath) {
-    const result: IdentityKeyResult = Right(undefined as string | undefined)
-    return result
-  }
-  return unwrapAgentKey(identityPath).fold<IdentityKeyResult>(
-    (err) => Left(err),
-    (key) => Right(key as string | undefined),
+  return identityPath.fold<IdentityKeyResult>(
+    () => Right(Option<string>(undefined)),
+    (path) =>
+      unwrapAgentKey(path).fold<IdentityKeyResult>(
+        (err) => Left(err),
+        (key) => Right(Option(key)),
+      ),
   )
 }
 
@@ -112,14 +112,10 @@ const looksLikeSecret = (value: string): boolean => {
 }
 
 const checkEnvMisclassification = (config: EnvpktConfig): string[] => {
-  const warnings: string[] = []
   const envEntries = config.env ?? {}
-  for (const [key, entry] of Object.entries(envEntries)) {
-    if (looksLikeSecret(entry.value)) {
-      warnings.push(`[env.${key}] value looks like a secret — consider moving to [secret.${key}]`)
-    }
-  }
-  return warnings
+  return Object.entries(envEntries)
+    .filter(([, entry]) => looksLikeSecret(entry.value))
+    .map(([key]) => `[env.${key}] value looks like a secret — consider moving to [secret.${key}]`)
 }
 
 /** Programmatic boot — returns Either<BootError, BootResult> */
@@ -129,25 +125,25 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
   const failOnExpired = opts.failOnExpired !== false
   const warnOnly = opts.warnOnly ?? false
 
+  // eslint-disable-next-line functype/prefer-do-notation -- multi-phase boot pipeline with side effects is clearer as explicit flatMap
   return resolveAndLoad(opts).flatMap(({ config, configPath, configDir, configSource }) => {
     const secretEntries = config.secret ?? {}
     const metaKeys = Object.keys(secretEntries)
-    const hasSealedValues = metaKeys.some((k) => !!secretEntries[k]?.encrypted_value)
+    const hasSealedValues = metaKeys.some((k) => !!secretEntries[k].encrypted_value)
 
     // Resolve identity key — non-fatal when sealed values exist (identity may be a plain age identity)
     const identityKeyResult = resolveIdentityKey(config, configDir)
     const identityKey = identityKeyResult.fold(
-      () => undefined,
+      () => Option<string>(undefined),
       (k) => k,
     )
 
     // If identity key resolution failed AND no sealed values, propagate the error
-    const identityKeyError = identityKeyResult.fold<BootError | undefined>(
-      (err) => err,
-      () => undefined,
-    )
-    if (identityKeyError && !hasSealedValues) {
-      return Left(identityKeyError)
+    if (identityKeyResult.isLeft() && !hasSealedValues) {
+      return identityKeyResult.fold<Either<BootError, BootResult>>(
+        (err) => Left(err),
+        () => Left({ _tag: "ReadError", message: "unexpected" } as BootError),
+      )
     }
 
     const fnoxKeys = detectFnoxKeys(configDir)
@@ -162,39 +158,52 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
       warnings.push(...checkEnvMisclassification(config))
 
       const envEntries = config.env ?? {}
-      const envDefaults: Record<string, string> = {}
-      const overridden: string[] = []
+      const envEntriesArr = Object.entries(envEntries)
 
-      for (const [key, entry] of Object.entries(envEntries)) {
-        if (process.env[key] === undefined) {
-          envDefaults[key] = entry.value
-          if (inject) {
-            process.env[key] = entry.value
-          }
-        } else {
-          overridden.push(key)
-        }
+      const envDefaults: Record<string, string> = Object.fromEntries(
+        envEntriesArr.flatMap(([key, entry]) =>
+          Option(process.env[key]).fold<ReadonlyArray<readonly [string, string]>>(
+            () => [[key, entry.value] as const],
+            () => [],
+          ),
+        ),
+      )
+      const overridden: string[] = envEntriesArr.flatMap(([key]) =>
+        Option(process.env[key]).fold<string[]>(
+          () => [],
+          () => [key],
+        ),
+      )
+
+      if (inject) {
+        Object.entries(envDefaults).forEach(([key, value]) => {
+          process.env[key] = value
+        })
       }
 
       // Phase 1: try sealed values (encrypted_value in meta)
       const sealedKeys = new Set<string>()
       const identityFilePath = resolveIdentityFilePath(config, configDir, true)
 
-      if (hasSealedValues && identityFilePath) {
-        unsealSecrets(secretEntries, identityFilePath).fold(
-          (err) => {
-            warnings.push(`Sealed value decryption failed: ${err.message}`)
+      if (hasSealedValues) {
+        identityFilePath.fold(
+          () => {
+            warnings.push("Sealed values found but no identity file available for decryption")
           },
-          (unsealed) => {
-            for (const [key, value] of Object.entries(unsealed)) {
-              secrets[key] = value
-              injected.push(key)
-              sealedKeys.add(key)
-            }
+          (idPath) => {
+            unsealSecrets(secretEntries, idPath).fold(
+              (err) => {
+                warnings.push(`Sealed value decryption failed: ${err.message}`)
+              },
+              (unsealed) => {
+                const unsealedEntries = Object.entries(unsealed)
+                Object.assign(secrets, unsealed)
+                injected.push(...unsealedEntries.map(([key]) => key))
+                unsealedEntries.map(([key]) => key).forEach((key) => sealedKeys.add(key))
+              },
+            )
           },
         )
-      } else if (hasSealedValues && !identityFilePath) {
-        warnings.push("Sealed values found but no identity file available for decryption")
       }
 
       // Phase 2: fnox for remaining keys
@@ -202,22 +211,19 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
 
       if (remainingKeys.length > 0) {
         if (fnoxAvailable()) {
-          fnoxExport(opts.profile, identityKey).fold(
+          fnoxExport(opts.profile, identityKey.orUndefined()).fold(
             (err) => {
               warnings.push(`fnox export failed: ${err.message}`)
-              for (const key of remainingKeys) {
-                skipped.push(key)
-              }
+              skipped.push(...remainingKeys)
             },
             (exported) => {
-              for (const key of remainingKeys) {
-                if (key in exported) {
-                  secrets[key] = exported[key]!
-                  injected.push(key)
-                } else {
-                  skipped.push(key)
-                }
-              }
+              const found = remainingKeys.filter((key) => key in exported)
+              const notFound = remainingKeys.filter((key) => !(key in exported))
+              found.forEach((key) => {
+                secrets[key] = exported[key]!
+              })
+              injected.push(...found)
+              skipped.push(...notFound)
             },
           )
         } else {
@@ -226,16 +232,14 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
           } else {
             warnings.push("fnox not available — unsealed secrets could not be resolved")
           }
-          for (const key of remainingKeys) {
-            skipped.push(key)
-          }
+          skipped.push(...remainingKeys)
         }
       }
 
       if (inject) {
-        for (const [key, value] of Object.entries(secrets)) {
+        Object.entries(secrets).forEach(([key, value]) => {
           process.env[key] = value
-        }
+        })
       }
 
       return {
@@ -253,7 +257,8 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
   })
 }
 
-/** Programmatic boot — throws EnvpktBootError on failure */
+/* eslint-disable functype/prefer-either -- boot() is the intentional throwing wrapper; bootSafe() returns Either */
+/** Programmatic boot — throws EnvpktBootError on failure (intentional throwing wrapper over bootSafe) */
 export const boot = (options?: BootOptions): BootResult =>
   bootSafe(options).fold(
     (err) => {
@@ -261,6 +266,7 @@ export const boot = (options?: BootOptions): BootResult =>
     },
     (r) => r,
   )
+/* eslint-enable functype/prefer-either */
 
 /** Error class for boot() failures */
 export class EnvpktBootError extends Error {

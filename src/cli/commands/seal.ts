@@ -1,6 +1,8 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
+import { Option } from "functype"
+
 import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import { resolveKeyPath } from "../../core/keygen.js"
 import { resolveValues } from "../../core/resolve-values.js"
@@ -21,37 +23,45 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
   const lines = raw.split("\n")
   const output: string[] = []
 
-  let currentMetaKey: string | undefined
+  let currentMetaKey: Option<string> = Option.none()
   let insideMetaBlock = false
   let hasEncryptedValue = false
   const pendingSeals = new Map<string, string>()
 
   // Collect all encrypted_value entries to write
-  for (const [key, meta] of Object.entries(sealedMeta)) {
+  Object.entries(sealedMeta).forEach(([key, meta]) => {
     if (meta.encrypted_value) {
       pendingSeals.set(key, meta.encrypted_value)
     }
-  }
+  })
 
   const metaSectionRe = /^\[secret\.(.+)\]\s*$/
   const encryptedValueRe = /^encrypted_value\s*=/
   const newSectionRe = /^\[/
 
+  /* eslint-disable functype/prefer-map -- side-effect accumulation into mutable output array */
+  const flushPending = (): void => {
+    currentMetaKey.forEach((key) => {
+      if (!hasEncryptedValue && pendingSeals.has(key)) {
+        output.push(`encrypted_value = """`)
+        output.push(pendingSeals.get(key)!)
+        output.push(`"""`)
+        output.push("")
+        pendingSeals.delete(key)
+      }
+    })
+  }
+  /* eslint-enable functype/prefer-map */
+
+  // eslint-disable-next-line functype/no-imperative-loops, functype/prefer-map -- index manipulation (i++) required for multiline TOML parsing
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i]!
     const metaMatch = metaSectionRe.exec(line)
 
     if (metaMatch) {
-      // Flush pending encrypted_value for previous block if needed
-      if (currentMetaKey && !hasEncryptedValue && pendingSeals.has(currentMetaKey)) {
-        output.push(`encrypted_value = """`)
-        output.push(pendingSeals.get(currentMetaKey)!)
-        output.push(`"""`)
-        output.push("")
-        pendingSeals.delete(currentMetaKey)
-      }
+      flushPending()
 
-      currentMetaKey = metaMatch[1]
+      currentMetaKey = Option(metaMatch[1])
       insideMetaBlock = true
       hasEncryptedValue = false
       output.push(line)
@@ -59,37 +69,36 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
     }
 
     if (insideMetaBlock && newSectionRe.test(line) && !metaSectionRe.test(line)) {
-      // Leaving meta block — flush if needed
-      if (currentMetaKey && !hasEncryptedValue && pendingSeals.has(currentMetaKey)) {
-        output.push(`encrypted_value = """`)
-        output.push(pendingSeals.get(currentMetaKey)!)
-        output.push(`"""`)
-        output.push("")
-        pendingSeals.delete(currentMetaKey)
-      }
+      flushPending()
       insideMetaBlock = false
-      currentMetaKey = undefined
+      currentMetaKey = Option.none()
       output.push(line)
       continue
     }
 
     if (insideMetaBlock && encryptedValueRe.test(line)) {
-      // Replace existing encrypted_value (skip old multiline content)
       hasEncryptedValue = true
-      const replacing = !!(currentMetaKey && pendingSeals.has(currentMetaKey))
+      const replacing = currentMetaKey.fold(
+        () => false,
+        (key) => pendingSeals.has(key),
+      )
 
       if (replacing) {
-        output.push(`encrypted_value = """`)
-        output.push(pendingSeals.get(currentMetaKey!)!)
-        output.push(`"""`)
-        pendingSeals.delete(currentMetaKey!)
+        /* eslint-disable functype/prefer-map -- side-effect accumulation into mutable output array */
+        currentMetaKey.forEach((key) => {
+          output.push(`encrypted_value = """`)
+          output.push(pendingSeals.get(key)!)
+          output.push(`"""`)
+          pendingSeals.delete(key)
+        })
+        /* eslint-enable functype/prefer-map */
       } else {
         output.push(line)
       }
 
-      // Skip old multiline value: if """ appears in the value part, consume until closing """
       const afterEquals = line.slice(line.indexOf("=") + 1).trim()
       if (afterEquals.includes('"""')) {
+        // eslint-disable-next-line functype/no-imperative-loops -- index manipulation required for multiline TOML
         while (i + 1 < lines.length && !lines[i + 1]!.includes('"""')) {
           if (!replacing) output.push(lines[i + 1]!)
           i++
@@ -105,17 +114,10 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
     output.push(line)
   }
 
-  // Flush the last meta block
-  if (currentMetaKey && !hasEncryptedValue && pendingSeals.has(currentMetaKey)) {
-    output.push(`encrypted_value = """`)
-    output.push(pendingSeals.get(currentMetaKey)!)
-    output.push(`"""`)
-    pendingSeals.delete(currentMetaKey)
-  }
+  flushPending()
 
   writeFileSync(configPath, output.join("\n"))
 }
-
 export const runSeal = async (options: SealOptions): Promise<void> => {
   const configResult = resolveConfigPath(options.config)
 
@@ -166,19 +168,17 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   }
 
   // Resolve identity key if key_file is configured
-  const identityKey: string | undefined = config.identity.key_file
-    ? (() => {
-        const identityPath = resolve(configDir, expandPath(config.identity.key_file))
-        return unwrapAgentKey(identityPath).fold(
-          (err) => {
-            const msg = err._tag === "IdentityNotFound" ? `not found: ${err.path}` : err.message
-            console.error(`${YELLOW}Warning:${RESET} Could not unwrap agent key: ${msg}`)
-            return undefined
-          },
-          (k) => k,
-        )
-      })()
-    : undefined
+  const identityKey: Option<string> = Option(config.identity.key_file).flatMap((keyFile) => {
+    const identityPath = resolve(configDir, expandPath(keyFile))
+    return unwrapAgentKey(identityPath).fold(
+      (err) => {
+        const msg = err._tag === "IdentityNotFound" ? `not found: ${err.path}` : err.message
+        console.error(`${YELLOW}Warning:${RESET} Could not unwrap agent key: ${msg}`)
+        return Option.none<string>()
+      },
+      (k) => Option(k),
+    )
+  })
 
   // --edit mode: re-seal specific keys with new interactively-prompted values
   const editKeys = options.edit
@@ -202,6 +202,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
       process.exit(2)
     }
 
+    // eslint-disable-next-line functype/prefer-flatmap -- Object.fromEntries requires tuple mapping, not flatMap
     const secretEntries = Object.fromEntries(editKeys.map((k) => [k, allSecretEntries[k]!]))
 
     console.log(
@@ -219,6 +220,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
       })
 
     const values: Record<string, string> = {}
+    // eslint-disable-next-line functype/no-imperative-loops -- sequential await required for interactive prompts
     for (const key of editKeys) {
       const value = await prompt(`Enter new value for ${key}: `)
       if (value === "") {
@@ -251,8 +253,8 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   // Partition secrets into already-sealed and unsealed
   const allSecretEntries = config.secret ?? {}
   const allKeys = Object.keys(allSecretEntries)
-  const alreadySealed = allKeys.filter((k) => allSecretEntries[k]?.encrypted_value)
-  const unsealed = allKeys.filter((k) => !allSecretEntries[k]?.encrypted_value)
+  const alreadySealed = allKeys.filter((k) => allSecretEntries[k]!.encrypted_value)
+  const unsealed = allKeys.filter((k) => !allSecretEntries[k]!.encrypted_value)
 
   // Skip already-sealed unless --reseal
   if (!options.reseal && alreadySealed.length > 0) {
@@ -268,6 +270,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   }
 
   const targetKeys = options.reseal ? allKeys : unsealed
+  // eslint-disable-next-line functype/prefer-flatmap -- Object.fromEntries requires tuple mapping
   const secretEntries = Object.fromEntries(targetKeys.map((k) => [k, allSecretEntries[k]!]))
 
   // Resolve values via cascade
@@ -297,6 +300,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
         process.exit(2)
       }
 
+      // eslint-disable-next-line functype/prefer-flatmap -- Object.fromEntries requires tuple mapping
       const sealedEntries = Object.fromEntries(alreadySealed.map((k) => [k, allSecretEntries[k]!]))
       const decrypted = unsealSecrets(sealedEntries, identityPath).fold(
         (err) => {
@@ -308,12 +312,13 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
       )
 
       // Only resolve values for keys that weren't already sealed
-      const newValues = unsealed.length > 0 ? await resolveValues(unsealed, options.profile, identityKey) : {}
+      const newValues =
+        unsealed.length > 0 ? await resolveValues(unsealed, options.profile, identityKey.orUndefined()) : {}
 
       // Merge: decrypted existing values + newly resolved values (new values override if present)
       return { ...decrypted, ...newValues }
     }
-    return resolveValues(metaKeys, options.profile, identityKey)
+    return resolveValues(metaKeys, options.profile, identityKey.orUndefined())
   })()
 
   const resolved = Object.keys(values).length

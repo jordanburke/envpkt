@@ -1,3 +1,5 @@
+import { Option } from "functype"
+
 import type { ResolveResult, SecretMeta } from "./types.js"
 
 export type SecretDisplay = "encrypted" | "plaintext"
@@ -73,11 +75,11 @@ export const formatPacket = (result: ResolveResult, options?: FormatPacketOption
   const secretLines = metaEntries.map(([key, meta]) => {
     const service = meta.service ?? key
     const sealedTag = meta.encrypted_value ? " [sealed]" : ""
-    const secretValue = options?.secrets?.[key]
-    const valueSuffix =
-      secretValue !== undefined
-        ? ` = ${(options?.secretDisplay ?? "encrypted") === "plaintext" ? secretValue : maskValue(secretValue)}`
-        : ""
+    const valueSuffix = Option(options?.secrets?.[key]).fold(
+      () => "",
+      (secretValue) =>
+        ` = ${(options?.secretDisplay ?? "encrypted") === "plaintext" ? secretValue : maskValue(secretValue)}`,
+    )
     const header = `  ${key} → ${service}${sealedTag}${valueSuffix}`
     const fields = formatSecretFields(meta, "    ")
     return fields ? `${header}\n${fields}` : header
@@ -106,9 +108,7 @@ export const formatPacket = (result: ResolveResult, options?: FormatPacketOption
       catLines.push("  overridden: (none)")
     }
     if (result.warnings.length > 0) {
-      for (const w of result.warnings) {
-        catLines.push(`  warning: ${w}`)
-      }
+      catLines.push(...result.warnings.map((w) => `  warning: ${w}`))
     }
     sections.push(catLines.join("\n"))
   }

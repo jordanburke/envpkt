@@ -2,7 +2,7 @@ import type { Dirent } from "node:fs"
 import { readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 
-import { Cond, List, Try } from "functype"
+import { Cond, List, Option, Try } from "functype"
 
 import { computeAudit } from "./audit.js"
 import { loadConfig } from "./config.js"
@@ -54,6 +54,7 @@ function* findEnvpktFiles(dir: string, maxDepth: number, currentDepth = 0): Gene
     (e) => e,
   )
 
+  // eslint-disable-next-line functype/no-imperative-loops
   for (const entry of entries) {
     if (entry.isDirectory() && !SKIP_DIRS.has(entry.name) && !entry.name.startsWith(".")) {
       yield* findEnvpktFiles(join(dir, entry.name), maxDepth, currentDepth + 1)
@@ -64,32 +65,36 @@ function* findEnvpktFiles(dir: string, maxDepth: number, currentDepth = 0): Gene
 export const scanFleet = (rootDir: string, options?: { maxDepth?: number }): FleetHealth => {
   const maxDepth = options?.maxDepth ?? 3
 
-  const agents: FleetAgent[] = []
-
-  for (const configPath of findEnvpktFiles(rootDir, maxDepth)) {
-    const result = loadConfig(configPath)
-    result.fold(
-      () => {
-        // Skip unreadable configs
-      },
+  const agents: FleetAgent[] = Array.from(findEnvpktFiles(rootDir, maxDepth)).flatMap((configPath) =>
+    loadConfig(configPath).fold<FleetAgent[]>(
+      () => [],
       (config) => {
         const audit = computeAudit(config)
-        agents.push({
-          path: configPath,
-          identity: config.identity,
-          min_expiry_days: audit.secrets.toArray().reduce<number | undefined>(
-            (min, s) =>
-              s.days_remaining.fold(
-                () => min,
-                (d) => (min === undefined ? d : Math.min(min, d)),
-              ),
-            undefined,
-          ),
-          audit,
-        })
+        return [
+          {
+            path: configPath,
+            identity: config.identity,
+            min_expiry_days: audit.secrets
+              .toArray()
+              .reduce<Option<number>>(
+                (min, s) =>
+                  s.days_remaining.fold(
+                    () => min,
+                    (d) =>
+                      min.fold(
+                        () => Option(d),
+                        (m) => Option(Math.min(m, d)),
+                      ),
+                  ),
+                Option<number>(undefined),
+              )
+              .orUndefined(),
+            audit,
+          },
+        ]
       },
-    )
-  }
+    ),
+  )
 
   const agentList = List(agents)
   const total_agents = agentList.size

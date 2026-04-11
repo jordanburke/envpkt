@@ -1,5 +1,7 @@
 import { dirname } from "node:path"
 
+import { Option } from "functype"
+
 import { computeAudit, computeEnvAudit } from "../../core/audit.js"
 import { resolveConfig } from "../../core/catalog.js"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
@@ -82,7 +84,7 @@ const formatEnvAuditTable = (config: EnvpktConfig): void => {
 
   console.log(`\n${BOLD}Environment Defaults${RESET} (${envAudit.total} entries)`)
 
-  for (const entry of envAudit.entries) {
+  envAudit.entries.forEach((entry) => {
     const statusIcon =
       entry.status === "default"
         ? `${GREEN}=${RESET}`
@@ -96,7 +98,7 @@ const formatEnvAuditTable = (config: EnvpktConfig): void => {
           ? `${YELLOW}overridden${RESET} (${entry.currentValue})`
           : `${RED}not set${RESET}`
     console.log(`  ${statusIcon} ${BOLD}${entry.key}${RESET} = "${entry.defaultValue}" ${statusLabel}`)
-  }
+  })
 }
 
 const formatEnvAuditJson = (config: EnvpktConfig): string => {
@@ -121,7 +123,7 @@ const runAuditOnConfig = (config: EnvpktConfig, options: AuditOptions): void => 
   const afterSealed = options.sealed
     ? (() => {
         const secretEntries = config.secret ?? {}
-        return { ...audit, secrets: audit.secrets.filter((s) => !!secretEntries[s.key]?.encrypted_value) }
+        return { ...audit, secrets: audit.secrets.filter((s) => !!secretEntries[s.key]!.encrypted_value) }
       })()
     : audit
 
@@ -130,7 +132,7 @@ const runAuditOnConfig = (config: EnvpktConfig, options: AuditOptions): void => 
         const secretEntries = config.secret ?? {}
         return {
           ...afterSealed,
-          secrets: afterSealed.secrets.filter((s) => !secretEntries[s.key]?.encrypted_value),
+          secrets: afterSealed.secrets.filter((s) => !secretEntries[s.key]!.encrypted_value),
         }
       })()
     : afterSealed
@@ -142,18 +144,18 @@ const runAuditOnConfig = (config: EnvpktConfig, options: AuditOptions): void => 
       }
     : afterExternal
 
-  const filtered =
-    options.expiring !== undefined
-      ? {
-          ...afterStatus,
-          secrets: afterStatus.secrets.filter((s) =>
-            s.days_remaining.fold(
-              () => false,
-              (d) => d >= 0 && d <= options.expiring!,
-            ),
-          ),
-        }
-      : afterStatus
+  const filtered = Option(options.expiring).fold(
+    () => afterStatus,
+    (expiring) => ({
+      ...afterStatus,
+      secrets: afterStatus.secrets.filter((s) =>
+        s.days_remaining.fold(
+          () => false,
+          (d) => d >= 0 && d <= expiring,
+        ),
+      ),
+    }),
+  )
 
   if (options.format === "json") {
     console.log(formatAuditJson(filtered))

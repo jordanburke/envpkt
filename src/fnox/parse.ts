@@ -9,9 +9,11 @@ import type { FnoxConfig, FnoxError } from "../core/types.js"
 
 /** Read and parse fnox.toml, extracting secret keys and profiles */
 export const readFnoxConfig = (path: string): Either<FnoxError, FnoxConfig> =>
+  // eslint-disable-next-line functype/prefer-do-notation -- Do notation is not available in functype; nested Try→Either fold is the idiomatic pattern
   Try(() => readFileSync(path, "utf-8")).fold<Either<FnoxError, FnoxConfig>>(
     (err) => Left({ _tag: "FnoxParseError", message: `Failed to read ${path}: ${err}` }),
     (content) =>
+      // eslint-disable-next-line functype/prefer-do-notation -- continuation of nested Try→Either fold
       Try(() => parse(content) as Record<string, unknown>).fold<Either<FnoxError, FnoxConfig>>(
         (err) => Left({ _tag: "FnoxParseError", message: `Failed to parse fnox.toml: ${err}` }),
         (data) => {

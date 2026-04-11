@@ -23,6 +23,7 @@ const normalizeDates = (obj: unknown): unknown => {
     return obj.map(normalizeDates)
   }
   if (obj !== null && typeof obj === "object") {
+    // eslint-disable-next-line functype/prefer-flatmap -- 1:1 recursive map, not a nested transformation
     return Object.fromEntries(Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, normalizeDates(v)]))
   }
   return obj
@@ -31,8 +32,15 @@ const normalizeDates = (obj: unknown): unknown => {
 /** Expand ~ and $ENV_VAR / ${ENV_VAR} in a path string (silent — unresolved vars become "") */
 export const expandPath = (p: string): string => {
   const homExpanded = Path.expandTilde(p)
-  return homExpanded.replace(/\$\{(\w+)\}|\$(\w+)/g, (_, braced: string | undefined, bare: string | undefined) => {
-    const name = braced ?? bare ?? ""
+  return homExpanded.replace(/\$\{(\w+)\}|\$(\w+)/g, (_, braced: string, bare: string) => {
+    const name = Option(braced).fold(
+      () =>
+        Option(bare).fold(
+          () => "",
+          (b) => b,
+        ),
+      (b) => b,
+    )
     return Env.getOrDefault(name, "")
   })
 }
@@ -90,19 +98,15 @@ const ENV_FALLBACK_PATHS: ReadonlyArray<string> = [
 
 /** Build discovery paths dynamically from Platform home and cloud storage detection */
 const buildSearchPaths = (): ReadonlyArray<string> => {
-  const paths: string[] = []
+  const homePaths = Platform.homeDirs()
+    .toArray()
+    .map((home) => join(home, ".envpkt", CONFIG_FILENAME))
 
-  // Home directories (Linux/Mac home + Windows home on WSL)
-  for (const home of Platform.homeDirs().toArray()) {
-    paths.push(join(home, ".envpkt", CONFIG_FILENAME))
-  }
+  const cloudPaths = Platform.cloudStorageDirs()
+    .toArray()
+    .map((cloud) => join(cloud.path, ".envpkt", CONFIG_FILENAME))
 
-  // Cloud storage directories from all homes
-  for (const cloud of Platform.cloudStorageDirs().toArray()) {
-    paths.push(join(cloud.path, ".envpkt", CONFIG_FILENAME))
-  }
-
-  return paths
+  return [...homePaths, ...cloudPaths]
 }
 
 type DiscoveredConfig = { readonly path: string; readonly source: "cwd" | "search" }
@@ -121,32 +125,32 @@ export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
     () => [] as string[],
     (v) => v.split(":").filter(Boolean),
   )
-  for (const template of customPaths) {
-    const expanded = expandPath(template)
-    if (!expanded || expanded.startsWith("/.envpkt")) continue
-    const matches = expandGlobPath(expanded)
-    if (matches.length > 0) {
-      const found: DiscoveredConfig = { path: matches[0]!, source: "search" }
-      return Option(found)
-    }
+  const customMatch = customPaths
+    .map((template) => ({ template, expanded: expandPath(template) }))
+    .filter(({ expanded }) => expanded !== "" && !expanded.startsWith("/.envpkt"))
+    .map(({ expanded }) => expandGlobPath(expanded))
+    .find((matches) => matches.length > 0)
+
+  if (customMatch) {
+    const found: DiscoveredConfig = { path: customMatch[0]!, source: "search" }
+    return Option(found)
   }
 
   // Dynamic Platform-detected paths (homes + cloud storage, no globs needed)
-  for (const p of buildSearchPaths()) {
-    if (Fs.existsSync(p)) {
-      const found: DiscoveredConfig = { path: p, source: "search" }
-      return Option(found)
-    }
+  const platformMatch = buildSearchPaths().find((p) => Fs.existsSync(p))
+  if (platformMatch) {
+    const found: DiscoveredConfig = { path: platformMatch, source: "search" }
+    return Option(found)
   }
 
   // Env-var fallback paths
-  for (const template of ENV_FALLBACK_PATHS) {
-    const expanded = expandPath(template)
-    if (!expanded || expanded.startsWith("/.envpkt")) continue
-    if (Fs.existsSync(expanded)) {
-      const found: DiscoveredConfig = { path: expanded, source: "search" }
-      return Option(found)
-    }
+  const fallbackMatch = ENV_FALLBACK_PATHS.map((template) => expandPath(template))
+    .filter((expanded) => expanded !== "" && !expanded.startsWith("/.envpkt"))
+    .find((expanded) => Fs.existsSync(expanded))
+
+  if (fallbackMatch) {
+    const found: DiscoveredConfig = { path: fallbackMatch, source: "search" }
+    return Option(found)
   }
 
   return Option<DiscoveredConfig>(undefined)
@@ -194,6 +198,7 @@ export const validateConfig = (data: unknown): Either<ConfigError, EnvpktConfig>
 
 /** Load and validate an envpkt.toml from a file path */
 export const loadConfig = (path: string): Either<ConfigError, EnvpktConfig> =>
+  // eslint-disable-next-line functype/prefer-do-notation -- simple linear flatMap chain is clearer than Do notation here
   readConfigFile(path).flatMap(parseToml).flatMap(validateConfig)
 
 /** Load config from CWD or discovery chain, returning path, source, and parsed config */
