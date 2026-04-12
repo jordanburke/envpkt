@@ -96,22 +96,6 @@ describe("generateKeypair", () => {
     )
   })
 
-  it.skipIf(!ageInstalled)("overwrites when force=true", () => {
-    const outputPath = join(tmpDir, "overwrite-key.txt")
-    writeFileSync(outputPath, "old content")
-
-    const result = generateKeypair({ force: true, outputPath })
-
-    result.fold(
-      (err) => expect.unreachable(`Keygen failed: ${err._tag}`),
-      (res) => {
-        expect(res.recipient).toMatch(/^age1/)
-        const content = readFileSync(outputPath, "utf-8")
-        expect(content).toContain("AGE-SECRET-KEY-")
-      },
-    )
-  })
-
   it.skipIf(!ageInstalled)("sets file permissions to 0o600", () => {
     const outputPath = join(tmpDir, "perms-key.txt")
     generateKeypair({ outputPath })

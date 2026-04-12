@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { dirname, join, resolve } from "node:path"
+import { basename, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
@@ -70,17 +70,14 @@ describe("envpkt keygen", () => {
     expect(result.stderr).toContain("already exists")
   })
 
-  it.skipIf(!ageInstalled)("overwrites with --force", () => {
+  it.skipIf(!ageInstalled)("refuses even existing-key collisions (no --force flag)", () => {
     const keyPath = join(tmpDir, "force-key.txt")
     writeFileSync(keyPath, "old content")
 
     const result = run(["keygen", "--force", "-o", keyPath])
 
-    expect(result.status).toBe(0)
-    expect(result.stdout).toContain("Generated")
-
-    const content = readFileSync(keyPath, "utf-8")
-    expect(content).toContain("AGE-SECRET-KEY-")
+    // --force is no longer a valid flag; commander should error
+    expect(result.status).not.toBe(0)
   })
 
   it.skipIf(!ageInstalled)("updates envpkt.toml with name, recipient, and key_file", () => {
@@ -112,6 +109,54 @@ describe("envpkt keygen", () => {
     expect(config).toContain("recipient = ")
     expect(config).toContain("name = ")
     expect(config).toContain("key_file = ")
+  })
+
+  it.skipIf(!ageInstalled)("defaults to project-specific path derived from config", () => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, `version = 1\n`)
+
+    // Use tmpDir as HOME so the derived path lands inside tmpDir
+    const result = run(["keygen", "-c", configPath], {
+      cwd: tmpDir,
+      env: { HOME: tmpDir },
+    })
+
+    expect(result.status).toBe(0)
+    // The derived path should include the tmpDir basename
+    const projectName = basename(tmpDir)
+    const expectedPath = join(tmpDir, ".envpkt", `${projectName}-key.txt`)
+    expect(existsSync(expectedPath)).toBe(true)
+    expect(result.stdout).toContain(".envpkt")
+  })
+
+  it.skipIf(!ageInstalled)("derives distinct paths for prod/dev configs in same project", () => {
+    const prodConfig = join(tmpDir, "prod.envpkt.toml")
+    const devConfig = join(tmpDir, "dev.envpkt.toml")
+    writeFileSync(prodConfig, `version = 1\n`)
+    writeFileSync(devConfig, `version = 1\n`)
+
+    const prodResult = run(["keygen", "-c", prodConfig], { cwd: tmpDir, env: { HOME: tmpDir } })
+    const devResult = run(["keygen", "-c", devConfig], { cwd: tmpDir, env: { HOME: tmpDir } })
+
+    expect(prodResult.status).toBe(0)
+    expect(devResult.status).toBe(0)
+
+    const projectName = basename(tmpDir)
+    expect(existsSync(join(tmpDir, ".envpkt", `${projectName}-prod-key.txt`))).toBe(true)
+    expect(existsSync(join(tmpDir, ".envpkt", `${projectName}-dev-key.txt`))).toBe(true)
+  })
+
+  it.skipIf(!ageInstalled)("--global writes to shared age-key.txt path", () => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, `version = 1\n`)
+
+    const result = run(["keygen", "-c", configPath, "--global"], {
+      cwd: tmpDir,
+      env: { HOME: tmpDir },
+    })
+
+    expect(result.status).toBe(0)
+    expect(existsSync(join(tmpDir, ".envpkt", "age-key.txt"))).toBe(true)
   })
 
   it.skipIf(!ageInstalled)("shows next steps when no envpkt.toml exists", () => {

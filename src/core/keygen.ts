@@ -18,11 +18,8 @@ export const resolveInlineKey = (): Option<string> => {
   return key ? Some(key) : None()
 }
 
-/** Generate an age keypair and write to disk */
-export const generateKeypair = (options?: {
-  readonly force?: boolean
-  readonly outputPath?: string
-}): Either<KeygenError, KeygenResult> => {
+/** Generate an age keypair and write to disk. Refuses to overwrite if the file already exists. */
+export const generateKeypair = (options?: { readonly outputPath?: string }): Either<KeygenError, KeygenResult> => {
   if (!ageAvailable()) {
     return Left({
       _tag: "AgeNotFound",
@@ -32,7 +29,7 @@ export const generateKeypair = (options?: {
 
   const outputPath = options?.outputPath ?? resolveKeyPath()
 
-  if (existsSync(outputPath) && !options?.force) {
+  if (existsSync(outputPath)) {
     return Left({ _tag: "KeyExists", path: outputPath } as const)
   }
 

@@ -7,8 +7,8 @@ import { BOLD, CYAN, DIM, formatError, GREEN, RESET, YELLOW } from "../output.js
 
 type KeygenOptions = {
   readonly config?: string
-  readonly force?: boolean
   readonly output?: string
+  readonly global?: boolean
 }
 
 /** Shorten a path under $HOME to use ~ prefix */
@@ -20,16 +20,34 @@ const tildeShorten = (p: string): string => {
 /** Derive a default identity name from the config path's parent directory */
 const deriveIdentityName = (configPath: string): string => basename(dirname(resolve(configPath)))
 
-export const runKeygen = (options: KeygenOptions): void => {
-  const outputPath = options.output ?? resolveKeyPath()
+/**
+ * Derive a project-specific key path from the config path.
+ * - `envpkt.toml` → `~/.envpkt/<dir>-key.txt`
+ * - `prod.envpkt.toml` → `~/.envpkt/<dir>-prod-key.txt`
+ * - `foo.envpkt.toml` → `~/.envpkt/<dir>-foo-key.txt`
+ */
+const deriveKeyPath = (configPath: string): string => {
+  const abs = resolve(configPath)
+  const dir = basename(dirname(abs))
+  const stem = basename(abs)
+    .replace(/\.envpkt\.toml$/, "")
+    .replace(/\.toml$/, "")
+  const name = stem === "envpkt" || stem === "" ? dir : `${dir}-${stem}`
+  return join(homedir(), ".envpkt", `${name}-key.txt`)
+}
 
-  const result = generateKeypair({ force: options.force, outputPath })
+export const runKeygen = (options: KeygenOptions): void => {
+  const configPath = resolve(options.config ?? join(process.cwd(), "envpkt.toml"))
+  const outputPath = options.output ?? (options.global ? resolveKeyPath() : deriveKeyPath(configPath))
+
+  const result = generateKeypair({ outputPath })
 
   result.fold(
     (err) => {
       if (err._tag === "KeyExists") {
         console.error(`${YELLOW}Warning:${RESET} Identity file already exists: ${CYAN}${err.path}${RESET}`)
-        console.error(`${DIM}Use --force to overwrite.${RESET}`)
+        console.error(`${DIM}To replace it: remove the file first, then re-run keygen.${RESET}`)
+        console.error(`${DIM}To use a different path: pass -o <path>.${RESET}`)
         process.exit(1)
       }
       console.error(formatError(err))
@@ -41,7 +59,6 @@ export const runKeygen = (options: KeygenOptions): void => {
       console.log("")
 
       // Try to update envpkt.toml if it exists
-      const configPath = resolve(options.config ?? join(process.cwd(), "envpkt.toml"))
       if (existsSync(configPath)) {
         const name = deriveIdentityName(configPath)
         const keyFile = tildeShorten(identityPath)

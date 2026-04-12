@@ -57,8 +57,8 @@ program
   .command("keygen")
   .description("Generate an age keypair for sealing secrets — run this before `seal` if you don't have a key yet")
   .option("-c, --config <path>", "Path to envpkt.toml (updates identity.recipient if found)")
-  .option("--force", "Overwrite existing identity file")
-  .option("-o, --output <path>", "Output path for identity file (default: ~/.envpkt/age-key.txt)")
+  .option("-o, --output <path>", "Output path for identity file (default: ~/.envpkt/<project>-key.txt)")
+  .option("--global", "Write key to the shared default path (~/.envpkt/age-key.txt) instead of a project-specific one")
   .action((options) => {
     runKeygen(options)
   })
