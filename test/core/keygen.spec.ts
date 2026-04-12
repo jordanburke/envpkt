@@ -5,7 +5,7 @@ import { tmpdir } from "node:os"
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigRecipient } from "../../src/core/keygen.js"
+import { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigIdentity } from "../../src/core/keygen.js"
 
 const ageInstalled = (() => {
   try {
@@ -136,12 +136,12 @@ describe("generateKeypair", () => {
   })
 })
 
-describe("updateConfigRecipient", () => {
+describe("updateConfigIdentity", () => {
   it("adds recipient to existing [identity] section", () => {
     const configPath = join(tmpDir, "envpkt.toml")
     writeFileSync(configPath, `version = 1\n\n[identity]\nname = "test-agent"\n\n[secret.MY_KEY]\nservice = "test"\n`)
 
-    const result = updateConfigRecipient(configPath, "age1testrecipient123")
+    const result = updateConfigIdentity(configPath, { recipient: "age1testrecipient123" })
 
     result.fold(
       (err) => expect.unreachable(`Update failed: ${err._tag}`),
@@ -154,22 +154,28 @@ describe("updateConfigRecipient", () => {
     expect(content).toContain("[secret.MY_KEY]")
   })
 
-  it("creates [identity] section when missing", () => {
+  it("creates [identity] section with all fields when missing", () => {
     const configPath = join(tmpDir, "envpkt.toml")
     writeFileSync(configPath, `version = 1\n\n[secret.MY_KEY]\nservice = "test"\n`)
 
-    updateConfigRecipient(configPath, "age1newrecipient456")
+    updateConfigIdentity(configPath, {
+      recipient: "age1newrecipient456",
+      name: "my-agent",
+      keyFile: "~/.envpkt/my-key.txt",
+    })
 
     const content = readFileSync(configPath, "utf-8")
     expect(content).toContain("[identity]")
     expect(content).toContain('recipient = "age1newrecipient456"')
+    expect(content).toContain('name = "my-agent"')
+    expect(content).toContain('key_file = "~/.envpkt/my-key.txt"')
   })
 
   it("updates existing recipient value", () => {
     const configPath = join(tmpDir, "envpkt.toml")
     writeFileSync(configPath, `version = 1\n\n[identity]\nname = "test"\nrecipient = "age1oldkey"\n`)
 
-    updateConfigRecipient(configPath, "age1newkey")
+    updateConfigIdentity(configPath, { recipient: "age1newkey" })
 
     const content = readFileSync(configPath, "utf-8")
     expect(content).toContain('recipient = "age1newkey"')
@@ -181,7 +187,7 @@ describe("updateConfigRecipient", () => {
     const original = `version = 1\n\n[identity]\nname = "test"\n\n[lifecycle]\nstale_warning_days = 90\n\n[secret.KEY]\nservice = "svc"\n`
     writeFileSync(configPath, original)
 
-    updateConfigRecipient(configPath, "age1recipient")
+    updateConfigIdentity(configPath, { recipient: "age1recipient" })
 
     const content = readFileSync(configPath, "utf-8")
     expect(content).toContain("[lifecycle]")

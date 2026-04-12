@@ -83,19 +83,35 @@ describe("envpkt keygen", () => {
     expect(content).toContain("AGE-SECRET-KEY-")
   })
 
-  it.skipIf(!ageInstalled)("updates envpkt.toml when present", () => {
+  it.skipIf(!ageInstalled)("updates envpkt.toml with name, recipient, and key_file", () => {
     const keyPath = join(tmpDir, "key.txt")
-    writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n\n[identity]\nname = "test"\n`)
+    writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n`)
 
     const result = run(["keygen", "-o", keyPath], { cwd: tmpDir })
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain("Updated")
-    expect(result.stdout).toContain("identity.recipient")
 
     const config = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
     expect(config).toContain("recipient = ")
     expect(config).toContain("age1")
+    expect(config).toContain('name = "')
+    expect(config).toContain("key_file = ")
+  })
+
+  it.skipIf(!ageInstalled)("preserves existing name when updating recipient", () => {
+    const keyPath = join(tmpDir, "key.txt")
+    writeFileSync(join(tmpDir, "envpkt.toml"), `version = 1\n\n[identity]\nname = "my-agent"\n`)
+
+    const result = run(["keygen", "-o", keyPath], { cwd: tmpDir })
+
+    expect(result.status).toBe(0)
+
+    const config = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
+    // Existing name should be updated with derived name, recipient and key_file added
+    expect(config).toContain("recipient = ")
+    expect(config).toContain("name = ")
+    expect(config).toContain("key_file = ")
   })
 
   it.skipIf(!ageInstalled)("shows next steps when no envpkt.toml exists", () => {

@@ -1,7 +1,8 @@
 import { existsSync } from "node:fs"
-import { join, resolve } from "node:path"
+import { homedir } from "node:os"
+import { basename, dirname, join, resolve } from "node:path"
 
-import { generateKeypair, resolveKeyPath, updateConfigRecipient } from "../../core/keygen.js"
+import { generateKeypair, resolveKeyPath, updateConfigIdentity } from "../../core/keygen.js"
 import { BOLD, CYAN, DIM, formatError, GREEN, RESET, YELLOW } from "../output.js"
 
 type KeygenOptions = {
@@ -9,6 +10,15 @@ type KeygenOptions = {
   readonly force?: boolean
   readonly output?: string
 }
+
+/** Shorten a path under $HOME to use ~ prefix */
+const tildeShorten = (p: string): string => {
+  const home = homedir()
+  return p.startsWith(home) ? `~${p.slice(home.length)}` : p
+}
+
+/** Derive a default identity name from the config path's parent directory */
+const deriveIdentityName = (configPath: string): string => basename(dirname(resolve(configPath)))
 
 export const runKeygen = (options: KeygenOptions): void => {
   const outputPath = options.output ?? resolveKeyPath()
@@ -33,7 +43,9 @@ export const runKeygen = (options: KeygenOptions): void => {
       // Try to update envpkt.toml if it exists
       const configPath = resolve(options.config ?? join(process.cwd(), "envpkt.toml"))
       if (existsSync(configPath)) {
-        const updateResult = updateConfigRecipient(configPath, recipient)
+        const name = deriveIdentityName(configPath)
+        const keyFile = tildeShorten(identityPath)
+        const updateResult = updateConfigIdentity(configPath, { recipient, name, keyFile })
         updateResult.fold(
           (err) => {
             console.error(
@@ -41,10 +53,14 @@ export const runKeygen = (options: KeygenOptions): void => {
             )
             console.log(`${DIM}Manually add to your envpkt.toml:${RESET}`)
             console.log(`  [identity]`)
+            console.log(`  name = "${name}"`)
             console.log(`  recipient = "${recipient}"`)
+            console.log(`  key_file = "${keyFile}"`)
           },
           () => {
-            console.log(`${GREEN}Updated${RESET} ${CYAN}${configPath}${RESET} with identity.recipient`)
+            console.log(
+              `${GREEN}Updated${RESET} ${CYAN}${configPath}${RESET} with identity (name, recipient, key_file)`,
+            )
           },
         )
       } else {

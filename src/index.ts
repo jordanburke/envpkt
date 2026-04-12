@@ -86,7 +86,7 @@ export { boot, bootSafe, EnvpktBootError } from "./core/boot.js"
 export { ageDecrypt, ageEncrypt, sealSecrets, unsealSecrets } from "./core/seal.js"
 
 // Keygen API
-export { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigRecipient } from "./core/keygen.js"
+export { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigIdentity } from "./core/keygen.js"
 
 // Value resolution
 export { resolveValues } from "./core/resolve-values.js"

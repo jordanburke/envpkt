@@ -83,53 +83,70 @@ export const generateKeypair = (options?: {
   )
 }
 
-/** Update identity.recipient in an envpkt.toml file, preserving structure */
-export const updateConfigRecipient = (configPath: string, recipient: string): Either<KeygenError, true> => {
+type UpdateIdentityOptions = {
+  readonly recipient: string
+  readonly keyFile?: string
+  readonly name?: string
+}
+
+/** Update identity fields (recipient, key_file, name) in an envpkt.toml file, preserving structure */
+export const updateConfigIdentity = (configPath: string, options: UpdateIdentityOptions): Either<KeygenError, true> => {
   const readResult = Try(() => readFileSync(configPath, "utf-8"))
+
+  const fieldUpdaters: ReadonlyArray<{ readonly re: RegExp; readonly line: string }> = [
+    { re: /^recipient\s*=/, line: `recipient = "${options.recipient}"` },
+    ...(options.name ? [{ re: /^name\s*=/, line: `name = "${options.name}"` }] : []),
+    ...(options.keyFile ? [{ re: /^key_file\s*=/, line: `key_file = "${options.keyFile}"` }] : []),
+  ]
 
   // eslint-disable-next-line functype/prefer-do-notation -- functype does not provide Either.Do notation
   return readResult.fold<Either<KeygenError, true>>(
     (err) => Left({ _tag: "ConfigUpdateError", message: `Failed to read config: ${err}` } as const),
     (raw) => {
       const lines = raw.split("\n")
+      const updatedFields = new Set<string>()
 
       const acc = lines.reduce(
         (state, line) => {
-          // Detect [identity] section
           if (/^\[identity\]\s*$/.test(line)) {
             return { ...state, output: [...state.output, line], inIdentitySection: true, hasIdentitySection: true }
           }
 
-          // Detect new section (leaving [identity])
           if (/^\[/.test(line) && !/^\[identity\]\s*$/.test(line)) {
-            const inserted =
-              state.inIdentitySection && !state.recipientUpdated
-                ? [...state.output, `recipient = "${recipient}"`, line]
-                : [...state.output, line]
+            // Leaving [identity] — insert any fields not yet written
+            const missing = state.inIdentitySection
+              ? fieldUpdaters.filter((f) => !updatedFields.has(f.re.source)).map((f) => f.line)
+              : []
+            missing.forEach((l) => updatedFields.add(l))
             return {
               ...state,
-              output: inserted,
+              output: [...state.output, ...missing, line],
               inIdentitySection: false,
-              recipientUpdated: state.recipientUpdated || (state.inIdentitySection && !state.recipientUpdated),
             }
           }
 
-          // Update existing recipient line
-          if (state.inIdentitySection && /^recipient\s*=/.test(line)) {
-            return { ...state, output: [...state.output, `recipient = "${recipient}"`], recipientUpdated: true }
+          if (state.inIdentitySection) {
+            const match = fieldUpdaters.find((f) => f.re.test(line))
+            if (match) {
+              updatedFields.add(match.re.source)
+              return { ...state, output: [...state.output, match.line] }
+            }
           }
 
           return { ...state, output: [...state.output, line] }
         },
-        { output: [] as string[], inIdentitySection: false, recipientUpdated: false, hasIdentitySection: false },
+        { output: [] as string[], inIdentitySection: false, hasIdentitySection: false },
       )
 
-      // If still in [identity] at EOF and didn't update
-      const afterEof =
-        acc.inIdentitySection && !acc.recipientUpdated ? [...acc.output, `recipient = "${recipient}"`] : acc.output
+      // Still in [identity] at EOF — insert any missing fields
+      const missingAtEof = acc.inIdentitySection
+        ? fieldUpdaters.filter((f) => !updatedFields.has(f.re.source)).map((f) => f.line)
+        : []
+      const afterEof = [...acc.output, ...missingAtEof]
 
-      // If no [identity] section at all, append one
-      const output = !acc.hasIdentitySection ? [...afterEof, "", "[identity]", `recipient = "${recipient}"`] : afterEof
+      // No [identity] section at all — append one with all fields
+      const identityLines = fieldUpdaters.map((f) => f.line)
+      const output = !acc.hasIdentitySection ? [...afterEof, "", "[identity]", ...identityLines] : afterEof
 
       const writeResult = Try(() => writeFileSync(configPath, output.join("\n")))
       return writeResult.fold<Either<KeygenError, true>>(
