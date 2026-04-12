@@ -150,21 +150,22 @@ Sealed packets embed age-encrypted secret values directly in `envpkt.toml`. This
 ### Setup
 
 ```bash
-# Generate an age keypair
-age-keygen -o identity.txt
-# public key: age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p
+# Generate an age keypair — writes to ~/.envpkt/<project>-key.txt and updates envpkt.toml
+envpkt keygen
 ```
 
-Add the public key to your config and the identity file to `.gitignore`:
+This writes `[identity]` with `name`, `recipient`, and `key_file` to your `envpkt.toml`. Add the key file to `.gitignore`:
 
 ```toml
 [identity]
 name = "my-agent"
 recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"
-key_file = "identity.txt"
+key_file = "~/.envpkt/my-agent-key.txt"
 ```
 
-The `key_file` path supports `~` expansion and environment variables (`$VAR`, `${VAR}`), so you can use paths like `~/keys/identity.txt` or `$KEYS_DIR/identity.txt`. Relative paths are resolved from the config file's directory. When omitted, envpkt falls back to `ENVPKT_AGE_KEY_FILE` env var, then `~/.envpkt/age-key.txt`.
+`envpkt keygen` defaults to a **project-specific path** (`~/.envpkt/<project>-key.txt`), so separate projects never collide. For multi-environment projects (e.g. `prod.envpkt.toml` + `dev.envpkt.toml`), each config gets its own key automatically. Pass `--global` to use the shared `~/.envpkt/age-key.txt` path instead.
+
+The `key_file` path supports `~` expansion and environment variables (`$VAR`, `${VAR}`). Relative paths are resolved from the config file's directory. When omitted, envpkt falls back to `ENVPKT_AGE_KEY_FILE` env var, then `~/.envpkt/age-key.txt` — but it's best to set `key_file` explicitly so the config tells you which key it needs.
 
 ### Seal
 

@@ -134,11 +134,13 @@ git add envpkt.toml && git commit -m "rotate: OPENAI_API_KEY"
 envpkt seal --reseal
 
 # Typical key rotation flow:
-# 1. Generate new age keypair
-envpkt keygen --force
-# 2. Re-encrypt all secrets with new key
+# 1. Remove old key (keygen refuses to overwrite by design)
+rm ~/.envpkt/<project>-key.txt
+# 2. Generate new age keypair
+envpkt keygen
+# 3. Re-encrypt all secrets with new key
 envpkt seal --reseal
-# 3. Commit
+# 4. Commit
 git add envpkt.toml && git commit -m "rotate: age keypair"
 ```
 

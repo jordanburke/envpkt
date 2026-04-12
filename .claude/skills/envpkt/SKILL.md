@@ -54,15 +54,23 @@ envpkt env scan --write
 ### 3. Generate encryption key
 
 ```bash
-# Generate age keypair (one-time setup)
+# Generate age keypair — writes to ~/.envpkt/<project>-key.txt by default
 envpkt keygen
+
+# Distinct key per config (prod and dev get separate keys automatically)
+envpkt keygen -c prod.envpkt.toml   # → ~/.envpkt/<project>-prod-key.txt
+envpkt keygen -c dev.envpkt.toml    # → ~/.envpkt/<project>-dev-key.txt
 
 # Custom output path
 envpkt keygen -o ./keys/agent-key.txt
 
-# Overwrite existing key (rotation)
-envpkt keygen --force
+# Use the shared global default (rare — prefer project-specific)
+envpkt keygen --global
 ```
+
+**Key rotation**: `keygen` refuses to overwrite existing keys. To rotate, `rm` the file first, then re-run. This prevents silently destroying data sealed against the old key.
+
+**Always set `key_file` explicitly** in `envpkt.toml` — the config then tells you which key it needs, and you never depend on the fragile default path.
 
 ### 4. Audit health
 
@@ -168,7 +176,7 @@ See `references/quick-reference.md` for a compact cheat sheet.
 
 **init options**: `--from-fnox [path]`, `--catalog <path>`, `--identity`, `--name <name>`, `--capabilities <caps>`, `--expires <date>`, `--force`
 
-**keygen options**: `-c <path>`, `--force`, `-o <path>`
+**keygen options**: `-c <path>`, `-o <path>`, `--global`
 
 **env scan options**: `--format table|json`, `--write`, `--dry-run`, `--include-unknown`
 
@@ -602,13 +610,13 @@ All errors are tagged unions with a `_tag` discriminant:
 
 ### KeygenError Tags
 
-| Tag                 | Meaning                                      |
-| ------------------- | -------------------------------------------- |
-| `AgeNotFound`       | `age-keygen` CLI not found on PATH           |
-| `KeygenFailed`      | `age-keygen` command failed                  |
-| `KeyExists`         | Identity file already exists (use `--force`) |
-| `WriteError`        | Failed to write identity file                |
-| `ConfigUpdateError` | Failed to update `envpkt.toml`               |
+| Tag                 | Meaning                                              |
+| ------------------- | ---------------------------------------------------- |
+| `AgeNotFound`       | `age-keygen` CLI not found on PATH                   |
+| `KeygenFailed`      | `age-keygen` command failed                          |
+| `KeyExists`         | Identity file already exists (`rm` first to replace) |
+| `WriteError`        | Failed to write identity file                        |
+| `ConfigUpdateError` | Failed to update `envpkt.toml`                       |
 
 ### Pattern: Error Recovery with Either
 

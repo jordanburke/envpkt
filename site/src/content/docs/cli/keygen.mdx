@@ -3,7 +3,7 @@ title: envpkt keygen
 description: Generate an age keypair for sealing secrets
 ---
 
-Generate an [age](https://github.com/FiloSottile/age) keypair and optionally update `envpkt.toml` with the recipient public key. This is the bridge between `env scan --write` and `seal`.
+Generate an [age](https://github.com/FiloSottile/age) keypair and optionally update `envpkt.toml` with the recipient public key, identity name, and key file path. This is the bridge between `env scan --write` and `seal`.
 
 ## Usage
 
@@ -13,46 +13,70 @@ envpkt keygen [options]
 
 ## Options
 
-| Option                | Description                                          | Default                 |
-| --------------------- | ---------------------------------------------------- | ----------------------- |
-| `-c, --config <path>` | Path to `envpkt.toml` (updates `identity.recipient`) | `./envpkt.toml`         |
-| `--force`             | Overwrite existing identity file                     | `false`                 |
-| `-o, --output <path>` | Output path for identity file                        | `~/.envpkt/age-key.txt` |
+| Option                | Description                                           | Default                                 |
+| --------------------- | ----------------------------------------------------- | --------------------------------------- |
+| `-c, --config <path>` | Path to `envpkt.toml` (updates `[identity]` if found) | `./envpkt.toml`                         |
+| `-o, --output <path>` | Output path for identity file                         | `~/.envpkt/<project>-key.txt` (derived) |
+| `--global`            | Write to the shared `~/.envpkt/age-key.txt` path      | `false`                                 |
 
 ## Key Path Resolution
 
-The identity file location is resolved in this order:
+By default, `keygen` writes to a **project-specific path** derived from the config, preventing collisions between projects.
 
-1. `-o` / `--output` flag
-2. `ENVPKT_AGE_KEY_FILE` environment variable
-3. Default: `~/.envpkt/age-key.txt`
+Derivation rules:
 
-For CI environments, you can also set `ENVPKT_AGE_KEY` with the inline key content instead of a file path.
+| Config file path              | Default output path                 |
+| ----------------------------- | ----------------------------------- |
+| `my-project/envpkt.toml`      | `~/.envpkt/my-project-key.txt`      |
+| `my-project/prod.envpkt.toml` | `~/.envpkt/my-project-prod-key.txt` |
+| `my-project/dev.envpkt.toml`  | `~/.envpkt/my-project-dev-key.txt`  |
+
+Explicit overrides (in priority order):
+
+1. `-o` / `--output` flag (highest priority)
+2. `--global` flag → `~/.envpkt/age-key.txt` (the shared default)
+3. `ENVPKT_AGE_KEY_FILE` environment variable
+4. Derived project-specific path (default)
+
+For CI environments, set `ENVPKT_AGE_KEY` with the inline key content instead of a file path.
 
 ## Examples
 
 ```bash
-# Generate a keypair (writes to ~/.envpkt/age-key.txt)
+# Generate a project-specific keypair (writes to ~/.envpkt/<project>-key.txt)
 envpkt keygen
+
+# Generate for a specific config — distinct path per config
+envpkt keygen -c prod.envpkt.toml   # → ~/.envpkt/<project>-prod-key.txt
+envpkt keygen -c dev.envpkt.toml    # → ~/.envpkt/<project>-dev-key.txt
 
 # Generate to a custom path
 envpkt keygen -o ./keys/agent-key.txt
 
-# Overwrite an existing key (key rotation)
-envpkt keygen --force
-
-# Generate and update a specific config
-envpkt keygen -c /path/to/envpkt.toml
+# Use the shared global default (rare — prefer project-specific)
+envpkt keygen --global
 ```
+
+## No `--force` Flag
+
+`keygen` will **refuse to overwrite** an existing key file. This is intentional — overwriting a key silently destroys any data sealed against it. To replace a key:
+
+```bash
+# Explicit deletion makes the destructive action visible in shell history
+rm ~/.envpkt/<project>-key.txt
+envpkt keygen
+```
+
+This prevents accidental key loss when multiple projects or agents run `keygen`.
 
 ## Behavior
 
 1. Checks that `age-keygen` is available on PATH
-2. Resolves the output path (flag > env var > default)
-3. If file exists and `--force` is not set: warns and exits with code 1
+2. Resolves the output path (flag > `--global` > env var > derived default)
+3. If file exists: refuses, prints guidance to `rm` or pass `-o`
 4. Generates keypair via `age-keygen`
 5. Writes identity file with `0600` permissions
-6. If `envpkt.toml` exists in the working directory (or at `-c` path): updates `identity.recipient` automatically
+6. If `envpkt.toml` exists: updates `[identity]` with `name`, `recipient`, and `key_file`
 7. If no config found: prints next-step guidance
 
 ## Typical Workflow
@@ -61,15 +85,38 @@ envpkt keygen -c /path/to/envpkt.toml
 # 1. Discover credentials
 envpkt env scan --write
 
-# 2. Generate encryption key
+# 2. Generate encryption key (project-specific by default)
 envpkt keygen
 
 # 3. Seal secrets into envpkt.toml
 envpkt seal
 ```
 
+## Multi-Environment Projects
+
+For projects with separate dev/prod configs, each config gets its own key automatically:
+
+```bash
+envpkt keygen -c prod.envpkt.toml
+envpkt keygen -c dev.envpkt.toml
+envpkt seal -c prod.envpkt.toml
+envpkt seal -c dev.envpkt.toml
+```
+
+This isolates environments — a leaked dev key can't decrypt prod secrets.
+
+If you want to share one key across multiple configs, generate once and reference the same `key_file` in both configs:
+
+```toml
+[identity]
+name = "my-project"
+recipient = "age1..."
+key_file = "~/.envpkt/my-project-key.txt"
+```
+
 ## Security Notes
 
+- Always set `key_file` explicitly in `envpkt.toml` rather than relying on the default path. The config then tells you exactly which key it needs.
 - The identity file (private key) is written with `0600` permissions (owner-only read/write)
 - Never commit identity files to version control
 - The recipient (public key) is safe to store in `envpkt.toml` and commit
