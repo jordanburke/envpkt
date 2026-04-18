@@ -107,6 +107,7 @@ export const formatAuditJson = (audit: AuditResult): string =>
       missing: audit.missing,
       missing_metadata: audit.missing_metadata,
       orphaned: audit.orphaned,
+      aliases: audit.aliases,
       secrets: audit.secrets
         .map((s) => ({
           key: s.key,
@@ -122,6 +123,10 @@ export const formatAuditJson = (audit: AuditResult): string =>
           rotation_url: s.rotation_url.fold(
             () => null,
             (u) => u,
+          ),
+          alias_of: s.alias_of.fold(
+            () => null,
+            (a) => a,
           ),
           purpose: s.purpose.fold(
             () => null,

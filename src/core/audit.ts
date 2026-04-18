@@ -145,14 +145,22 @@ export const computeAudit = (
   )
   const healthByKey = new Map(nonAliasHealth.map((h) => [h.key, h]))
 
-  // Alias entries: inherit status from target
+  // Alias entries: inherit status from target.
+  // Prefer the pre-validated aliasTable when provided (e.g. from bootSafe),
+  // but fall back to parsing meta.from_key directly so audit works standalone
+  // without requiring callers to plumb the alias table through.
+  const parseTargetKey = (from_key: string): string | undefined => {
+    const match = /^secret\.(.+)$/.exec(from_key)
+    return match?.[1]
+  }
+
   const aliasHealth = aliasEntries.map(([key, meta]) => {
     const tableEntry = aliasTable?.entries.get(`secret.${key}`)
-    const targetKey = tableEntry?.targetKey
+    const targetKey = tableEntry?.targetKey ?? (meta.from_key !== undefined ? parseTargetKey(meta.from_key) : undefined)
     const targetHealth = targetKey !== undefined ? healthByKey.get(targetKey) : undefined
     const targetRef = meta.from_key ?? (targetKey !== undefined ? `secret.${targetKey}` : "")
     if (!targetHealth) {
-      // Target missing — shouldn't happen if validator ran, but be defensive
+      // Target genuinely missing — config is invalid but we still produce a row
       return {
         key,
         service: Option(meta.service),

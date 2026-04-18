@@ -294,6 +294,85 @@ describe("computeAudit", () => {
         ),
     )
   })
+
+  describe("aliases", () => {
+    it("alias inherits healthy status from target without needing the alias table passed in", () => {
+      // Regression: computeAudit used to mark aliases 'missing' unless the
+      // caller plumbed an AliasTable through. The audit CLI doesn't, so any
+      // alias showed as missing even when the target was healthy.
+      const config = makeConfig({
+        API_KEY: {
+          service: "stripe",
+          created: "2025-04-01",
+          expires: "2026-01-01",
+        },
+        LEGACY_API_KEY: {
+          from_key: "secret.API_KEY",
+        },
+      })
+
+      const result = computeAudit(config, undefined, today)
+      expect(result.total).toBe(2)
+      expect(result.healthy).toBe(2)
+      expect(result.missing).toBe(0)
+      expect(result.aliases).toBe(1)
+
+      const aliasRow = result.secrets.find((s) => s.key === "LEGACY_API_KEY")
+      aliasRow.fold(
+        () => expect.unreachable("Expected alias row"),
+        (s) => {
+          expect(s.status).toBe("healthy")
+          s.alias_of.fold(
+            () => expect.unreachable("Expected alias_of"),
+            (ref) => expect(ref).toBe("secret.API_KEY"),
+          )
+        },
+      )
+    })
+
+    it("alias inherits expired status from target", () => {
+      const config = makeConfig({
+        OLD_KEY: {
+          service: "legacy",
+          created: "2024-01-01",
+          expires: "2025-01-01",
+        },
+        OLD_KEY_ALIAS: {
+          from_key: "secret.OLD_KEY",
+        },
+      })
+
+      const result = computeAudit(config, undefined, today)
+      expect(result.expired).toBe(2)
+      expect(result.healthy).toBe(0)
+      const aliasRow = result.secrets.find((s) => s.key === "OLD_KEY_ALIAS")
+      aliasRow.fold(
+        () => expect.unreachable("Expected alias row"),
+        (s) => expect(s.status).toBe("expired"),
+      )
+    })
+
+    it("alias with missing target reports missing with clear issue", () => {
+      // Shouldn't happen in practice because validateAliases catches this
+      // at boot, but audit should still produce a sensible row.
+      const config = makeConfig({
+        ORPHAN: {
+          from_key: "secret.NONEXISTENT",
+        },
+      })
+
+      const result = computeAudit(config, undefined, today)
+      expect(result.missing).toBe(1)
+      const row = result.secrets.find((s) => s.key === "ORPHAN")
+      row.fold(
+        () => expect.unreachable("Expected row"),
+        (s) => {
+          expect(s.status).toBe("missing")
+          expect(s.issues.toArray()).toContain("Alias target not resolvable")
+        },
+      )
+    })
+  })
 })
 
 describe("computeEnvAudit", () => {
