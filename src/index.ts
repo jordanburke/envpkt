@@ -90,16 +90,16 @@ export { boot, bootSafe, EnvpktBootError } from "./core/boot.js"
 // Diagnostic logger re-exports from functype-log. BootOptions.logger accepts
 // any DirectLogger; consumers can use createDirectConsoleLogger for quick
 // enabling, createDirectTestLogger for assertions, or bring their own.
+// Import from /direct to avoid eagerly loading loglayer — the /direct
+// subpath has zero loglayer dependency (just console output + no-op).
+export type { LogEntry, LogLevel, LogMetadata } from "functype-log"
 export {
   createDirectConsoleLogger,
   createDirectTestLogger,
   type DirectLogger,
   directSilentLogger,
   type DirectTestLoggerHandle,
-  type LogEntry,
-  type LogLevel,
-  type LogMetadata,
-} from "functype-log"
+} from "functype-log/direct"
 
 // Seal API
 export { ageDecrypt, ageEncrypt, sealSecrets, unsealSecrets } from "./core/seal.js"
