@@ -17,11 +17,11 @@ importers:
         specifier: ^14.0.3
         version: 14.0.3
       functype:
-        specifier: ^0.58.0
-        version: 0.58.0
+        specifier: ^0.58.1
+        version: 0.58.1
       functype-os:
         specifier: ^0.4.2
-        version: 0.4.2(functype@0.58.0)
+        version: 0.4.2(functype@0.58.1)
       smol-toml:
         specifier: ^1.6.1
         version: 1.6.1
@@ -1396,9 +1396,9 @@ packages:
       { integrity: sha512-UPFieSFnd4F60Y+xeItOIiJDk+YpaKhhbsPwqatBzl5kDaAzlGPliEe5MLaC1diO2PXdVMsmGGvOgSqi6/a9eQ== }
     hasBin: true
 
-  functype@0.58.0:
+  functype@0.58.1:
     resolution:
-      { integrity: sha512-PDGS0SR3m2vO9BPeK0Ev8AsT25PI65b+V3G1626XVR7zoLGi5BrqOvexCzjU8PomjtbRJ542AQSSl7ACC/vbdA== }
+      { integrity: sha512-Be33Uno97+ej1vn+M3cLpkLxBQ58oZOdFGCjStdyTAZ4ehU3WBLZekpI6JElFsGc20f02j8hD+6VDcHB5kDBlA== }
     hasBin: true
 
   get-intrinsic@1.3.0:
@@ -3281,13 +3281,13 @@ snapshots:
     dependencies:
       functype: 0.57.3
 
-  functype-os@0.4.2(functype@0.58.0):
+  functype-os@0.4.2(functype@0.58.1):
     dependencies:
-      functype: 0.58.0
+      functype: 0.58.1
 
   functype@0.57.3: {}
 
-  functype@0.58.0: {}
+  functype@0.58.1: {}
 
   get-intrinsic@1.3.0:
     dependencies:
