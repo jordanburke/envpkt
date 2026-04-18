@@ -1,4 +1,5 @@
 import type { List, Option } from "functype"
+import type { DirectLogger } from "functype-log"
 
 import type { EnvpktConfig, Identity } from "./schema.js"
 
@@ -193,6 +194,13 @@ export type BootOptions = {
   readonly inject?: boolean
   readonly failOnExpired?: boolean
   readonly warnOnly?: boolean
+  /**
+   * Optional diagnostic logger. Defaults to a silent logger (zero overhead).
+   * Receives structured trace events at boot resolution decision points
+   * (alias validation, sealed phase, fnox phase, alias copy phase). Useful
+   * for debugging why a particular secret landed in skipped[] vs injected[].
+   */
+  readonly logger?: DirectLogger
 }
 
 export type BootResult = {

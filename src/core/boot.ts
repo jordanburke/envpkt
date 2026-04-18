@@ -2,6 +2,7 @@ import { existsSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
 import { type Either, Left, Option, Right } from "functype"
+import { directSilentLogger } from "functype-log"
 
 import { fnoxExport } from "../fnox/cli.js"
 import { detectFnox, fnoxAvailable } from "../fnox/detect.js"
@@ -125,12 +126,17 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
   const inject = opts.inject !== false
   const failOnExpired = opts.failOnExpired !== false
   const warnOnly = opts.warnOnly ?? false
+  const log = (opts.logger ?? directSilentLogger).withContext({ component: "envpkt.boot" })
 
   // eslint-disable-next-line functype/prefer-do-notation -- multi-phase boot pipeline with side effects is clearer as explicit flatMap
   return resolveAndLoad(opts).flatMap(({ config, configPath, configDir, configSource }) =>
     validateAliases(config).fold<Either<BootError, BootResult>>(
-      (err) => Left(err),
+      (err) => {
+        log.warn("alias.validate.failed", { tag: err._tag, key: "key" in err ? err.key : undefined })
+        return Left(err)
+      },
       (aliasTable) => {
+        log.debug("alias.validate.success", { aliases: aliasTable.entries.size })
         const secretEntries = config.secret ?? {}
         const envEntries = config.env ?? {}
 
@@ -201,18 +207,25 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
           if (hasSealedValues) {
             identityFilePath.fold(
               () => {
+                log.warn("phase.sealed.no_identity_file", {
+                  sealed_keys: nonAliasMetaKeys.filter((k) => !!nonAliasSecretEntries[k]?.encrypted_value).length,
+                })
                 warnings.push("Sealed values found but no identity file available for decryption")
               },
               (idPath) => {
                 unsealSecrets(nonAliasSecretEntries, idPath).fold(
                   (err) => {
+                    log.warn("phase.sealed.decrypt_failed", { message: err.message })
                     warnings.push(`Sealed value decryption failed: ${err.message}`)
                   },
                   (unsealed) => {
                     const unsealedEntries = Object.entries(unsealed)
                     Object.assign(secrets, unsealed)
                     injected.push(...unsealedEntries.map(([key]) => key))
-                    unsealedEntries.map(([key]) => key).forEach((key) => sealedKeys.add(key))
+                    unsealedEntries.forEach(([key]) => {
+                      sealedKeys.add(key)
+                      log.debug("phase.sealed.resolved", { key })
+                    })
                   },
                 )
               },
@@ -226,6 +239,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
             if (fnoxAvailable()) {
               fnoxExport(opts.profile, identityKey.orUndefined()).fold(
                 (err) => {
+                  log.warn("phase.fnox.export_failed", { message: err.message, skipped: remainingKeys.length })
                   warnings.push(`fnox export failed: ${err.message}`)
                   skipped.push(...remainingKeys)
                 },
@@ -234,12 +248,17 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
                   const notFound = remainingKeys.filter((key) => !(key in exported))
                   found.forEach((key) => {
                     secrets[key] = exported[key]!
+                    log.debug("phase.fnox.resolved", { key, profile: opts.profile })
+                  })
+                  notFound.forEach((key) => {
+                    log.debug("phase.fnox.not_in_export", { key, profile: opts.profile })
                   })
                   injected.push(...found)
                   skipped.push(...notFound)
                 },
               )
             } else {
+              log.debug("phase.fnox.unavailable", { skipped: remainingKeys.length })
               if (!hasSealedValues) {
                 warnings.push("fnox not available — no secrets injected")
               } else {
@@ -257,8 +276,10 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
             if (targetValue !== undefined) {
               secrets[aliasKey] = targetValue
               injected.push(aliasKey)
+              log.debug("phase.alias.copied", { alias: aliasKey, target: entry.targetKey })
             } else {
               skipped.push(aliasKey)
+              log.debug("phase.alias.target_unresolved", { alias: aliasKey, target: entry.targetKey })
             }
           })
 

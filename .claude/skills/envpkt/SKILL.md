@@ -96,6 +96,21 @@ result.fold(
 )
 ```
 
+### Diagnostic logging (optional)
+
+Pass a `DirectLogger` via `BootOptions.logger` to trace each resolution phase
+(sealed → fnox → alias copy). Silent by default.
+
+```typescript
+import { bootSafe, createDirectConsoleLogger } from "envpkt"
+
+bootSafe({ logger: createDirectConsoleLogger({ level: "debug" }) })
+// Emits: alias.validate.success, phase.sealed.resolved, phase.fnox.resolved,
+// phase.alias.copied, etc. — all scoped with { component: "envpkt.boot" }
+```
+
+See the Library API reference for the full event catalogue.
+
 ## envpkt.toml Configuration
 
 See `references/envpkt-toml-reference.md` for the complete annotated schema.

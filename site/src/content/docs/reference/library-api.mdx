@@ -43,7 +43,47 @@ type BootOptions = {
   readonly inject?: boolean
   readonly failOnExpired?: boolean
   readonly warnOnly?: boolean
+  readonly logger?: DirectLogger // from functype-log; see "Diagnostic logging" below
 }
+```
+
+### Diagnostic logging
+
+`bootSafe` emits structured trace events at each resolution decision point.
+Pass a `DirectLogger` via `BootOptions.logger` to observe them; omit for
+silent default (zero overhead).
+
+```typescript
+import { bootSafe, createDirectConsoleLogger } from "envpkt"
+
+const logger = createDirectConsoleLogger({ level: "debug" })
+bootSafe({ logger })
+```
+
+Emitted events (all scoped with `{ component: "envpkt.boot" }`):
+
+| Level   | Message                         | Metadata                                 |
+| ------- | ------------------------------- | ---------------------------------------- |
+| `debug` | `alias.validate.success`        | `{ aliases: number }`                    |
+| `warn`  | `alias.validate.failed`         | `{ tag: AliasError._tag, key?: string }` |
+| `warn`  | `phase.sealed.no_identity_file` | `{ sealed_keys: number }`                |
+| `warn`  | `phase.sealed.decrypt_failed`   | `{ message: string }`                    |
+| `debug` | `phase.sealed.resolved`         | `{ key: string }`                        |
+| `warn`  | `phase.fnox.export_failed`      | `{ message: string, skipped: number }`   |
+| `debug` | `phase.fnox.resolved`           | `{ key: string, profile?: string }`      |
+| `debug` | `phase.fnox.not_in_export`      | `{ key: string, profile?: string }`      |
+| `debug` | `phase.fnox.unavailable`        | `{ skipped: number }`                    |
+| `debug` | `phase.alias.copied`            | `{ alias: string, target: string }`      |
+| `debug` | `phase.alias.target_unresolved` | `{ alias: string, target: string }`      |
+
+For tests, use `createDirectTestLogger` which captures entries in memory:
+
+```typescript
+import { bootSafe, createDirectTestLogger } from "envpkt"
+
+const { logger, entries, hasEntry } = createDirectTestLogger()
+bootSafe({ logger })
+expect(hasEntry("debug", "phase.alias.copied")).toBe(true)
 ```
 
 ### `BootResult`
