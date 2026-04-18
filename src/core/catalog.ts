@@ -67,35 +67,33 @@ export const resolveConfig = (
 
   const agentSecretEntries = agentConfig.secret ?? {}
 
-  return loadCatalog(catalogPath).flatMap<ResolveResult>((catalogConfig) =>
-    resolveSecrets(agentSecretEntries, catalogConfig.secret ?? {}, agentSecrets, catalogPath).map<ResolveResult>(
-      (resolvedMeta) => {
-        const merged = [...agentSecrets]
-        const overridden = agentSecrets.filter((key) => key in agentSecretEntries)
-        const warnings: string[] = []
+  return loadCatalog(catalogPath).flatMap((catalogConfig) =>
+    resolveSecrets(agentSecretEntries, catalogConfig.secret ?? {}, agentSecrets, catalogPath).map((resolvedMeta) => {
+      const merged = [...agentSecrets]
+      const overridden = agentSecrets.filter((key) => key in agentSecretEntries)
+      const warnings: string[] = []
 
-        const { catalog: _catalog, ...agentWithoutCatalog } = agentConfig
-        const identityData = agentConfig.identity
-          ? (() => {
-              const { secrets: _secrets, ...rest } = agentConfig.identity!
-              return rest
-            })()
-          : undefined
+      const { catalog: _catalog, ...agentWithoutCatalog } = agentConfig
+      const identityData = agentConfig.identity
+        ? (() => {
+            const { secrets: _secrets, ...rest } = agentConfig.identity!
+            return rest
+          })()
+        : undefined
 
-        const resolvedConfig: EnvpktConfig = {
-          ...agentWithoutCatalog,
-          identity: identityData ? { ...identityData, name: identityData.name } : undefined,
-          secret: resolvedMeta,
-        }
+      const resolvedConfig: EnvpktConfig = {
+        ...agentWithoutCatalog,
+        identity: identityData ? { ...identityData, name: identityData.name } : undefined,
+        secret: resolvedMeta,
+      }
 
-        return {
-          config: resolvedConfig,
-          catalogPath,
-          merged,
-          overridden,
-          warnings,
-        }
-      },
-    ),
+      return {
+        config: resolvedConfig,
+        catalogPath,
+        merged,
+        overridden,
+        warnings,
+      }
+    }),
   )
 }

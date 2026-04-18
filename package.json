@@ -42,14 +42,14 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@sinclair/typebox": "^0.34.49",
     "commander": "^14.0.3",
-    "functype": "^0.56.0",
+    "functype": "^0.58.0",
     "functype-os": "^0.4.2",
     "smol-toml": "^1.6.1"
   },
   "devDependencies": {
     "@types/node": "^24.12.2",
-    "ts-builds": "^2.6.3",
-    "tsdown": "^0.21.7",
+    "ts-builds": "^2.7.0",
+    "tsdown": "^0.21.9",
     "tsx": "^4.21.0"
   },
   "type": "module",
