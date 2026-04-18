@@ -1,6 +1,6 @@
 {
   "name": "envpkt",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "description": "Credential lifecycle and fleet management for AI agents",
   "keywords": [
     "credentials",
