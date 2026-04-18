@@ -235,12 +235,13 @@ See `references/quick-reference.md` for a compact cheat sheet.
 
 ### Secret Management (CRUD)
 
-| Command                            | Description                                  |
-| ---------------------------------- | -------------------------------------------- |
-| `envpkt secret add <name>`         | Add a new secret entry to `envpkt.toml`      |
-| `envpkt secret edit <name>`        | Update metadata fields on an existing secret |
-| `envpkt secret rm <name>`          | Remove a secret entry from `envpkt.toml`     |
-| `envpkt secret rename <old> <new>` | Rename a secret entry, preserving metadata   |
+| Command                                             | Description                                          |
+| --------------------------------------------------- | ---------------------------------------------------- |
+| `envpkt secret add <name>`                          | Add a new secret entry to `envpkt.toml`              |
+| `envpkt secret edit <name>`                         | Update metadata fields on an existing secret         |
+| `envpkt secret rm <name>`                           | Remove a secret entry from `envpkt.toml`             |
+| `envpkt secret rename <old> <new>`                  | Rename a secret entry, preserving metadata           |
+| `envpkt secret alias <name> --from secret.<TARGET>` | Create an alias entry reusing another secret's value |
 
 **secret add options**: `-c <path>`, `--service`, `--purpose`, `--comment`, `--expires <YYYY-MM-DD>`, `--capabilities <comma-separated>`, `--rotates <schedule>`, `--rate-limit`, `--model-hint`, `--source`, `--rotation-url`, `--tags <key=val,...>`, `--required`, `--dry-run`
 
@@ -250,14 +251,17 @@ See `references/quick-reference.md` for a compact cheat sheet.
 
 **secret rename options**: `-c <path>`, `--dry-run`
 
+**secret alias options**: `--from secret.<KEY>` (required), `-c <path>`, `--purpose`, `--comment`, `--tags`, `--force` (overwrite if name exists), `--dry-run`. Rejects cross-type (`env.*`), chained, and self-referencing targets. Without `--force`, warns and exits if `<name>` already exists.
+
 ### Env Defaults Management (CRUD)
 
-| Command                         | Description                                |
-| ------------------------------- | ------------------------------------------ |
-| `envpkt env add <name> <value>` | Add a new env default entry                |
-| `envpkt env edit <name>`        | Update fields on an existing env entry     |
-| `envpkt env rm <name>`          | Remove an env entry from `envpkt.toml`     |
-| `envpkt env rename <old> <new>` | Rename an env entry, preserving all fields |
+| Command                                       | Description                                     |
+| --------------------------------------------- | ----------------------------------------------- |
+| `envpkt env add <name> <value>`               | Add a new env default entry                     |
+| `envpkt env edit <name>`                      | Update fields on an existing env entry          |
+| `envpkt env rm <name>`                        | Remove an env entry from `envpkt.toml`          |
+| `envpkt env rename <old> <new>`               | Rename an env entry, preserving all fields      |
+| `envpkt env alias <name> --from env.<TARGET>` | Create an alias entry reusing another env value |
 
 **env add options**: `-c <path>`, `--purpose`, `--comment`, `--tags <key=val,...>`, `--dry-run`
 
@@ -266,6 +270,8 @@ See `references/quick-reference.md` for a compact cheat sheet.
 **env rm options**: `-c <path>`, `--dry-run`
 
 **env rename options**: `-c <path>`, `--dry-run`
+
+**env alias options**: `--from env.<KEY>` (required), `-c <path>`, `--purpose`, `--comment`, `--tags`, `--force`, `--dry-run`. Rejects cross-type (`secret.*`), chained, and self-referencing targets.
 
 ### Fleet & Integration
 

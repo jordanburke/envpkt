@@ -81,6 +81,17 @@ envpkt secret rm STRIPE_SECRET_KEY
 
 # All CRUD commands support --dry-run for preview
 envpkt secret rm STRIPE_SECRET_KEY --dry-run
+
+# Create an alias — expose the same governed value under a second name
+envpkt secret alias STRIPE_LEGACY --from secret.STRIPE_SECRET_KEY \
+  --purpose "Legacy env var name the older SDK still reads"
+
+# Overwrite protection: warns without --force
+envpkt secret alias STRIPE_LEGACY --from secret.STRIPE_SECRET_KEY
+# → Warning: secret "STRIPE_LEGACY" already exists. Pass --force to overwrite.
+
+# Same pattern for env entries
+envpkt env alias LEGACY_URL --from env.SERVICE_URL
 ```
 
 ## Env Defaults CRUD Workflow

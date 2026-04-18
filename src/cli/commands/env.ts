@@ -72,6 +72,16 @@ type RenameEnvOptions = {
   readonly dryRun?: boolean
 }
 
+type AliasEnvOptions = {
+  readonly config?: string
+  readonly from: string
+  readonly purpose?: string
+  readonly comment?: string
+  readonly tags?: string
+  readonly force?: boolean
+  readonly dryRun?: boolean
+}
+
 const printPostWriteGuidance = (): void => {
   console.log(`\n${DIM}Note: Secret values are NOT stored — only metadata.${RESET}`)
   console.log(`${BOLD}Next steps:${RESET}`)
@@ -401,6 +411,115 @@ const runEnvRm = (name: string, options: RmEnvOptions): void => {
   })
 }
 
+const ALIAS_REF_RE = /^(secret|env)\.(.+)$/
+
+const buildEnvAliasBlock = (name: string, options: AliasEnvOptions): string => {
+  const lines: string[] = [`[env.${name}]`, `from_key = "${options.from}"`]
+  if (options.purpose) lines.push(`purpose = "${options.purpose}"`)
+  if (options.comment) lines.push(`comment = "${options.comment}"`)
+  if (options.tags) {
+    const pairs = options.tags.split(",").map((pair) => {
+      const [k, v] = pair.split("=").map((s) => s.trim())
+      return `${k} = "${v}"`
+    })
+    lines.push(`tags = { ${pairs.join(", ")} }`)
+  }
+  return `${lines.join("\n")}\n`
+}
+
+const runEnvAlias = (name: string, options: AliasEnvOptions): void => {
+  const match = ALIAS_REF_RE.exec(options.from)
+  if (!match) {
+    console.error(`${RED}Error:${RESET} --from "${options.from}" must be formatted as "secret.<KEY>" or "env.<KEY>"`)
+    process.exit(1)
+  }
+  const [, targetKind, targetKey] = match
+  if (targetKind !== "env") {
+    console.error(
+      `${RED}Error:${RESET} env alias must point at another env entry — got "${options.from}". Use \`envpkt secret alias\` for secret→secret aliases.`,
+    )
+    process.exit(1)
+  }
+
+  const configResult = resolveConfigPath(options.config)
+  configResult.fold(
+    (err) => {
+      console.error(formatError(err))
+      process.exit(2)
+    },
+    ({ path: configPath, source }) => {
+      const sourceMsg = formatConfigSource(configPath, source)
+      if (sourceMsg) console.error(sourceMsg)
+
+      loadConfig(configPath).fold(
+        (err) => {
+          console.error(formatError(err))
+          process.exit(2)
+        },
+        (config) => {
+          const envEntries = config.env ?? {}
+
+          if (name === targetKey) {
+            console.error(`${RED}Error:${RESET} alias "${name}" cannot reference itself`)
+            process.exit(1)
+          }
+
+          const target = envEntries[targetKey!]
+          if (!target) {
+            console.error(
+              `${RED}Error:${RESET} alias target "${options.from}" not found in ${configPath}. Add the target env entry first.`,
+            )
+            process.exit(1)
+          }
+          if (target.from_key !== undefined) {
+            console.error(
+              `${RED}Error:${RESET} alias target "${options.from}" is itself an alias. Chained aliases are not supported — point at the canonical entry instead.`,
+            )
+            process.exit(1)
+          }
+
+          const existing = envEntries[name]
+          if (existing) {
+            if (!options.force) {
+              console.error(
+                `${YELLOW}Warning:${RESET} env entry "${name}" already exists in ${configPath} (${existing.from_key ? `currently alias → ${existing.from_key}` : "currently a regular entry"}).`,
+              )
+              console.error(`  Pass ${BOLD}--force${RESET} to overwrite, or use a different name.`)
+              process.exit(1)
+            }
+            console.error(
+              `${YELLOW}Warning:${RESET} overwriting existing env entry "${name}" (${existing.from_key ? `was alias → ${existing.from_key}` : "was a regular entry"})`,
+            )
+          }
+
+          const block = buildEnvAliasBlock(name, options)
+
+          if (options.dryRun) {
+            console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
+            if (existing) console.log(`${DIM}# (would replace existing [env.${name}] block)${RESET}\n`)
+            console.log(block)
+            return
+          }
+
+          const raw = readFileSync(configPath, "utf-8")
+          const base = existing
+            ? removeSection(raw, `[env.${name}]`).fold(
+                () => raw,
+                (r) => r,
+              )
+            : raw
+          const updated = appendSection(base, block)
+          writeFileSync(configPath, updated, "utf-8")
+
+          console.log(
+            `${GREEN}✓${RESET} Aliased ${BOLD}${name}${RESET} → ${BOLD}${options.from}${RESET} in ${CYAN}${configPath}${RESET}`,
+          )
+        },
+      )
+    },
+  )
+}
+
 const runEnvRename = (oldName: string, newName: string, options: RenameEnvOptions): void => {
   withConfig(Option(options.config), (configPath, raw) => {
     const result = renameSection(raw, `[env.${oldName}]`, `[env.${newName}]`)
@@ -510,5 +629,20 @@ export const registerEnvCommands = (program: Command): void => {
     .option("--dry-run", "Preview the result without writing")
     .action((oldName: string, newName: string, options: RenameEnvOptions) => {
       runEnvRename(oldName, newName, options)
+    })
+
+  env
+    .command("alias")
+    .description("Create an alias entry that reuses another env entry's resolved value")
+    .argument("<name>", "Alias name (becomes the env var key)")
+    .requiredOption("--from <ref>", 'Target reference — must be "env.<KEY>"')
+    .option("-c, --config <path>", "Path to envpkt.toml")
+    .option("--purpose <purpose>", "Why this alias exists (local metadata)")
+    .option("--comment <comment>", "Free-form annotation")
+    .option("--tags <tags>", "Comma-separated key=value tags (e.g. env=prod,team=payments)")
+    .option("--force", "Overwrite the entry if <name> already exists")
+    .option("--dry-run", "Preview the TOML block without writing")
+    .action((name: string, options: AliasEnvOptions) => {
+      runEnvAlias(name, options)
     })
 }

@@ -5,7 +5,7 @@ import { Option } from "functype"
 
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import { appendSection, removeSection, renameSection, updateSectionFields } from "../../core/toml-edit.js"
-import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET } from "../output.js"
+import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 
 type AddOptions = {
   readonly config?: string
@@ -48,6 +48,16 @@ type RmOptions = {
 
 type RenameOptions = {
   readonly config?: string
+  readonly dryRun?: boolean
+}
+
+type AliasOptions = {
+  readonly config?: string
+  readonly from: string
+  readonly purpose?: string
+  readonly comment?: string
+  readonly tags?: string
+  readonly force?: boolean
   readonly dryRun?: boolean
 }
 
@@ -272,6 +282,118 @@ const runSecretRename = (oldName: string, newName: string, options: RenameOption
   })
 }
 
+const ALIAS_REF_RE = /^(secret|env)\.(.+)$/
+
+const buildSecretAliasBlock = (name: string, options: AliasOptions): string => {
+  const lines: string[] = [`[secret.${name}]`, `from_key = "${options.from}"`]
+  if (options.purpose) lines.push(`purpose = "${options.purpose}"`)
+  if (options.comment) lines.push(`comment = "${options.comment}"`)
+  if (options.tags) {
+    const pairs = options.tags.split(",").map((pair) => {
+      const [k, v] = pair.split("=").map((s) => s.trim())
+      return `${k} = "${v}"`
+    })
+    lines.push(`tags = { ${pairs.join(", ")} }`)
+  }
+  return `${lines.join("\n")}\n`
+}
+
+const runSecretAlias = (name: string, options: AliasOptions): void => {
+  // Validate alias ref syntax and type up front — match the validator's rules
+  const match = ALIAS_REF_RE.exec(options.from)
+  if (!match) {
+    console.error(`${RED}Error:${RESET} --from "${options.from}" must be formatted as "secret.<KEY>" or "env.<KEY>"`)
+    process.exit(1)
+  }
+  const [, targetKind, targetKey] = match
+  if (targetKind !== "secret") {
+    console.error(
+      `${RED}Error:${RESET} secret alias must point at another secret — got "${options.from}". Use \`envpkt env alias\` for env→env aliases.`,
+    )
+    process.exit(1)
+  }
+
+  const configResult = resolveConfigPath(options.config)
+  configResult.fold(
+    (err) => {
+      console.error(formatError(err))
+      process.exit(2)
+    },
+    ({ path: configPath, source }) => {
+      const sourceMsg = formatConfigSource(configPath, source)
+      if (sourceMsg) console.error(sourceMsg)
+
+      loadConfig(configPath).fold(
+        (err) => {
+          console.error(formatError(err))
+          process.exit(2)
+        },
+        (config) => {
+          const secrets = config.secret ?? {}
+
+          if (name === targetKey) {
+            console.error(`${RED}Error:${RESET} alias "${name}" cannot reference itself`)
+            process.exit(1)
+          }
+
+          const target = secrets[targetKey!]
+          if (!target) {
+            console.error(
+              `${RED}Error:${RESET} alias target "${options.from}" not found in ${configPath}. Add the target secret first.`,
+            )
+            process.exit(1)
+          }
+          if (target.from_key !== undefined) {
+            console.error(
+              `${RED}Error:${RESET} alias target "${options.from}" is itself an alias. Chained aliases are not supported — point at the canonical entry instead.`,
+            )
+            process.exit(1)
+          }
+
+          // Warn if we'd overwrite an existing entry
+          const existing = secrets[name]
+          if (existing) {
+            if (!options.force) {
+              console.error(
+                `${YELLOW}Warning:${RESET} secret "${name}" already exists in ${configPath} (${existing.from_key ? `currently alias → ${existing.from_key}` : "currently a regular entry"}).`,
+              )
+              console.error(`  Pass ${BOLD}--force${RESET} to overwrite, or use a different name.`)
+              process.exit(1)
+            }
+            console.error(
+              `${YELLOW}Warning:${RESET} overwriting existing entry "${name}" (${existing.from_key ? `was alias → ${existing.from_key}` : "was a regular entry"})`,
+            )
+          }
+
+          const block = buildSecretAliasBlock(name, options)
+
+          if (options.dryRun) {
+            console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
+            if (existing) console.log(`${DIM}# (would replace existing [secret.${name}] block)${RESET}\n`)
+            console.log(block)
+            return
+          }
+
+          const raw = readFileSync(configPath, "utf-8")
+          // If replacing, remove the old block first
+          const base = existing
+            ? removeSection(raw, `[secret.${name}]`).fold(
+                () => raw,
+                (r) => r,
+              )
+            : raw
+          const updated = appendSection(base, block)
+          writeFileSync(configPath, updated, "utf-8")
+
+          console.log(
+            `${GREEN}✓${RESET} Aliased ${BOLD}${name}${RESET} → ${BOLD}${options.from}${RESET} in ${CYAN}${configPath}${RESET}`,
+          )
+        },
+      )
+    },
+  )
+}
+
 const addSecretFlags = (cmd: Command): Command =>
   cmd
     .option("--service <service>", "Service this secret authenticates to")
@@ -333,5 +455,20 @@ export const registerSecretCommands = (program: Command): void => {
     .option("--dry-run", "Preview the result without writing")
     .action((oldName: string, newName: string, options: RenameOptions) => {
       runSecretRename(oldName, newName, options)
+    })
+
+  secret
+    .command("alias")
+    .description("Create an alias entry that reuses another secret's resolved value")
+    .argument("<name>", "Alias name (becomes the env var key)")
+    .requiredOption("--from <ref>", 'Target reference — must be "secret.<KEY>"')
+    .option("-c, --config <path>", "Path to envpkt.toml")
+    .option("--purpose <purpose>", "Why this alias exists (local metadata)")
+    .option("--comment <comment>", "Free-form annotation")
+    .option("--tags <tags>", "Comma-separated key=value tags (e.g. env=prod,team=payments)")
+    .option("--force", "Overwrite the entry if <name> already exists")
+    .option("--dry-run", "Preview the TOML block without writing")
+    .action((name: string, options: AliasOptions) => {
+      runSecretAlias(name, options)
     })
 }
