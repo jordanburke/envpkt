@@ -33,6 +33,8 @@ export default defineConfig({
             { slug: "cli/resolve" },
             { slug: "cli/fleet" },
             { slug: "cli/exec" },
+            { slug: "cli/secret" },
+            { slug: "cli/env-crud" },
             { slug: "cli/env-scan" },
             { slug: "cli/env-check" },
             { slug: "cli/env-export" },

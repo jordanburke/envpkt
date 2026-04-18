@@ -1,0 +1,123 @@
+---
+title: envpkt env (add / edit / rm / rename / alias)
+description: Manage [env.*] entries in envpkt.toml
+---
+
+CRUD subcommands for `[env.*]` entries — the plaintext, non-secret environment defaults that live in `envpkt.toml`. For scan / check / export workflows, see [`envpkt env scan`](/cli/env-scan/), [`envpkt env check`](/cli/env-check/), and [`envpkt env export`](/cli/env-export/).
+
+## Usage
+
+```bash
+envpkt env add    <name> <value> [options]
+envpkt env edit   <name> [options]
+envpkt env rm     <name> [options]
+envpkt env rename <old> <new> [options]
+envpkt env alias  <name> --from env.<TARGET> [options]
+```
+
+## `env add`
+
+Create a new `[env.<name>]` block with a plaintext default value. Errors if `<name>` already exists.
+
+| Option                | Description                            |
+| --------------------- | -------------------------------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`                  |
+| `--purpose <text>`    | Why this env var exists                |
+| `--comment <text>`    | Free-form annotation                   |
+| `--tags <pairs>`      | Comma-separated `key=value` tags       |
+| `--dry-run`           | Preview the TOML block without writing |
+
+```bash
+envpkt env add NODE_ENV production --purpose "Runtime mode"
+envpkt env add LOG_LEVEL info      --comment "Override to 'debug' locally"
+```
+
+## `env edit`
+
+Update fields on an existing env entry.
+
+| Option                | Description                                |
+| --------------------- | ------------------------------------------ |
+| `-c, --config <path>` | Path to `envpkt.toml`                      |
+| `--value <text>`      | New default value                          |
+| `--purpose <text>`    | Update purpose                             |
+| `--comment <text>`    | Update comment                             |
+| `--tags <pairs>`      | Replace tags (comma-separated `key=value`) |
+| `--dry-run`           | Preview the changes without writing        |
+
+```bash
+envpkt env edit LOG_LEVEL --value warn
+envpkt env edit NODE_ENV  --purpose "Application runtime mode (deprecated — use APP_ENV)"
+```
+
+## `env rm`
+
+Remove an env entry from the file.
+
+| Option                | Description                        |
+| --------------------- | ---------------------------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`              |
+| `--dry-run`           | Preview the result without writing |
+
+```bash
+envpkt env rm LEGACY_FLAG
+```
+
+## `env rename`
+
+Rename an env entry, preserving all fields.
+
+| Option                | Description                        |
+| --------------------- | ---------------------------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`              |
+| `--dry-run`           | Preview the result without writing |
+
+```bash
+envpkt env rename NODE_ENV APP_ENV
+```
+
+## `env alias`
+
+Create an alias entry that reuses another env entry's resolved value. Useful for exposing the same configuration default under multiple canonical names. See [Aliases](/reference/toml-schema/#aliases) for the feature overview.
+
+| Option                | Description                                         |
+| --------------------- | --------------------------------------------------- |
+| `--from <ref>`        | **Required.** Target reference, must be `env.<KEY>` |
+| `-c, --config <path>` | Path to `envpkt.toml`                               |
+| `--purpose <text>`    | Why this alias exists (local metadata)              |
+| `--comment <text>`    | Free-form annotation                                |
+| `--tags <pairs>`      | Comma-separated `key=value` tags                    |
+| `--force`             | Overwrite the entry if `<name>` already exists      |
+| `--dry-run`           | Preview the TOML block without writing              |
+
+```bash
+# Basic alias — LEGACY_URL resolves to SERVICE_URL's value
+envpkt env alias LEGACY_URL --from env.SERVICE_URL
+
+# With local metadata
+envpkt env alias LEGACY_URL \
+  --from env.SERVICE_URL \
+  --purpose "Legacy name kept for backwards compatibility"
+
+# Overwrite protection — without --force, warns and exits if name exists
+envpkt env alias LEGACY_URL --from env.SERVICE_URL --force
+```
+
+### Rejection rules (enforced at write time)
+
+| Case                                      | Behavior                                                                  |
+| ----------------------------------------- | ------------------------------------------------------------------------- |
+| `--from` missing or not `env.<KEY>`       | Exit with error                                                           |
+| `--from` points at a `secret.*` entry     | Reject — use `envpkt secret alias` for secret aliases                     |
+| Target doesn't exist in config            | Reject — add the target env entry first                                   |
+| Target is itself an alias                 | Reject — chained aliases are not supported                                |
+| `<name>` equals the target key            | Reject — self-reference                                                   |
+| `<name>` already exists without `--force` | Warn and exit; report whether existing entry was regular or another alias |
+
+At runtime the load-time validator re-checks these rules, so configs hand-edited to bypass the CLI checks still fail to boot with a clear `AliasError` (see [Error Types](/reference/error-types/#aliaserror)).
+
+## Notes
+
+- `[env.*]` entries hold **non-secret** plaintext defaults. For credentials, use [`envpkt secret`](/cli/secret/) and seal the values with [`envpkt seal`](/cli/seal/).
+- Every subcommand supports `--dry-run` to preview the resulting file without writing.
+- `-c, --config <path>` defaults to the standard discovery chain (CWD → `ENVPKT_CONFIG` → `~/.envpkt/` → cloud storage).
