@@ -88,6 +88,12 @@ capabilities = ["post-message"]
 created = "2025-09-01"
 rotation_url = "https://api.slack.com/apps/A00/incoming-webhooks"
 source = "manual"
+
+# Alias: expose the same governed webhook under a legacy name that the
+# notifier library still expects. Both names are injected at boot.
+[secret.LEGACY_SLACK_HOOK]
+from_key = "secret.SLACK_WEBHOOK_URL"
+purpose = "Legacy env var name read by the older notifier client"
 ```
 
 ## Sections Breakdown
@@ -98,3 +104,4 @@ source = "manual"
 - **`[tools]`** — enables fnox and MCP integrations
 - **`[env.*]`** — plaintext environment defaults (non-secret, safe to commit)
 - **`[secret.*]`** — per-secret metadata with service, purpose, comment, capabilities, dates, and source
+- **`[secret.*].from_key`** — [alias](/reference/toml-schema/#aliases) to another entry; the value is inherited from the target and injected under both canonical names

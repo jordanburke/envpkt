@@ -14,6 +14,8 @@ export {
 // TypeScript types (Static<> from schema + domain types)
 export type {
   AgentIdentity,
+  AliasError,
+  AliasTable,
   AuditResult,
   BootError,
   BootOptions,
@@ -63,6 +65,9 @@ export {
 
 // Catalog resolution
 export { loadCatalog, resolveConfig, resolveSecrets } from "./core/catalog.js"
+
+// Alias validation
+export { formatAliasError, isEnvAlias, isSecretAlias, validateAliases } from "./core/alias.js"
 
 // Packet formatting
 export type { FormatPacketOptions, SecretDisplay } from "./core/format.js"

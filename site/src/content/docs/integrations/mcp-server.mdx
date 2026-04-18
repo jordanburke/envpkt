@@ -40,7 +40,7 @@ Uses stdio transport. The server reads `envpkt.toml` from the current directory 
 
 ### `getPacketHealth`
 
-Returns the full audit result including overall status and per-secret health.
+Returns the full audit result including overall status and per-secret health. Alias entries appear as their own rows with an `alias_of` field and inherit `status`, `days_remaining`, and `rotation_url` from their target. An `aliases` count is included alongside `total`, `healthy`, etc.
 
 ### `listCapabilities`
 
@@ -48,7 +48,7 @@ Returns identity-level capabilities (from `[identity].capabilities`) and per-sec
 
 ### `getSecretMeta`
 
-Takes a secret key and returns its metadata (service, purpose, capabilities, expiration, rotation URL, etc.).
+Takes a secret key and returns its metadata (service, purpose, capabilities, expiration, rotation URL, etc.). If the requested key is an [alias](/reference/toml-schema/#aliases), the response merges the target's metadata with any overrides declared on the alias and includes an `alias_of` field identifying the target (e.g., `"alias_of": "secret.API_KEY"`).
 
 ### `checkExpiration`
 

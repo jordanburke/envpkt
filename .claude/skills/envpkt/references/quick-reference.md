@@ -73,6 +73,15 @@
 | `loadCatalog(path)`                | `Either<CatalogError, EnvpktConfig>`  |
 | `resolveSecrets(config, catalog)`  | `Either<CatalogError, EnvpktConfig>`  |
 
+### Aliases
+
+| Function                   | Returns                         |
+| -------------------------- | ------------------------------- |
+| `validateAliases(config)`  | `Either<AliasError, AliasTable>` |
+| `isSecretAlias(meta)`      | `boolean`                       |
+| `isEnvAlias(meta)`         | `boolean`                       |
+| `formatAliasError(err)`    | `string`                        |
+
 ### Pattern Matching
 
 | Function                     | Returns                    |
@@ -121,17 +130,19 @@
 | `model_hint`      | 3      | `string`                 | Suggested model/tier                 |
 | `source`          | 3      | `string`                 | Value origin (vault, ci, etc.)       |
 | `encrypted_value` | sealed | `string`                 | Age-encrypted ciphertext             |
+| `from_key`        | alias  | `"secret.<KEY>"`         | Alias — reuse another entry's value  |
 | `required`        | 4      | `boolean`                | Whether required for operation       |
 | `tags`            | 4      | `Record<string, string>` | Key-value tags                       |
 
 ### `[env.*]`
 
-| Field     | Type                     | Description                           |
-| --------- | ------------------------ | ------------------------------------- |
-| `value`   | `string`                 | Default value (required)              |
-| `purpose` | `string`                 | Why this env var exists               |
-| `comment` | `string`                 | Free-form annotation or note          |
-| `tags`    | `Record<string, string>` | Key-value tags for grouping/filtering |
+| Field      | Type                     | Description                             |
+| ---------- | ------------------------ | --------------------------------------- |
+| `value`    | `string`                 | Default value (required unless aliased) |
+| `from_key` | `"env.<KEY>"`            | Alias — reuse another entry's value     |
+| `purpose`  | `string`                 | Why this env var exists                 |
+| `comment`  | `string`                 | Free-form annotation or note            |
+| `tags`     | `Record<string, string>` | Key-value tags for grouping/filtering   |
 
 ### `[lifecycle]`
 

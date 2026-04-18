@@ -110,6 +110,41 @@ Parse raw TOML string. Returns `Either<ConfigError, unknown>`.
 
 Validate parsed data against the schema. Returns `Either<ConfigError, EnvpktConfig>`.
 
+## Alias Resolution
+
+### `validateAliases(config)`
+
+Validate all `from_key` references in a resolved config. Returns `Either<AliasError, AliasTable>`. Called automatically inside `bootSafe` before the secret resolution passes.
+
+```typescript
+import { validateAliases } from "envpkt"
+
+validateAliases(config).fold(
+  (err) => console.error("Alias error:", err._tag),
+  (table) => console.log(`${table.entries.size} alias(es) resolved`),
+)
+```
+
+### `AliasTable`
+
+```typescript
+type AliasTable = {
+  readonly entries: ReadonlyMap<
+    string,
+    { readonly kind: "secret" | "env"; readonly targetKind: "secret" | "env"; readonly targetKey: string }
+  >
+}
+```
+
+Keys are type-prefixed (`"secret.<KEY>"` or `"env.<KEY>"`) so the two namespaces don't collide.
+
+### Runtime behavior
+
+- Alias entries appear in `BootResult.injected` alongside their target when the target resolves; in `BootResult.skipped` when the target doesn't.
+- `BootResult.secrets[aliasKey]` holds the same value as `secrets[targetKey]`.
+- `AuditResult.secrets` includes alias rows with `alias_of: Option<string>` and status inherited from the target; `AuditResult.aliases` counts them separately.
+- Cross-type and chained aliases fail at load time with `AliasError` variants — see [Error Types → AliasError](/reference/error-types/#aliaserror).
+
 ## Catalog Resolution
 
 ### `resolveConfig(config, baseDir)`

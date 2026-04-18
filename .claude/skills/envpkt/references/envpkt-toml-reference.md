@@ -79,6 +79,23 @@ comment = "Override to 'development' for local testing"
 value = "info"
 purpose = "Application log verbosity"
 
+# --- Aliases (optional) ---
+# Expose a governed secret or env value under a second canonical name —
+# useful when a consumer hardcodes a different env var name than the one
+# you govern canonically. Both names are injected at boot with the same
+# value; expiration and rotation are tracked on the target only.
+#
+# Rules: same-type only (secret→secret, env→env), single hop (no chains),
+# and mutually exclusive with value-producing fields (`encrypted_value`
+# for secrets, `value` for env).
+
+[secret.LEGACY_API_KEY]
+from_key = "secret.MY_API_KEY"   # references another [secret.*] entry
+purpose = "Legacy name some consumer still reads"
+
+[env.LEGACY_MODE]
+from_key = "env.NODE_ENV"        # references another [env.*] entry
+
 # --- Lifecycle Policy (optional) ---
 [lifecycle]
 stale_warning_days = 90        # Days since creation to flag as stale (default: 90)

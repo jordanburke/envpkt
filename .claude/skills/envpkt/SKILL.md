@@ -160,6 +160,28 @@ on_audit_fail = "pagerduty-alert.sh"
 | 3 — Operational | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime operational data           |
 | 4 — Enforcement | `required`, `tags`                              | Policy enforcement and filtering   |
 | Sealed          | `encrypted_value`                               | Age-encrypted value safe to commit |
+| Alias           | `from_key`                                      | Reuse another entry's value        |
+
+### Aliases (`from_key`)
+
+Use `from_key` to expose one governed value under multiple canonical env var
+names without duplication. Works identically on `[secret.*]` and `[env.*]`:
+
+```toml
+[secret.API_KEY]
+service = "example"
+expires = "2026-12-31"
+
+[secret.LEGACY_API_KEY]
+from_key = "secret.API_KEY"   # reuses the governed value under a second name
+```
+
+Rules: same-type only (secret→secret, env→env), single hop (no chains), and
+mutually exclusive with `encrypted_value` / `value`. Both target and alias are
+injected into `process.env` at boot. Audit and MCP report aliases as first-class
+rows with inherited status and an `alias_of` marker — lifecycle tracking lives
+on the target, so an alias is healthy iff its target is. Cross-type aliasing
+(secret → env) is rejected at config load time.
 
 ## CLI Command Reference
 

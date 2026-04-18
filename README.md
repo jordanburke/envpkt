@@ -141,6 +141,29 @@ value = "info"
 purpose = "Application log verbosity"
 ```
 
+### Aliases
+
+When a consumer hardcodes a different env var name than the one you govern
+canonically, use `from_key` to expose the same value under a second name —
+without duplicating the secret:
+
+```toml
+[secret.API_KEY]
+service      = "stripe"
+expires      = "2027-01-15"
+rotation_url = "https://dashboard.stripe.com/apikeys"
+
+# Same governed value, under a legacy name some consumer expects
+[secret.STRIPE_SECRET_KEY]
+from_key = "secret.API_KEY"
+```
+
+Both names are injected at boot, both appear in audit output, and expiration
+tracking lives on the target — an alias is healthy iff its target is. Same
+pattern works for `[env.*]`. Cross-type aliasing (secret → env) is rejected
+at load time. See [TOML Schema → Aliases](https://envpkt.dev/reference/toml-schema/#aliases)
+for the full rules.
+
 See [`examples/`](./examples/) for more configurations.
 
 ## Sealed Packets

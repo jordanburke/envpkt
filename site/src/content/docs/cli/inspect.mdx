@@ -50,3 +50,10 @@ The `--secrets` flag reads values from environment variables matching each secre
 - **Without `--secrets`**: Only metadata is shown, no values
 - **With `--secrets`**: Values are masked (e.g., `pos•••••t/db`)
 - **With `--secrets --plaintext`**: Full values are displayed
+
+## Aliases
+
+Entries with `from_key` (see [Aliases](/reference/toml-schema/#aliases)) are
+shown as separate rows with an `[alias → secret.X]` tag next to the service
+name, making the relationship visible. They don't have their own value —
+they inherit from their target at boot time.

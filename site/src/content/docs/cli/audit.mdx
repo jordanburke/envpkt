@@ -79,3 +79,11 @@ With `--strict`, any non-healthy secret causes a non-zero exit.
 | `stale`            | Secret is older than `stale_warning_days` without updates |
 | `missing`          | Secret key exists in config but has no metadata           |
 | `missing_metadata` | Required fields (service, expiration) are absent          |
+
+## Aliases
+
+Entries with `from_key` (see [Aliases](/reference/toml-schema/#aliases)) appear
+as separate rows in audit output with an `alias_of` field identifying their
+target. Their `status`, `expires`, and `days_remaining` are inherited from the
+target — an alias is healthy if and only if its target is. The audit response
+also includes an `aliases` count alongside `total`, `healthy`, etc.

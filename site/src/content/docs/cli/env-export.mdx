@@ -51,3 +51,10 @@ Warnings are emitted to stderr so they don't pollute the `eval` output.
 5. Emits any warnings to stderr
 
 Values containing single quotes are safely escaped (`'` becomes `'\''`).
+
+## Aliases
+
+Entries with `from_key` (see [Aliases](/reference/toml-schema/#aliases)) are
+exported as separate `export` statements alongside their target, each holding
+the same resolved value. If the target resolves, its aliases resolve; if the
+target is skipped, aliases are skipped too.

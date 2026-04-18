@@ -98,6 +98,45 @@ type KeygenError =
 | `WriteError`        | Failed to write identity file or create directory       |
 | `ConfigUpdateError` | Failed to read/write `envpkt.toml` for recipient update |
 
+## `AliasError`
+
+Errors from validating `from_key` alias references in `envpkt.toml`. Raised at
+config load time before any secret resolution begins.
+
+```typescript
+type AliasError =
+  | {
+      readonly _tag: "AliasInvalidSyntax"
+      readonly key: string
+      readonly kind: "secret" | "env"
+      readonly value: string
+    }
+  | { readonly _tag: "AliasTargetMissing"; readonly key: string; readonly target: string }
+  | { readonly _tag: "AliasSelfReference"; readonly key: string }
+  | { readonly _tag: "AliasChained"; readonly key: string; readonly target: string }
+  | {
+      readonly _tag: "AliasCrossType"
+      readonly key: string
+      readonly kind: "secret" | "env"
+      readonly targetKind: "secret" | "env"
+    }
+  | {
+      readonly _tag: "AliasValueConflict"
+      readonly key: string
+      readonly kind: "secret" | "env"
+      readonly field: string
+    }
+```
+
+| Tag                  | When                                                                                |
+| -------------------- | ----------------------------------------------------------------------------------- |
+| `AliasInvalidSyntax` | `from_key` is not formatted as `"secret.<KEY>"` or `"env.<KEY>"`                    |
+| `AliasTargetMissing` | `from_key` references a target that doesn't exist in the resolved config            |
+| `AliasSelfReference` | An entry's `from_key` points at itself                                              |
+| `AliasChained`       | The target is itself an alias (only single-hop aliasing is supported)               |
+| `AliasCrossType`     | A secret entry aliases an env entry or vice versa (same-type aliasing only)         |
+| `AliasValueConflict` | The entry declares both `from_key` and a value field (`encrypted_value` or `value`) |
+
 ## `BootError`
 
 Union of all error types that can occur during boot:
@@ -107,6 +146,7 @@ type BootError =
   | ConfigError
   | FnoxError
   | CatalogError
+  | AliasError
   | { readonly _tag: "AuditFailed"; readonly audit: AuditResult; readonly message: string }
   | IdentityError
 ```
