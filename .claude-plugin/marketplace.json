@@ -1,22 +1,26 @@
 {
   "name": "envpkt-skills",
-  "description": "Skills for credential lifecycle and fleet management with envpacket / envpkt",
   "owner": {
     "name": "Jordan Burke",
     "email": "jordan.burke@gmail.com"
+  },
+  "metadata": {
+    "description": "Skills for credential lifecycle and fleet management with envpacket / envpkt",
+    "version": "1.0.1"
   },
   "plugins": [
     {
       "name": "envpkt",
       "description": "Help developers use envpkt for credential management — CLI usage, envpkt.toml configuration, library API, boot patterns, MCP server integration, and fleet health monitoring",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "author": {
         "name": "Jordan Burke",
         "email": "jordan.burke@gmail.com"
       },
       "source": "./",
       "category": "development",
-      "strict": false
+      "strict": false,
+      "skills": ["./.claude/skills/envpkt"]
     }
   ]
 }
