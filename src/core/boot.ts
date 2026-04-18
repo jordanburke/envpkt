@@ -7,6 +7,7 @@ import { fnoxExport } from "../fnox/cli.js"
 import { detectFnox, fnoxAvailable } from "../fnox/detect.js"
 import { unwrapAgentKey } from "../fnox/identity.js"
 import { extractFnoxKeys, readFnoxConfig } from "../fnox/parse.js"
+import { formatAliasError, validateAliases } from "./alias.js"
 import { computeAudit } from "./audit.js"
 import { resolveConfig } from "./catalog.js"
 import { expandPath, loadConfig, resolveConfigPath } from "./config.js"
@@ -114,7 +115,7 @@ const looksLikeSecret = (value: string): boolean => {
 const checkEnvMisclassification = (config: EnvpktConfig): string[] => {
   const envEntries = config.env ?? {}
   return Object.entries(envEntries)
-    .filter(([, entry]) => looksLikeSecret(entry.value))
+    .filter(([, entry]) => entry.value !== undefined && looksLikeSecret(entry.value))
     .map(([key]) => `[env.${key}] value looks like a secret — consider moving to [secret.${key}]`)
 }
 
@@ -126,135 +127,181 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
   const warnOnly = opts.warnOnly ?? false
 
   // eslint-disable-next-line functype/prefer-do-notation -- multi-phase boot pipeline with side effects is clearer as explicit flatMap
-  return resolveAndLoad(opts).flatMap(({ config, configPath, configDir, configSource }) => {
-    const secretEntries = config.secret ?? {}
-    const metaKeys = Object.keys(secretEntries)
-    const hasSealedValues = metaKeys.some((k) => !!secretEntries[k].encrypted_value)
+  return resolveAndLoad(opts).flatMap(({ config, configPath, configDir, configSource }) =>
+    validateAliases(config).fold<Either<BootError, BootResult>>(
+      (err) => Left(err),
+      (aliasTable) => {
+        const secretEntries = config.secret ?? {}
+        const envEntries = config.env ?? {}
 
-    // Resolve identity key — non-fatal when sealed values exist (identity may be a plain age identity)
-    const identityKeyResult = resolveIdentityKey(config, configDir)
-    const identityKey = identityKeyResult.fold(
-      () => Option<string>(undefined),
-      (k) => k,
-    )
+        // Separate alias from non-alias entries. Aliases carry no value of
+        // their own; they copy from their target after the real entries resolve.
+        const nonAliasSecretEntries = Object.fromEntries(
+          Object.entries(secretEntries).filter(([, meta]) => meta.from_key === undefined),
+        )
+        const aliasSecretKeys = Object.keys(secretEntries).filter((k) => secretEntries[k].from_key !== undefined)
+        const nonAliasEnvEntries = Object.entries(envEntries).filter(([, meta]) => meta.from_key === undefined)
+        const aliasEnvKeys = Object.keys(envEntries).filter((k) => envEntries[k].from_key !== undefined)
 
-    // If identity key resolution failed AND no sealed values, propagate the error
-    if (identityKeyResult.isLeft() && !hasSealedValues) {
-      return identityKeyResult.fold<Either<BootError, BootResult>>(
-        (err) => Left(err),
-        () => Left({ _tag: "ReadError", message: "unexpected" } as BootError),
-      )
-    }
+        const nonAliasMetaKeys = Object.keys(nonAliasSecretEntries)
+        const hasSealedValues = nonAliasMetaKeys.some((k) => !!nonAliasSecretEntries[k].encrypted_value)
 
-    const fnoxKeys = detectFnoxKeys(configDir)
-    const audit = computeAudit(config, fnoxKeys)
+        // Resolve identity key — non-fatal when sealed values exist (identity may be a plain age identity)
+        const identityKeyResult = resolveIdentityKey(config, configDir)
+        const identityKey = identityKeyResult.fold(
+          () => Option<string>(undefined),
+          (k) => k,
+        )
 
-    return checkExpiration(audit, failOnExpired, warnOnly).map((warnings) => {
-      const secrets: Record<string, string> = {}
-      const injected: string[] = []
-      const skipped: string[] = []
+        // If identity key resolution failed AND no sealed values, propagate the error
+        if (identityKeyResult.isLeft() && !hasSealedValues) {
+          return identityKeyResult.fold<Either<BootError, BootResult>>(
+            (err) => Left(err),
+            () => Left({ _tag: "ReadError", message: "unexpected" } as BootError),
+          )
+        }
 
-      // Phase 0: apply env defaults + misclassification check
-      warnings.push(...checkEnvMisclassification(config))
+        const fnoxKeys = detectFnoxKeys(configDir)
+        const audit = computeAudit(config, fnoxKeys, undefined, aliasTable)
 
-      const envEntries = config.env ?? {}
-      const envEntriesArr = Object.entries(envEntries)
+        return checkExpiration(audit, failOnExpired, warnOnly).map((warnings) => {
+          const secrets: Record<string, string> = {}
+          const injected: string[] = []
+          const skipped: string[] = []
 
-      const envDefaults: Record<string, string> = Object.fromEntries(
-        envEntriesArr.flatMap(([key, entry]) =>
-          Option(process.env[key]).fold<ReadonlyArray<readonly [string, string]>>(
-            () => [[key, entry.value] as const],
-            () => [],
-          ),
-        ),
-      )
-      const overridden: string[] = envEntriesArr.flatMap(([key]) =>
-        Option(process.env[key]).fold<string[]>(
-          () => [],
-          () => [key],
-        ),
-      )
+          // Phase 0: apply env defaults + misclassification check
+          warnings.push(...checkEnvMisclassification(config))
 
-      if (inject) {
-        Object.entries(envDefaults).forEach(([key, value]) => {
-          process.env[key] = value
-        })
-      }
+          // Non-alias env defaults: inject literal values only if process.env[key] is unset
+          const envDefaults: Record<string, string> = Object.fromEntries(
+            nonAliasEnvEntries.flatMap(([key, entry]) =>
+              Option(process.env[key]).fold<ReadonlyArray<readonly [string, string]>>(
+                () => (entry.value !== undefined ? [[key, entry.value] as const] : []),
+                () => [],
+              ),
+            ),
+          )
+          const overridden: string[] = nonAliasEnvEntries.flatMap(([key]) =>
+            Option(process.env[key]).fold<string[]>(
+              () => [],
+              () => [key],
+            ),
+          )
 
-      // Phase 1: try sealed values (encrypted_value in meta)
-      const sealedKeys = new Set<string>()
-      const identityFilePath = resolveIdentityFilePath(config, configDir, true)
+          if (inject) {
+            Object.entries(envDefaults).forEach(([key, value]) => {
+              process.env[key] = value
+            })
+          }
 
-      if (hasSealedValues) {
-        identityFilePath.fold(
-          () => {
-            warnings.push("Sealed values found but no identity file available for decryption")
-          },
-          (idPath) => {
-            unsealSecrets(secretEntries, idPath).fold(
-              (err) => {
-                warnings.push(`Sealed value decryption failed: ${err.message}`)
+          // Phase 1: try sealed values (encrypted_value in meta) — non-alias only
+          const sealedKeys = new Set<string>()
+          const identityFilePath = resolveIdentityFilePath(config, configDir, true)
+
+          if (hasSealedValues) {
+            identityFilePath.fold(
+              () => {
+                warnings.push("Sealed values found but no identity file available for decryption")
               },
-              (unsealed) => {
-                const unsealedEntries = Object.entries(unsealed)
-                Object.assign(secrets, unsealed)
-                injected.push(...unsealedEntries.map(([key]) => key))
-                unsealedEntries.map(([key]) => key).forEach((key) => sealedKeys.add(key))
+              (idPath) => {
+                unsealSecrets(nonAliasSecretEntries, idPath).fold(
+                  (err) => {
+                    warnings.push(`Sealed value decryption failed: ${err.message}`)
+                  },
+                  (unsealed) => {
+                    const unsealedEntries = Object.entries(unsealed)
+                    Object.assign(secrets, unsealed)
+                    injected.push(...unsealedEntries.map(([key]) => key))
+                    unsealedEntries.map(([key]) => key).forEach((key) => sealedKeys.add(key))
+                  },
+                )
               },
             )
-          },
-        )
-      }
-
-      // Phase 2: fnox for remaining keys
-      const remainingKeys = metaKeys.filter((k) => !sealedKeys.has(k))
-
-      if (remainingKeys.length > 0) {
-        if (fnoxAvailable()) {
-          fnoxExport(opts.profile, identityKey.orUndefined()).fold(
-            (err) => {
-              warnings.push(`fnox export failed: ${err.message}`)
-              skipped.push(...remainingKeys)
-            },
-            (exported) => {
-              const found = remainingKeys.filter((key) => key in exported)
-              const notFound = remainingKeys.filter((key) => !(key in exported))
-              found.forEach((key) => {
-                secrets[key] = exported[key]!
-              })
-              injected.push(...found)
-              skipped.push(...notFound)
-            },
-          )
-        } else {
-          if (!hasSealedValues) {
-            warnings.push("fnox not available — no secrets injected")
-          } else {
-            warnings.push("fnox not available — unsealed secrets could not be resolved")
           }
-          skipped.push(...remainingKeys)
-        }
-      }
 
-      if (inject) {
-        Object.entries(secrets).forEach(([key, value]) => {
-          process.env[key] = value
+          // Phase 2: fnox for remaining non-alias keys
+          const remainingKeys = nonAliasMetaKeys.filter((k) => !sealedKeys.has(k))
+
+          if (remainingKeys.length > 0) {
+            if (fnoxAvailable()) {
+              fnoxExport(opts.profile, identityKey.orUndefined()).fold(
+                (err) => {
+                  warnings.push(`fnox export failed: ${err.message}`)
+                  skipped.push(...remainingKeys)
+                },
+                (exported) => {
+                  const found = remainingKeys.filter((key) => key in exported)
+                  const notFound = remainingKeys.filter((key) => !(key in exported))
+                  found.forEach((key) => {
+                    secrets[key] = exported[key]!
+                  })
+                  injected.push(...found)
+                  skipped.push(...notFound)
+                },
+              )
+            } else {
+              if (!hasSealedValues) {
+                warnings.push("fnox not available — no secrets injected")
+              } else {
+                warnings.push("fnox not available — unsealed secrets could not be resolved")
+              }
+              skipped.push(...remainingKeys)
+            }
+          }
+
+          // Phase 3: alias copy pass — aliases reuse their target's resolved value
+          aliasSecretKeys.forEach((aliasKey) => {
+            const entry = aliasTable.entries.get(`secret.${aliasKey}`)
+            if (!entry) return
+            const targetValue = secrets[entry.targetKey]
+            if (targetValue !== undefined) {
+              secrets[aliasKey] = targetValue
+              injected.push(aliasKey)
+            } else {
+              skipped.push(aliasKey)
+            }
+          })
+
+          // Env alias copy pass — copy target's resolved env default if canonical not already set
+          aliasEnvKeys.forEach((aliasKey) => {
+            const entry = aliasTable.entries.get(`env.${aliasKey}`)
+            if (!entry) return
+            if (process.env[aliasKey] !== undefined) {
+              overridden.push(aliasKey)
+              return
+            }
+            const targetEntry = envEntries[entry.targetKey]
+            if (targetEntry?.value === undefined) return
+            // Prefer the already-injected/overriding value so alias tracks its target at runtime
+            const resolvedTarget = process.env[entry.targetKey] ?? targetEntry.value
+            envDefaults[aliasKey] = resolvedTarget
+          })
+
+          if (inject) {
+            // Inject env alias defaults (and any env defaults added by the alias pass)
+            Object.entries(envDefaults).forEach(([key, value]) => {
+              process.env[key] ??= value
+            })
+            Object.entries(secrets).forEach(([key, value]) => {
+              process.env[key] = value
+            })
+          }
+
+          return {
+            audit,
+            injected: injected as ReadonlyArray<string>,
+            skipped: skipped as ReadonlyArray<string>,
+            secrets: secrets as Readonly<Record<string, string>>,
+            warnings: warnings as ReadonlyArray<string>,
+            envDefaults: envDefaults as Readonly<Record<string, string>>,
+            overridden: overridden as ReadonlyArray<string>,
+            configPath,
+            configSource,
+          }
         })
-      }
-
-      return {
-        audit,
-        injected: injected as ReadonlyArray<string>,
-        skipped: skipped as ReadonlyArray<string>,
-        secrets: secrets as Readonly<Record<string, string>>,
-        warnings: warnings as ReadonlyArray<string>,
-        envDefaults: envDefaults as Readonly<Record<string, string>>,
-        overridden: overridden as ReadonlyArray<string>,
-        configPath,
-        configSource,
-      }
-    })
-  })
+      },
+    ),
+  )
 }
 
 /* eslint-disable functype/prefer-either -- boot() is the intentional throwing wrapper; bootSafe() returns Either */
@@ -311,6 +358,13 @@ const formatBootError = (error: BootError): string => {
       return `Decrypt failed: ${error.message}`
     case "IdentityNotFound":
       return `Identity file not found: ${error.path}`
+    case "AliasInvalidSyntax":
+    case "AliasTargetMissing":
+    case "AliasSelfReference":
+    case "AliasChained":
+    case "AliasCrossType":
+    case "AliasValueConflict":
+      return formatAliasError(error)
     default:
       return `Boot error: ${JSON.stringify(error)}`
   }

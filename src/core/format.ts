@@ -75,16 +75,31 @@ export const formatPacket = (result: ResolveResult, options?: FormatPacketOption
   const secretLines = metaEntries.map(([key, meta]) => {
     const service = meta.service ?? key
     const sealedTag = meta.encrypted_value ? " [sealed]" : ""
+    const aliasTag = meta.from_key ? ` [alias → ${meta.from_key}]` : ""
     const valueSuffix = Option(options?.secrets?.[key]).fold(
       () => "",
       (secretValue) =>
         ` = ${(options?.secretDisplay ?? "encrypted") === "plaintext" ? secretValue : maskValue(secretValue)}`,
     )
-    const header = `  ${key} → ${service}${sealedTag}${valueSuffix}`
+    const header = `  ${key} → ${service}${sealedTag}${aliasTag}${valueSuffix}`
     const fields = formatSecretFields(meta, "    ")
     return fields ? `${header}\n${fields}` : header
   })
   sections.push([secretHeader, ...secretLines].join("\n"))
+
+  // Env block — show alias relationships
+  const envConfig = config.env ?? {}
+  const envEntriesArr = Object.entries(envConfig)
+  if (envEntriesArr.length > 0) {
+    const envHeader = `env: ${envEntriesArr.length}`
+    const envLines = envEntriesArr.map(([key, meta]) => {
+      const aliasTag = meta.from_key ? ` [alias → ${meta.from_key}]` : ""
+      const valuePart = meta.value !== undefined ? ` = ${meta.value}` : ""
+      const purposePart = meta.purpose ? `\n    purpose: ${meta.purpose}` : ""
+      return `  ${key}${aliasTag}${valuePart}${purposePart}`
+    })
+    sections.push([envHeader, ...envLines].join("\n"))
+  }
 
   // Lifecycle block
   if (config.lifecycle) {

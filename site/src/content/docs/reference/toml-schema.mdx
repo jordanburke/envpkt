@@ -41,32 +41,35 @@ Identity and capabilities.
 
 Per-secret metadata. Each key corresponds to an environment variable name.
 
-| Field          | Type            | Required | Tier        | Description                                   |
-| -------------- | --------------- | -------- | ----------- | --------------------------------------------- |
-| `service`      | `string`        | No       | Scan-first  | Service this secret authenticates to          |
-| `expires`      | `string` (date) | No       | Scan-first  | Expiration date (`YYYY-MM-DD`)                |
-| `rotation_url` | `string` (URI)  | No       | Scan-first  | URL for rotation procedure                    |
-| `purpose`      | `string`        | No       | Context     | Why this secret exists                        |
-| `comment`      | `string`        | No       | Context     | Free-form annotation or note                  |
-| `capabilities` | `string[]`      | No       | Context     | Operations this secret grants                 |
-| `created`      | `string` (date) | No       | Context     | Provisioning date (`YYYY-MM-DD`)              |
-| `rotates`      | `string`        | No       | Operational | Rotation schedule (e.g., `90d`, `quarterly`)  |
-| `rate_limit`   | `string`        | No       | Operational | Rate limit info (e.g., `1000/min`)            |
-| `model_hint`   | `string`        | No       | Operational | Suggested model or tier                       |
-| `source`       | `string`        | No       | Operational | Secret origin (e.g., `vault`, `ci`, `manual`) |
-| `required`     | `boolean`       | No       | Enforcement | Whether secret is required for operation      |
-| `tags`         | `object`        | No       | Enforcement | Key-value tags for grouping/filtering         |
+| Field             | Type            | Required | Tier        | Description                                                                         |
+| ----------------- | --------------- | -------- | ----------- | ----------------------------------------------------------------------------------- |
+| `service`         | `string`        | No       | Scan-first  | Service this secret authenticates to                                                |
+| `expires`         | `string` (date) | No       | Scan-first  | Expiration date (`YYYY-MM-DD`)                                                      |
+| `rotation_url`    | `string` (URI)  | No       | Scan-first  | URL for rotation procedure                                                          |
+| `purpose`         | `string`        | No       | Context     | Why this secret exists                                                              |
+| `comment`         | `string`        | No       | Context     | Free-form annotation or note                                                        |
+| `capabilities`    | `string[]`      | No       | Context     | Operations this secret grants                                                       |
+| `created`         | `string` (date) | No       | Context     | Provisioning date (`YYYY-MM-DD`)                                                    |
+| `rotates`         | `string`        | No       | Operational | Rotation schedule (e.g., `90d`, `quarterly`)                                        |
+| `rate_limit`      | `string`        | No       | Operational | Rate limit info (e.g., `1000/min`)                                                  |
+| `model_hint`      | `string`        | No       | Operational | Suggested model or tier                                                             |
+| `source`          | `string`        | No       | Operational | Secret origin (e.g., `vault`, `ci`, `manual`)                                       |
+| `encrypted_value` | `string`        | No       | Value       | Age-encrypted ciphertext — mutually exclusive with `from_key`                       |
+| `from_key`        | `string`        | No       | Alias       | Reference another secret entry (format: `"secret.<KEY>"`) — see [Aliases](#aliases) |
+| `required`        | `boolean`       | No       | Enforcement | Whether secret is required for operation                                            |
+| `tags`            | `object`        | No       | Enforcement | Key-value tags for grouping/filtering                                               |
 
 ## `[env.<KEY>]` Sections
 
 Plaintext environment defaults. Each key corresponds to an environment variable. These are non-secret values that are safe to commit — use `[secret.*]` for sensitive credentials.
 
-| Field     | Type     | Required                 | Description                           |
-| --------- | -------- | ------------------------ | ------------------------------------- |
-| `value`   | `string` | Yes (if section present) | Default value for this env variable   |
-| `purpose` | `string` | No                       | Why this env var exists               |
-| `comment` | `string` | No                       | Free-form annotation or note          |
-| `tags`    | `object` | No                       | Key-value tags for grouping/filtering |
+| Field      | Type     | Required           | Description                                                                   |
+| ---------- | -------- | ------------------ | ----------------------------------------------------------------------------- |
+| `value`    | `string` | Yes unless aliased | Default value for this env variable — mutually exclusive with `from_key`      |
+| `from_key` | `string` | No                 | Reference another env entry (format: `"env.<KEY>"`) — see [Aliases](#aliases) |
+| `purpose`  | `string` | No                 | Why this env var exists                                                       |
+| `comment`  | `string` | No                 | Free-form annotation or note                                                  |
+| `tags`     | `object` | No                 | Key-value tags for grouping/filtering                                         |
 
 ```toml
 [env.NODE_ENV]
@@ -78,6 +81,61 @@ comment = "Override to 'development' for local testing"
 value = "info"
 purpose = "Application log verbosity"
 ```
+
+## Aliases
+
+Some consumers expect a credential under a different env var name than the one
+you use canonically. `from_key` exposes the same governed value under multiple
+canonical names without duplicating it.
+
+```toml
+[secret.API_KEY]
+service      = "example"
+expires      = "2026-12-31"
+rotation_url = "https://api.example.com/settings/keys"
+purpose      = "Authenticates envpkt-managed tooling"
+
+# Same governed value, exposed under a second name for a consumer
+# that hardcodes a different env var name.
+[secret.LEGACY_API_KEY]
+from_key = "secret.API_KEY"
+purpose  = "Name required by the legacy consumer"
+```
+
+Works identically for `[env.*]`:
+
+```toml
+[env.SERVICE_URL]
+value = "https://api.example.com"
+
+[env.LEGACY_URL]
+from_key = "env.SERVICE_URL"
+```
+
+**Rules:**
+
+- `from_key` must be formatted as `"secret.<KEY>"` or `"env.<KEY>"`.
+- The target must exist in the same resolved config (after catalog merge).
+- The target must not itself be an alias — single hop only.
+- An alias cannot also declare a value-producing field (`encrypted_value` for
+  secrets, `value` for env entries). It has no value of its own.
+- Cross-type aliasing (secret → env or env → secret) is rejected at load time.
+
+**Runtime behavior:**
+
+At boot, envpkt injects both the target AND every alias pointing at it, as
+separate entries in `process.env` holding the same value:
+
+```
+$ envpkt exec -- env | grep API_KEY
+API_KEY=sk-...
+LEGACY_API_KEY=sk-...
+```
+
+Audit, `envpkt inspect`, `envpkt env export`, and MCP responses all list
+aliases as first-class entries, tagged with `alias_of` so the relationship is
+visible. Status (expiration, health) is inherited from the target — an alias
+is healthy iff its target is healthy.
 
 `envpkt audit --all` includes env default drift alongside secret health. Use `envpkt audit --env-only` to see only env defaults.
 

@@ -225,16 +225,19 @@ const runEnvExport = (options: ExportOptions): void => {
         console.log(`export ${key}='${shellEscape(value)}'`)
       })
 
-      // Emit env entries that boot skipped (already in process.env)
+      // Emit env entries that boot skipped (already in process.env).
+      // Alias entries have no value of their own; fall back to reading the
+      // current process.env value (which is what they would have copied).
       if (boot.overridden.length > 0) {
         loadConfig(boot.configPath).fold(
           () => {},
           (config) => {
             const envEntries = config.env ?? {}
             boot.overridden.forEach((key) => {
-              if (key in envEntries) {
-                console.log(`export ${key}='${shellEscape(envEntries[key]!.value)}'`)
-              }
+              if (!(key in envEntries)) return
+              const entry = envEntries[key]!
+              const value = entry.value ?? process.env[key] ?? ""
+              console.log(`export ${key}='${shellEscape(value)}'`)
             })
           },
         )

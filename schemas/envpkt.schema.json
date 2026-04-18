@@ -151,6 +151,10 @@
               "description": "Age-encrypted secret value (armored ciphertext, safe to commit)",
               "type": "string"
             },
+            "from_key": {
+              "description": "Reference another entry (format: 'secret.<KEY>') whose resolved value this alias reuses. Mutually exclusive with encrypted_value.",
+              "type": "string"
+            },
             "required": {
               "description": "Whether this secret is required for operation",
               "type": "boolean"
@@ -175,12 +179,13 @@
         "^(.*)$": {
           "description": "Metadata for a plaintext environment default (non-secret)",
           "type": "object",
-          "required": [
-            "value"
-          ],
           "properties": {
             "value": {
-              "description": "Default value for this environment variable",
+              "description": "Default value for this environment variable. Optional when from_key is set; required otherwise.",
+              "type": "string"
+            },
+            "from_key": {
+              "description": "Reference another entry (format: 'env.<KEY>') whose resolved value this alias reuses. Mutually exclusive with value.",
               "type": "string"
             },
             "purpose": {

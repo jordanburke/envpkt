@@ -58,6 +58,13 @@ export const envScan = (env: Readonly<Record<string, string | undefined>>, optio
   }
 }
 
+const parseAliasRef = (raw: string, expectedKind: "secret" | "env"): string | undefined => {
+  const match = /^(secret|env)\.(.+)$/.exec(raw)
+  if (!match) return undefined
+  if (match[1] !== expectedKind) return undefined
+  return match[2]
+}
+
 /** Bidirectional drift detection between config and live environment */
 // eslint-disable-next-line functype/prefer-option -- process.env uses string | undefined natively
 export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, string | undefined>>): CheckResult => {
@@ -65,10 +72,20 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
   const metaKeys = Object.keys(secretEntries)
   const trackedSet = new Set(metaKeys)
 
-  // Direction 1: TOML keys → check if present in env
+  // A secret entry is "satisfied" if its canonical name is set, OR (for aliases)
+  // its target name is set — because at boot the alias will copy from target.
+  const isSecretPresent = (key: string): boolean => {
+    if (env[key] !== undefined && env[key] !== "") return true
+    const meta = secretEntries[key]
+    if (meta?.from_key === undefined) return false
+    const targetKey = parseAliasRef(meta.from_key, "secret")
+    return targetKey !== undefined && env[targetKey] !== undefined && env[targetKey] !== ""
+  }
+
+  // Direction 1: TOML keys → check if present in env (aliases satisfied by target)
   const secretDriftEntries: DriftEntry[] = metaKeys.map((key) => {
     const meta = secretEntries[key]
-    const present = env[key] !== undefined && env[key] !== ""
+    const present = isSecretPresent(key)
     return {
       envVar: key,
       service: Option(meta.service),
@@ -77,8 +94,16 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
     }
   })
 
-  // Direction 1b: [env.*] keys → check if present (non-secret defaults)
+  // Direction 1b: [env.*] keys → check if present (non-secret defaults; aliases satisfied by target)
   const envDefaults = config.env ?? {}
+  const isEnvPresent = (key: string): boolean => {
+    if (env[key] !== undefined && env[key] !== "") return true
+    const meta = envDefaults[key]
+    if (meta?.from_key === undefined) return false
+    const targetKey = parseAliasRef(meta.from_key, "env")
+    return targetKey !== undefined && env[targetKey] !== undefined && env[targetKey] !== ""
+  }
+
   const envDefaultEntries: DriftEntry[] = Object.keys(envDefaults)
     .filter((key) => {
       if (trackedSet.has(key)) return false
@@ -86,7 +111,7 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
       return true
     })
     .map((key) => {
-      const present = env[key] !== undefined && env[key] !== ""
+      const present = isEnvPresent(key)
       return {
         envVar: key,
         service: Option<string>(undefined),

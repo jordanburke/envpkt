@@ -141,6 +141,10 @@ const handleGetPacketHealth = (args: Record<string, unknown>): CallToolResult =>
       () => null,
       (u) => u,
     ),
+    alias_of: s.alias_of.fold(
+      () => null,
+      (a) => a,
+    ),
     issues: s.issues.toArray(),
   }))
 
@@ -155,6 +159,7 @@ const handleGetPacketHealth = (args: Record<string, unknown>): CallToolResult =>
         expired: audit.expired,
         stale: audit.stale,
         missing: audit.missing,
+        aliases: audit.aliases,
         secrets: secretDetails,
       },
       null,
@@ -210,8 +215,20 @@ const handleGetSecretMeta = (args: Record<string, unknown>): CallToolResult => {
   return Option(secretEntries[key]).fold(
     () => errorResult(`Secret not found: ${key}`),
     (meta) => {
-      const { encrypted_value: _, ...safeMeta } = meta
-      return textResult(JSON.stringify({ key, ...safeMeta }, null, 2))
+      const { encrypted_value: _, from_key: fromKey, ...rest } = meta
+      // If this entry is an alias, merge target metadata for a complete view,
+      // then stamp alias_of so the caller knows the relationship.
+      if (fromKey !== undefined) {
+        const match = /^secret\.(.+)$/.exec(fromKey)
+        const targetKey = match?.[1]
+        const target = targetKey !== undefined ? secretEntries[targetKey] : undefined
+        if (target) {
+          const { encrypted_value: __, from_key: ___, ...targetRest } = target
+          return textResult(JSON.stringify({ key, ...targetRest, ...rest, alias_of: fromKey }, null, 2))
+        }
+        return textResult(JSON.stringify({ key, ...rest, alias_of: fromKey }, null, 2))
+      }
+      return textResult(JSON.stringify({ key, ...rest }, null, 2))
     },
   )
 }

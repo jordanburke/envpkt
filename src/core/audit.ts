@@ -1,7 +1,15 @@
 import { Cond, List, Option } from "functype"
 
 import type { EnvpktConfig } from "./schema.js"
-import type { AuditResult, EnvAuditResult, EnvDriftStatus, HealthStatus, SecretHealth, SecretStatus } from "./types.js"
+import type {
+  AliasTable,
+  AuditResult,
+  EnvAuditResult,
+  EnvDriftStatus,
+  HealthStatus,
+  SecretHealth,
+  SecretStatus,
+} from "./types.js"
 
 const MS_PER_DAY = 86_400_000
 const WARN_BEFORE_DAYS = 30
@@ -85,10 +93,39 @@ const classifySecret = (
     created: Option(meta.created),
     expires: Option(meta.expires),
     issues: List(issues),
+    alias_of: Option<string>(undefined),
   }
 }
 
-export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string>, today?: Date): AuditResult => {
+/**
+ * Build a SecretHealth row for an alias entry. Status is inherited from the
+ * target; metadata (purpose, tags) comes from the alias entry itself where
+ * set, otherwise falls through to the target so operators see context.
+ */
+const classifyAlias = (
+  key: string,
+  meta: NonNullable<EnvpktConfig["secret"]>[string],
+  targetHealth: SecretHealth,
+  targetRef: string,
+): SecretHealth => ({
+  key,
+  service: targetHealth.service,
+  status: targetHealth.status,
+  days_remaining: targetHealth.days_remaining,
+  rotation_url: targetHealth.rotation_url,
+  purpose: meta.purpose !== undefined ? Option(meta.purpose) : targetHealth.purpose,
+  created: targetHealth.created,
+  expires: targetHealth.expires,
+  issues: List<string>([]),
+  alias_of: Option(targetRef),
+})
+
+export const computeAudit = (
+  config: EnvpktConfig,
+  fnoxKeys?: ReadonlySet<string>,
+  today?: Date,
+  aliasTable?: AliasTable,
+): AuditResult => {
   const now = today ?? new Date()
   const lifecycle = config.lifecycle ?? {}
   const staleWarningDays = lifecycle.stale_warning_days ?? 90
@@ -97,17 +134,46 @@ export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string
 
   const keys = fnoxKeys ?? new Set<string>()
   const secretEntries = config.secret ?? {}
-  const metaKeys = new Set(Object.keys(secretEntries))
 
-  const secrets = List(
-    Object.entries(secretEntries).map(([key, meta]) =>
-      classifySecret(key, meta, keys, staleWarningDays, requireExpiration, requireService, now),
-    ),
+  // Non-alias entries: classify normally
+  const nonAliasEntries = Object.entries(secretEntries).filter(([, meta]) => meta.from_key === undefined)
+  const aliasEntries = Object.entries(secretEntries).filter(([, meta]) => meta.from_key !== undefined)
+  const nonAliasMetaKeys = new Set(nonAliasEntries.map(([k]) => k))
+
+  const nonAliasHealth = nonAliasEntries.map(([key, meta]) =>
+    classifySecret(key, meta, keys, staleWarningDays, requireExpiration, requireService, now),
   )
+  const healthByKey = new Map(nonAliasHealth.map((h) => [h.key, h]))
 
-  // Count orphaned: secret entries that don't have a corresponding fnox key
+  // Alias entries: inherit status from target
+  const aliasHealth = aliasEntries.map(([key, meta]) => {
+    const tableEntry = aliasTable?.entries.get(`secret.${key}`)
+    const targetKey = tableEntry?.targetKey
+    const targetHealth = targetKey !== undefined ? healthByKey.get(targetKey) : undefined
+    const targetRef = meta.from_key ?? (targetKey !== undefined ? `secret.${targetKey}` : "")
+    if (!targetHealth) {
+      // Target missing — shouldn't happen if validator ran, but be defensive
+      return {
+        key,
+        service: Option(meta.service),
+        status: "missing" as SecretStatus,
+        days_remaining: Option<number>(undefined),
+        rotation_url: Option(meta.rotation_url),
+        purpose: Option(meta.purpose),
+        created: Option(meta.created),
+        expires: Option(meta.expires),
+        issues: List<string>(["Alias target not resolvable"]),
+        alias_of: Option(targetRef),
+      }
+    }
+    return classifyAlias(key, meta, targetHealth, targetRef)
+  })
+
+  const secrets = List([...nonAliasHealth, ...aliasHealth])
+
+  // Count orphaned: non-alias secret entries that don't have a corresponding fnox key
   // Only count when fnox keys are available
-  const orphaned = keys.size > 0 ? [...metaKeys].filter((k) => !keys.has(k)).length : 0
+  const orphaned = keys.size > 0 ? [...nonAliasMetaKeys].filter((k) => !keys.has(k)).length : 0
 
   const total = secrets.size
   const expired = secrets.count((s) => s.status === "expired")
@@ -116,6 +182,7 @@ export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string
   const expiring_soon = secrets.count((s) => s.status === "expiring_soon")
   const stale = secrets.count((s) => s.status === "stale")
   const healthy = secrets.count((s) => s.status === "healthy")
+  const aliases = aliasHealth.length
 
   const status: HealthStatus = Cond.of<HealthStatus>()
     .when(expired > 0 || missing > 0, "critical")
@@ -133,6 +200,7 @@ export const computeAudit = (config: EnvpktConfig, fnoxKeys?: ReadonlySet<string
     missing,
     missing_metadata,
     orphaned,
+    aliases,
     identity: config.identity,
   }
 }
@@ -146,17 +214,29 @@ export const computeEnvAudit = (
 
   const entries = Object.entries(envEntries).map(([key, entry]) => {
     const currentValue = env[key]
+    // Resolve effective default: for aliases, it's the target's value
+    const effectiveDefault =
+      entry.from_key !== undefined
+        ? (() => {
+            const match = /^env\.(.+)$/.exec(entry.from_key)
+            const targetKey = match?.[1]
+            const targetEntry = targetKey !== undefined ? envEntries[targetKey] : undefined
+            return targetEntry?.value ?? ""
+          })()
+        : (entry.value ?? "")
+
     const status: EnvDriftStatus = Cond.of<EnvDriftStatus>()
       .when(currentValue === undefined, "missing")
-      .elseWhen(currentValue !== entry.value, "overridden")
+      .elseWhen(currentValue !== effectiveDefault, "overridden")
       .else("default")
 
     return {
       key,
-      defaultValue: entry.value,
+      defaultValue: effectiveDefault,
       currentValue,
       status,
       purpose: entry.purpose,
+      alias_of: Option(entry.from_key),
     }
   })
 

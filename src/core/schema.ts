@@ -71,6 +71,14 @@ export const SecretMetaSchema = Type.Object(
     encrypted_value: Type.Optional(
       Type.String({ description: "Age-encrypted secret value (armored ciphertext, safe to commit)" }),
     ),
+    // Alias: reuse another entry's resolved value under this canonical name.
+    // Format: "secret.<KEY>". Mutually exclusive with encrypted_value.
+    from_key: Type.Optional(
+      Type.String({
+        description:
+          "Reference another entry (format: 'secret.<KEY>') whose resolved value this alias reuses. Mutually exclusive with encrypted_value.",
+      }),
+    ),
     // Tier 4: enforcement/extensibility
     required: Type.Optional(Type.Boolean({ description: "Whether this secret is required for operation" })),
     tags: Type.Optional(
@@ -118,7 +126,17 @@ export type ToolsConfig = Static<typeof ToolsConfigSchema>
 
 export const EnvMetaSchema = Type.Object(
   {
-    value: Type.String({ description: "Default value for this environment variable" }),
+    value: Type.Optional(
+      Type.String({
+        description: "Default value for this environment variable. Optional when from_key is set; required otherwise.",
+      }),
+    ),
+    from_key: Type.Optional(
+      Type.String({
+        description:
+          "Reference another entry (format: 'env.<KEY>') whose resolved value this alias reuses. Mutually exclusive with value.",
+      }),
+    ),
     purpose: Type.Optional(Type.String({ description: "Why this env var exists" })),
     comment: Type.Optional(Type.String({ description: "Free-form annotation or note" })),
     tags: Type.Optional(

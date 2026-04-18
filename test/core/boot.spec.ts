@@ -454,6 +454,154 @@ describe("boot with sealed values", () => {
   })
 })
 
+describe("bootSafe with aliases", () => {
+  it.skipIf(!ageInstalled)("secret alias inherits target's sealed value", () => {
+    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+    const recipient = keygenOutput
+      .split("\n")
+      .find((l) => l.startsWith("# public key:"))!
+      .replace("# public key: ", "")
+      .trim()
+    const identityPath = join(tmpDir, "identity.txt")
+    writeFileSync(identityPath, keygenOutput)
+
+    const ciphertext = ageEncrypt("canonical-value", recipient).fold(
+      () => "",
+      (v) => v,
+    )
+
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[identity]`,
+        `name = "test-alias"`,
+        `recipient = "${recipient}"`,
+        `key_file = "identity.txt"`,
+        `[secret.API_KEY]`,
+        `service = "example"`,
+        `encrypted_value = """`,
+        ciphertext,
+        `"""`,
+        `[secret.LEGACY_API_KEY]`,
+        `from_key = "secret.API_KEY"`,
+        `purpose = "Legacy name consumers still use"`,
+      ].join("\n"),
+    )
+
+    delete process.env["API_KEY"]
+    delete process.env["LEGACY_API_KEY"]
+
+    const result = bootSafe({ configPath, inject: false })
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+      (boot) => {
+        expect(boot.secrets["API_KEY"]).toBe("canonical-value")
+        expect(boot.secrets["LEGACY_API_KEY"]).toBe("canonical-value")
+        expect(boot.injected).toContain("API_KEY")
+        expect(boot.injected).toContain("LEGACY_API_KEY")
+      },
+    )
+  })
+
+  it("env alias copies target's declared value", () => {
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[env.SERVICE_URL]`,
+        `value = "https://api.example.com"`,
+        `[env.LEGACY_URL]`,
+        `from_key = "env.SERVICE_URL"`,
+      ].join("\n"),
+    )
+
+    delete process.env["SERVICE_URL"]
+    delete process.env["LEGACY_URL"]
+
+    const result = bootSafe({ configPath, inject: false })
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+      (boot) => {
+        expect(boot.envDefaults["SERVICE_URL"]).toBe("https://api.example.com")
+        expect(boot.envDefaults["LEGACY_URL"]).toBe("https://api.example.com")
+      },
+    )
+  })
+
+  it("secret alias reports skipped when target is unresolved", () => {
+    const configPath = writeConfig(
+      `version = 1\n[secret.TARGET]\nservice = "svc"\n\n[secret.ALIAS]\nfrom_key = "secret.TARGET"\n`,
+    )
+
+    const result = bootSafe({ configPath, inject: false })
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+      (boot) => {
+        expect(boot.skipped).toContain("TARGET")
+        expect(boot.skipped).toContain("ALIAS")
+      },
+    )
+  })
+
+  it("rejects invalid alias config at boot", () => {
+    const configPath = writeConfig(`version = 1\n[secret.ALIAS]\nfrom_key = "secret.NONEXISTENT"\n`)
+    const result = bootSafe({ configPath, inject: false })
+    result.fold(
+      (err) => expect(err._tag).toBe("AliasTargetMissing"),
+      () => expect.unreachable("Expected Left"),
+    )
+  })
+
+  it("rejects cross-type alias at boot", () => {
+    const configPath = writeConfig(
+      `version = 1\n[secret.API_KEY]\nservice = "x"\n\n[env.BAD]\nfrom_key = "secret.API_KEY"\n`,
+    )
+    const result = bootSafe({ configPath, inject: false })
+    result.fold(
+      (err) => expect(err._tag).toBe("AliasCrossType"),
+      () => expect.unreachable("Expected Left"),
+    )
+  })
+
+  it("rejects chained aliases at boot", () => {
+    const configPath = writeConfig(
+      `version = 1\n[secret.A]\nservice = "x"\n\n[secret.B]\nfrom_key = "secret.A"\n\n[secret.C]\nfrom_key = "secret.B"\n`,
+    )
+    const result = bootSafe({ configPath, inject: false })
+    result.fold(
+      (err) => expect(err._tag).toBe("AliasChained"),
+      () => expect.unreachable("Expected Left"),
+    )
+  })
+
+  it("env alias does not inject if canonical name is already set", () => {
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[env.SERVICE_URL]`,
+        `value = "https://from-config.example.com"`,
+        `[env.LEGACY_URL]`,
+        `from_key = "env.SERVICE_URL"`,
+      ].join("\n"),
+    )
+
+    delete process.env["SERVICE_URL"]
+    process.env["LEGACY_URL"] = "https://preset.example.com"
+
+    try {
+      const result = bootSafe({ configPath, inject: false })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        (boot) => {
+          expect(boot.overridden).toContain("LEGACY_URL")
+          expect(boot.envDefaults["LEGACY_URL"]).toBeUndefined()
+        },
+      )
+    } finally {
+      delete process.env["LEGACY_URL"]
+    }
+  })
+})
+
 describe("EnvpktBootError", () => {
   it("has descriptive message for FileNotFound", () => {
     const err = new EnvpktBootError({ _tag: "FileNotFound", path: "/missing" })
@@ -468,5 +616,10 @@ describe("EnvpktBootError", () => {
       message: "2 secret(s) have expired",
     })
     expect(err.message).toContain("expired")
+  })
+
+  it("has descriptive message for AliasTargetMissing", () => {
+    const err = new EnvpktBootError({ _tag: "AliasTargetMissing", key: "secret.X", target: "secret.Y" })
+    expect(err.message).toContain("secret.Y")
   })
 })

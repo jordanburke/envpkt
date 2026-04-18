@@ -35,6 +35,8 @@ export type SecretHealth = {
   readonly created: Option<string>
   readonly expires: Option<string>
   readonly issues: List<string>
+  /** If this entry is an alias (from_key), the reference it points at (e.g. "secret.X") */
+  readonly alias_of: Option<string>
 }
 
 export type AuditResult = {
@@ -48,6 +50,8 @@ export type AuditResult = {
   readonly missing: number
   readonly missing_metadata: number
   readonly orphaned: number
+  /** Count of entries that are aliases (from_key). Included in `secrets` but reported separately for visibility. */
+  readonly aliases: number
   readonly identity?: Identity
 }
 
@@ -63,6 +67,8 @@ export type EnvDriftEntry = {
   readonly status: EnvDriftStatus
   // eslint-disable-next-line functype/prefer-option
   readonly purpose: string | undefined
+  /** If this entry is an alias (from_key), the reference it points at (e.g. "env.X") */
+  readonly alias_of: Option<string>
 }
 
 export type EnvAuditResult = {
@@ -146,6 +152,39 @@ export type CatalogError =
   | { readonly _tag: "SecretNotInCatalog"; readonly key: string; readonly catalogPath: string }
   | { readonly _tag: "MissingSecretsList"; readonly message: string }
 
+// --- Alias types ---
+
+export type AliasTable = {
+  /** key → { type: "secret"|"env", targetType, targetKey } for every alias entry */
+  readonly entries: ReadonlyMap<
+    string,
+    { readonly kind: "secret" | "env"; readonly targetKind: "secret" | "env"; readonly targetKey: string }
+  >
+}
+
+export type AliasError =
+  | {
+      readonly _tag: "AliasInvalidSyntax"
+      readonly key: string
+      readonly kind: "secret" | "env"
+      readonly value: string
+    }
+  | { readonly _tag: "AliasTargetMissing"; readonly key: string; readonly target: string }
+  | { readonly _tag: "AliasSelfReference"; readonly key: string }
+  | { readonly _tag: "AliasChained"; readonly key: string; readonly target: string }
+  | {
+      readonly _tag: "AliasCrossType"
+      readonly key: string
+      readonly kind: "secret" | "env"
+      readonly targetKind: "secret" | "env"
+    }
+  | {
+      readonly _tag: "AliasValueConflict"
+      readonly key: string
+      readonly kind: "secret" | "env"
+      readonly field: string
+    }
+
 // --- Boot types ---
 
 export type BootOptions = {
@@ -172,6 +211,7 @@ export type BootError =
   | ConfigError
   | FnoxError
   | CatalogError
+  | AliasError
   | { readonly _tag: "AuditFailed"; readonly audit: AuditResult; readonly message: string }
   | IdentityError
 
