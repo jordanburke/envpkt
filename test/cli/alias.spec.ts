@@ -1,17 +1,23 @@
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { loadConfig } from "../../src/core/config.js"
 
-const CLI = join(__dirname, "..", "..", "dist", "cli.js")
+// Run the CLI via tsx against the source file — tests run before `build` in
+// the validate pipeline, so `dist/cli.js` doesn't exist yet in CI.
+const __testDir = dirname(fileURLToPath(import.meta.url))
+const PROJECT_ROOT = resolve(__testDir, "../..")
+const CLI_SRC = resolve(PROJECT_ROOT, "src/cli/index.ts")
+const TSX = resolve(PROJECT_ROOT, "node_modules/.bin/tsx")
 
 const runCli = (args: string[], configPath: string): { stdout: string; stderr: string; exitCode: number } => {
   try {
-    const stdout = execFileSync("node", [CLI, ...args, "-c", configPath], {
+    const stdout = execFileSync(TSX, [CLI_SRC, ...args, "-c", configPath], {
       encoding: "utf-8",
       stdio: ["ignore", "pipe", "pipe"],
     })
