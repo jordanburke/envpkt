@@ -1,4 +1,4 @@
-import { Option } from "functype"
+import { Option, Set } from "functype"
 
 // --- Types ---
 
@@ -22,7 +22,7 @@ export type MatchResult = {
 
 // --- Exclusion set: env vars that are never credentials ---
 
-const EXCLUDED_VARS = new Set([
+const EXCLUDED_VARS = Set([
   "PATH",
   "HOME",
   "USER",

@@ -104,6 +104,7 @@ const validateOneEnv = (
 export const validateAliases = (config: EnvpktConfig): Either<AliasError, AliasTable> => {
   const secretEntries = config.secret ?? {}
   const envEntries = config.env ?? {}
+  // eslint-disable-next-line functype/prefer-functype-map -- AliasTable.entries is public API ReadonlyMap
   const entries = new Map<string, AliasEntry>()
 
   const secretResults = Object.entries(secretEntries).map(

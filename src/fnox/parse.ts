@@ -31,4 +31,5 @@ export const readFnoxConfig = (path: string): Either<FnoxError, FnoxConfig> =>
   )
 
 /** Extract the set of secret key names from a parsed fnox config */
+// eslint-disable-next-line functype/prefer-functype-set -- return type is public API ReadonlySet<string>
 export const extractFnoxKeys = (config: FnoxConfig): ReadonlySet<string> => new Set(Object.keys(config.secrets))

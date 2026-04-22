@@ -1,4 +1,4 @@
-import { List, Option } from "functype"
+import { List, Option, Set as FSet } from "functype"
 
 import type { ConfidenceLevel, MatchResult } from "./patterns.js"
 import { scanEnv } from "./patterns.js"
@@ -69,7 +69,7 @@ const parseAliasRef = (raw: string, expectedKind: "secret" | "env"): Option<stri
 export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, string | undefined>>): CheckResult => {
   const secretEntries = config.secret ?? {}
   const metaKeys = Object.keys(secretEntries)
-  const trackedSet = new Set(metaKeys)
+  const metaKeysSet = FSet(metaKeys)
 
   // A secret entry is "satisfied" if its canonical name is set, OR (for aliases)
   // its target name is set — because at boot the alias will copy from target.
@@ -106,12 +106,9 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
     )
   }
 
+  // Env defaults excluding any key already tracked as a secret
   const envDefaultEntries: DriftEntry[] = Object.keys(envDefaults)
-    .filter((key) => {
-      if (trackedSet.has(key)) return false
-      trackedSet.add(key)
-      return true
-    })
+    .filter((key) => !metaKeysSet.has(key))
     .map((key) => {
       const present = isEnvPresent(key)
       return {
@@ -122,10 +119,13 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
       }
     })
 
+  // Keys considered "tracked" = secrets ∪ env defaults (after dedup above)
+  const trackedKeys = FSet([...metaKeys, ...envDefaultEntries.map((e) => e.envVar)])
+
   // Direction 2: env vars → find credential-shaped vars not in TOML
   const envMatches = scanEnv(env)
   const untrackedEntries: DriftEntry[] = envMatches
-    .filter((match) => !trackedSet.has(match.envVar))
+    .filter((match) => !trackedKeys.has(match.envVar))
     .map((match) => ({
       envVar: match.envVar,
       service: match.service,

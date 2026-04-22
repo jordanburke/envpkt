@@ -10,6 +10,7 @@ export const resolveValues = async (
   agentKey?: string,
 ): Promise<Record<string, string>> => {
   const result: Record<string, string> = {}
+  // eslint-disable-next-line functype/prefer-functype-set -- mutation tracks unresolved keys across async resolution layers (fnox → env → sequential TTY prompts); refactoring to immutable accumulator would obscure the multi-stage semantics
   const remaining = new Set(keys)
 
   // Layer 1: try fnox export

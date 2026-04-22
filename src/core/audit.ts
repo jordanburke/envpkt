@@ -1,4 +1,4 @@
-import { Cond, List, Option } from "functype"
+import { Cond, List, Map as FMap, Option, Set as FSet } from "functype"
 
 import type { EnvpktConfig } from "./schema.js"
 import type {
@@ -138,12 +138,12 @@ export const computeAudit = (
   // Non-alias entries: classify normally
   const nonAliasEntries = Object.entries(secretEntries).filter(([, meta]) => meta.from_key === undefined)
   const aliasEntries = Object.entries(secretEntries).filter(([, meta]) => meta.from_key !== undefined)
-  const nonAliasMetaKeys = new Set(nonAliasEntries.map(([k]) => k))
+  const nonAliasMetaKeys = FSet(nonAliasEntries.map(([k]) => k))
 
   const nonAliasHealth = nonAliasEntries.map(([key, meta]) =>
     classifySecret(key, meta, keys, staleWarningDays, requireExpiration, requireService, now),
   )
-  const healthByKey = new Map(nonAliasHealth.map((h) => [h.key, h]))
+  const healthByKey = FMap<string, SecretHealth>(nonAliasHealth.map((h) => [h.key, h] as const))
 
   // Alias entries: inherit status from target.
   // Prefer the pre-validated aliasTable when provided (e.g. from bootSafe),
@@ -160,7 +160,7 @@ export const computeAudit = (
       () => Option(meta.from_key).flatMap(parseTargetKey),
       (k) => Option(k),
     )
-    const targetHealth = targetKey.flatMap((k) => Option(healthByKey.get(k)))
+    const targetHealth = targetKey.flatMap((k) => healthByKey.get(k))
     const targetRef = Option(meta.from_key)
       .fold<Option<string>>(
         () => targetKey.map((k) => `secret.${k}`),
@@ -189,7 +189,7 @@ export const computeAudit = (
 
   // Count orphaned: non-alias secret entries that don't have a corresponding fnox key
   // Only count when fnox keys are available
-  const orphaned = keys.size > 0 ? [...nonAliasMetaKeys].filter((k) => !keys.has(k)).length : 0
+  const orphaned = keys.size > 0 ? nonAliasMetaKeys.toArray().filter((k) => !keys.has(k)).length : 0
 
   const total = secrets.size
   const expired = secrets.count((s) => s.status === "expired")

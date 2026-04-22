@@ -2,14 +2,14 @@ import type { Dirent } from "node:fs"
 import { readdirSync, statSync } from "node:fs"
 import { join } from "node:path"
 
-import { Cond, List, Option, Try } from "functype"
+import { Cond, List, Option, Set, Try } from "functype"
 
 import { computeAudit } from "./audit.js"
 import { loadConfig } from "./config.js"
 import type { FleetAgent, FleetHealth, HealthStatus } from "./types.js"
 
 const CONFIG_FILENAME = "envpkt.toml"
-const SKIP_DIRS = new Set([
+const SKIP_DIRS = Set.of(
   "node_modules",
   ".git",
   ".hg",
@@ -33,7 +33,7 @@ const SKIP_DIRS = new Set([
   "coverage",
   ".nyc_output",
   ".turbo",
-])
+)
 
 function* findEnvpktFiles(dir: string, maxDepth: number, currentDepth = 0): Generator<string> {
   if (currentDepth > maxDepth) return
