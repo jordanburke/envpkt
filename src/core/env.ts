@@ -58,11 +58,10 @@ export const envScan = (env: Readonly<Record<string, string | undefined>>, optio
   }
 }
 
-const parseAliasRef = (raw: string, expectedKind: "secret" | "env"): string | undefined => {
-  const match = /^(secret|env)\.(.+)$/.exec(raw)
-  if (!match) return undefined
-  if (match[1] !== expectedKind) return undefined
-  return match[2]
+const parseAliasRef = (raw: string, expectedKind: "secret" | "env"): Option<string> => {
+  const match = raw.match(/^(secret|env)\.(.+)$/)
+  if (match?.[1] !== expectedKind) return Option<string>(undefined)
+  return Option(match[2])
 }
 
 /** Bidirectional drift detection between config and live environment */
@@ -78,8 +77,10 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
     if (env[key] !== undefined && env[key] !== "") return true
     const meta = secretEntries[key]
     if (meta?.from_key === undefined) return false
-    const targetKey = parseAliasRef(meta.from_key, "secret")
-    return targetKey !== undefined && env[targetKey] !== undefined && env[targetKey] !== ""
+    return parseAliasRef(meta.from_key, "secret").fold(
+      () => false,
+      (targetKey) => env[targetKey] !== undefined && env[targetKey] !== "",
+    )
   }
 
   // Direction 1: TOML keys → check if present in env (aliases satisfied by target)
@@ -99,8 +100,10 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
     if (env[key] !== undefined && env[key] !== "") return true
     const meta = envDefaults[key]
     if (meta?.from_key === undefined) return false
-    const targetKey = parseAliasRef(meta.from_key, "env")
-    return targetKey !== undefined && env[targetKey] !== undefined && env[targetKey] !== ""
+    return parseAliasRef(meta.from_key, "env").fold(
+      () => false,
+      (targetKey) => env[targetKey] !== undefined && env[targetKey] !== "",
+    )
   }
 
   const envDefaultEntries: DriftEntry[] = Object.keys(envDefaults)

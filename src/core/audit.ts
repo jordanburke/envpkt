@@ -149,19 +149,27 @@ export const computeAudit = (
   // Prefer the pre-validated aliasTable when provided (e.g. from bootSafe),
   // but fall back to parsing meta.from_key directly so audit works standalone
   // without requiring callers to plumb the alias table through.
-  const parseTargetKey = (from_key: string): string | undefined => {
-    const match = /^secret\.(.+)$/.exec(from_key)
-    return match?.[1]
+  const parseTargetKey = (from_key: string): Option<string> => {
+    const match = from_key.match(/^secret\.(.+)$/)
+    return Option(match?.[1])
   }
 
   const aliasHealth = aliasEntries.map(([key, meta]) => {
     const tableEntry = aliasTable?.entries.get(`secret.${key}`)
-    const targetKey = tableEntry?.targetKey ?? (meta.from_key !== undefined ? parseTargetKey(meta.from_key) : undefined)
-    const targetHealth = targetKey !== undefined ? healthByKey.get(targetKey) : undefined
-    const targetRef = meta.from_key ?? (targetKey !== undefined ? `secret.${targetKey}` : "")
-    if (!targetHealth) {
-      // Target genuinely missing — config is invalid but we still produce a row
-      return {
+    const targetKey: Option<string> = Option(tableEntry?.targetKey).fold(
+      () => Option(meta.from_key).flatMap(parseTargetKey),
+      (k) => Option(k),
+    )
+    const targetHealth = targetKey.flatMap((k) => Option(healthByKey.get(k)))
+    const targetRef = Option(meta.from_key)
+      .fold<Option<string>>(
+        () => targetKey.map((k) => `secret.${k}`),
+        (v) => Option(v),
+      )
+      .orElse("")
+
+    return targetHealth.fold<SecretHealth>(
+      () => ({
         key,
         service: Option(meta.service),
         status: "missing" as SecretStatus,
@@ -172,9 +180,9 @@ export const computeAudit = (
         expires: Option(meta.expires),
         issues: List<string>(["Alias target not resolvable"]),
         alias_of: Option(targetRef),
-      }
-    }
-    return classifyAlias(key, meta, targetHealth, targetRef)
+      }),
+      (health) => classifyAlias(key, meta, health, targetRef),
+    )
   })
 
   const secrets = List([...nonAliasHealth, ...aliasHealth])

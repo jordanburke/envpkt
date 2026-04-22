@@ -136,9 +136,11 @@ export const validateAliases = (config: EnvpktConfig): Either<AliasError, AliasT
 }
 
 /** Does this secret entry point at another entry? */
+// eslint-disable-next-line functype/prefer-option -- public API: signature mirrors native `Record[key]` for JS/TS consumers
 export const isSecretAlias = (meta: { from_key?: string } | undefined): boolean => meta?.from_key !== undefined
 
 /** Does this env entry point at another entry? */
+// eslint-disable-next-line functype/prefer-option -- public API: signature mirrors native `Record[key]` for JS/TS consumers
 export const isEnvAlias = (meta: { from_key?: string } | undefined): boolean => meta?.from_key !== undefined
 
 /** Format an alias error into a human-readable message */
