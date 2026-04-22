@@ -1,9 +1,27 @@
-import { Either } from "functype"
+import { Either, List, Set } from "functype"
 
 import type { TomlEditError } from "./types.js"
 
 const SECTION_RE = /^\[.+\]\s*$/
 const MULTILINE_OPEN = '"""'
+
+type ScanState = { readonly end: number; readonly inMultiline: boolean; readonly done: boolean }
+
+const scanSectionBoundary = (state: ScanState, line: string, i: number): ScanState => {
+  if (state.done) return state
+
+  if (state.inMultiline) {
+    return line.includes(MULTILINE_OPEN) ? { ...state, inMultiline: false } : state
+  }
+
+  if (line.includes(MULTILINE_OPEN)) {
+    const afterEquals = line.slice(line.indexOf("=") + 1).trim()
+    const count = (afterEquals.match(new RegExp('"""', "g")) ?? []).length
+    return count === 1 ? { ...state, inMultiline: true } : state
+  }
+
+  return SECTION_RE.test(line) ? { ...state, end: i, done: true } : state
+}
 
 /**
  * Find the line range [start, end) of a TOML section by its header string.
@@ -18,32 +36,12 @@ const findSectionRange = (
   const start = lines.findIndex((l) => l.trim() === sectionHeader)
   if (start === -1) return undefined
 
-  let end = lines.length
-  let inMultiline = false
-  // eslint-disable-next-line functype/no-imperative-loops
-  for (let i = start + 1; i < lines.length; i++) {
-    const line = lines[i]!
+  const initial: ScanState = { end: lines.length, inMultiline: false, done: false }
+  const final = List(lines.slice(start + 1))
+    .zipWithIndex()
+    .foldLeft<ScanState>(initial)((state, entry) => scanSectionBoundary(state, entry[0], start + 1 + entry[1]))
 
-    if (inMultiline) {
-      if (line.includes(MULTILINE_OPEN)) inMultiline = false
-      continue
-    }
-
-    if (line.includes(MULTILINE_OPEN)) {
-      const afterEquals = line.slice(line.indexOf("=") + 1).trim()
-      // Opening """ — check if it also closes on same line (unlikely for encrypted_value but handle it)
-      const count = (afterEquals.match(new RegExp('"""', "g")) ?? []).length
-      if (count === 1) inMultiline = true
-      continue
-    }
-
-    if (SECTION_RE.test(line)) {
-      end = i
-      break
-    }
-  }
-
-  return { start, end }
+  return { start, end: final.end }
 }
 
 /** Check whether a section header exists in the raw TOML */
@@ -59,21 +57,12 @@ export const removeSection = (raw: string, sectionHeader: string): Either<TomlEd
   const range = findSectionRange(lines, sectionHeader)
   if (!range) return Either.left({ _tag: "SectionNotFound", section: sectionHeader })
 
-  // Also remove any trailing blank lines after the section
-  let removeEnd = range.end
-  // eslint-disable-next-line functype/no-imperative-loops
-  while (removeEnd > range.start && removeEnd - 1 >= range.start && lines[removeEnd - 1]!.trim() === "") {
-    removeEnd--
-  }
-  // Keep the section content removal but strip blank lines before next section
-  const before = lines.slice(0, range.start)
   const after = lines.slice(range.end)
 
-  // Remove trailing blank lines from `before`
-  // eslint-disable-next-line functype/no-imperative-loops
-  while (before.length > 0 && before[before.length - 1]!.trim() === "") {
-    before.pop()
-  }
+  // Drop trailing blank lines from the kept prefix so the removed section doesn't leave a gap
+  const beforeAll = lines.slice(0, range.start)
+  const lastNonBlank = beforeAll.findLastIndex((l) => l.trim() !== "")
+  const before = lastNonBlank === -1 ? [] : beforeAll.slice(0, lastNonBlank + 1)
 
   const result = [...before, ...after].join("\n")
   return Either.right(result)
@@ -97,6 +86,12 @@ export const renameSection = (raw: string, oldHeader: string, newHeader: string)
   return Either.right(result)
 }
 
+type UpdateState = {
+  readonly remaining: readonly string[]
+  readonly updatedKeys: Set<string>
+  readonly skipUntil: number
+}
+
 /**
  * Update, add, or remove fields within an existing TOML section.
  * - A string value replaces or adds the field
@@ -115,84 +110,59 @@ export const updateSectionFields = (
 
   const before = lines.slice(0, range.start + 1) // include header
   const after = lines.slice(range.end)
-
-  // Parse existing fields in the section body
   const sectionBody = lines.slice(range.start + 1, range.end)
-  const remaining: string[] = []
-  const updatedKeys = new Set<string>()
 
-  let inMultiline = false
-  let multilineKey = ""
-  // eslint-disable-next-line functype/no-imperative-loops, functype/prefer-map
-  for (let i = 0; i < sectionBody.length; i++) {
-    const line = sectionBody[i]!
-
-    if (inMultiline) {
-      if (line.includes(MULTILINE_OPEN)) {
-        inMultiline = false
-        // If removing this key, skip the closing line too
-        if (updates[multilineKey] === null) continue
-        if (multilineKey in updates) {
-          // Already handled when we saw the opening line
-          continue
-        }
-      } else {
-        if (updates[multilineKey] === null) continue
-        if (multilineKey in updates) continue
-      }
-      remaining.push(line)
-      continue
-    }
-
-    // Check for key = value line
-    const eqIdx = line.indexOf("=")
-    if (eqIdx > 0 && !line.trimStart().startsWith("#") && !line.trimStart().startsWith("[")) {
-      const key = line.slice(0, eqIdx).trim()
-
-      if (key in updates) {
-        updatedKeys.add(key)
-        const afterEquals = line.slice(eqIdx + 1).trim()
-
-        // Check for multiline opening
-        if (afterEquals.includes(MULTILINE_OPEN)) {
-          const count = (afterEquals.match(new RegExp('"""', "g")) ?? []).length
-          if (count === 1) {
-            inMultiline = true
-            multilineKey = key
-          }
-        }
-
-        if (updates[key] === null) {
-          // Remove: skip this line (and multiline content handled above)
-          continue
-        }
-        // Replace
-        remaining.push(`${key} = ${updates[key]}`)
-        // If multiline was opening, skip through closing
-        if (inMultiline) {
-          // eslint-disable-next-line functype/no-imperative-loops
-          for (let j = i + 1; j < sectionBody.length; j++) {
-            if (sectionBody[j]!.includes(MULTILINE_OPEN)) {
-              i = j
-              inMultiline = false
-              break
-            }
-          }
-        }
-        continue
-      }
-    }
-
-    remaining.push(line)
+  // Given an opening `"""` at `fromIdx`, return the index of the closing `"""`
+  // or sectionBody.length if the multiline is unterminated (skip-to-end fallback).
+  const findClosingMultiline = (fromIdx: number): number => {
+    const idx = sectionBody.findIndex((l, j) => j > fromIdx && l.includes(MULTILINE_OPEN))
+    return idx === -1 ? sectionBody.length : idx
   }
 
-  // Add new fields that weren't already in the section
-  const newFields = Object.entries(updates)
-    .filter(([key, value]) => value !== null && !updatedKeys.has(key))
-    .map(([key, value]) => `${key} = ${value}`)
-  remaining.push(...newFields)
+  const initial: UpdateState = {
+    remaining: [],
+    updatedKeys: Set.empty<string>(),
+    skipUntil: -1,
+  }
 
-  const result = [...before, ...remaining, ...after].join("\n")
+  const step = (state: UpdateState, line: string, i: number): UpdateState => {
+    if (i <= state.skipUntil) return state
+
+    const eqIdx = line.indexOf("=")
+    const isFieldLine = eqIdx > 0 && !line.trimStart().startsWith("#") && !line.trimStart().startsWith("[")
+    const key = isFieldLine ? line.slice(0, eqIdx).trim() : ""
+
+    if (isFieldLine && key in updates) {
+      const afterEquals = line.slice(eqIdx + 1).trim()
+      const opensMultiline =
+        afterEquals.includes(MULTILINE_OPEN) && (afterEquals.match(new RegExp('"""', "g")) ?? []).length === 1
+      const skipUntil = opensMultiline ? findClosingMultiline(i) : state.skipUntil
+      const updatedKeys = state.updatedKeys.add(key)
+      const value = updates[key]
+
+      if (value === null) {
+        return { ...state, updatedKeys, skipUntil }
+      }
+      return {
+        remaining: [...state.remaining, `${key} = ${value}`],
+        updatedKeys,
+        skipUntil,
+      }
+    }
+
+    return { ...state, remaining: [...state.remaining, line] }
+  }
+
+  const final = List(sectionBody).zipWithIndex().foldLeft<UpdateState>(initial)((state, entry) =>
+    step(state, entry[0], entry[1]),
+  )
+
+  // Append fields that weren't already present
+  const newFields = Object.entries(updates)
+    .filter(([key, value]) => value !== null && !final.updatedKeys.has(key))
+    .map(([key, value]) => `${key} = ${value}`)
+
+  const result = [...before, ...final.remaining, ...newFields, ...after].join("\n")
   return Either.right(result)
 }
 

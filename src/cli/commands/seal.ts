@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
 
-import { Option } from "functype"
+import { List, Option, Set } from "functype"
 
 import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import { resolveKeyPath } from "../../core/keygen.js"
@@ -17,107 +17,133 @@ type SealOptions = {
   readonly edit?: string
 }
 
-/** Write sealed values back into the TOML file, preserving structure */
+type SealParseState = {
+  readonly output: readonly string[]
+  readonly currentMetaKey: Option<string>
+  readonly insideMetaBlock: boolean
+  readonly hasEncryptedValue: boolean
+  readonly consumedKeys: Set<string>
+  readonly skipUntil: number
+}
+
+const META_SECTION_RE = /^\[secret\.(.+)\]\s*$/
+const ENCRYPTED_VALUE_RE = /^encrypted_value\s*=/
+const NEW_SECTION_RE = /^\[/
+const MULTILINE_DELIM = '"""'
+
+/** Write sealed values back into the TOML file, preserving structure. */
 const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encrypted_value?: string }>): void => {
   const raw = readFileSync(configPath, "utf-8")
   const lines = raw.split("\n")
-  const output: string[] = []
 
-  let currentMetaKey: Option<string> = Option.none()
-  let insideMetaBlock = false
-  let hasEncryptedValue = false
-  const pendingSeals = new Map<string, string>()
+  const getSeal = (key: string): Option<string> => Option(sealedMeta[key]?.encrypted_value)
 
-  // Collect all encrypted_value entries to write
-  Object.entries(sealedMeta).forEach(([key, meta]) => {
-    if (meta.encrypted_value) {
-      pendingSeals.set(key, meta.encrypted_value)
-    }
-  })
+  const isPending = (state: SealParseState, key: string): boolean =>
+    !getSeal(key).isEmpty && !state.consumedKeys.has(key)
 
-  const metaSectionRe = /^\[secret\.(.+)\]\s*$/
-  const encryptedValueRe = /^encrypted_value\s*=/
-  const newSectionRe = /^\[/
+  const sealLinesFor = (key: string): readonly string[] =>
+    getSeal(key).fold<readonly string[]>(
+      () => [],
+      (v) => [`encrypted_value = """`, v, `"""`],
+    )
 
-  /* eslint-disable functype/prefer-map -- side-effect accumulation into mutable output array */
-  const flushPending = (): void => {
-    currentMetaKey.forEach((key) => {
-      if (!hasEncryptedValue && pendingSeals.has(key)) {
-        output.push(`encrypted_value = """`)
-        output.push(pendingSeals.get(key)!)
-        output.push(`"""`)
-        output.push("")
-        pendingSeals.delete(key)
-      }
-    })
-  }
-  /* eslint-enable functype/prefer-map */
+  /** Append a seal block to `output` if the current section is pending and hasn't already got one. */
+  const flushPending = (state: SealParseState): SealParseState =>
+    state.currentMetaKey.fold(
+      () => state,
+      (key) => {
+        if (state.hasEncryptedValue || !isPending(state, key)) return state
+        return {
+          ...state,
+          output: [...state.output, ...sealLinesFor(key), ""],
+          consumedKeys: state.consumedKeys.add(key),
+        }
+      },
+    )
 
-  // eslint-disable-next-line functype/no-imperative-loops, functype/prefer-map -- index manipulation (i++) required for multiline TOML parsing
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]!
-    const metaMatch = metaSectionRe.exec(line)
+  const step = (state: SealParseState, line: string, i: number): SealParseState => {
+    if (i <= state.skipUntil) return state
 
+    const metaMatch = line.match(META_SECTION_RE)
     if (metaMatch) {
-      flushPending()
-
-      currentMetaKey = Option(metaMatch[1])
-      insideMetaBlock = true
-      hasEncryptedValue = false
-      output.push(line)
-      continue
-    }
-
-    if (insideMetaBlock && newSectionRe.test(line) && !metaSectionRe.test(line)) {
-      flushPending()
-      insideMetaBlock = false
-      currentMetaKey = Option.none()
-      output.push(line)
-      continue
-    }
-
-    if (insideMetaBlock && encryptedValueRe.test(line)) {
-      hasEncryptedValue = true
-      const replacing = currentMetaKey.fold(
-        () => false,
-        (key) => pendingSeals.has(key),
-      )
-
-      if (replacing) {
-        /* eslint-disable functype/prefer-map -- side-effect accumulation into mutable output array */
-        currentMetaKey.forEach((key) => {
-          output.push(`encrypted_value = """`)
-          output.push(pendingSeals.get(key)!)
-          output.push(`"""`)
-          pendingSeals.delete(key)
-        })
-        /* eslint-enable functype/prefer-map */
-      } else {
-        output.push(line)
+      const flushed = flushPending(state)
+      return {
+        ...flushed,
+        output: [...flushed.output, line],
+        currentMetaKey: Option(metaMatch[1]),
+        insideMetaBlock: true,
+        hasEncryptedValue: false,
       }
+    }
+
+    if (state.insideMetaBlock && NEW_SECTION_RE.test(line) && !META_SECTION_RE.test(line)) {
+      const flushed = flushPending(state)
+      return {
+        ...flushed,
+        output: [...flushed.output, line],
+        insideMetaBlock: false,
+        currentMetaKey: Option.none<string>(),
+      }
+    }
+
+    if (state.insideMetaBlock && ENCRYPTED_VALUE_RE.test(line)) {
+      const replacingKey = state.currentMetaKey.filter((k) => isPending(state, k))
+      const replacement = replacingKey.fold<readonly string[]>(
+        () => [line],
+        (key) => sealLinesFor(key),
+      )
+      const consumedKeys = replacingKey.fold(
+        () => state.consumedKeys,
+        (key) => state.consumedKeys.add(key),
+      )
+      const replacing = !replacingKey.isEmpty
 
       const afterEquals = line.slice(line.indexOf("=") + 1).trim()
-      if (afterEquals.includes('"""')) {
-        // eslint-disable-next-line functype/no-imperative-loops -- index manipulation required for multiline TOML
-        while (i + 1 < lines.length && !lines[i + 1]!.includes('"""')) {
-          if (!replacing) output.push(lines[i + 1]!)
-          i++
-        }
-        if (i + 1 < lines.length) {
-          if (!replacing) output.push(lines[i + 1]!)
-          i++ // skip the closing """
+      if (!afterEquals.includes(MULTILINE_DELIM)) {
+        return {
+          ...state,
+          output: [...state.output, ...replacement],
+          hasEncryptedValue: true,
+          consumedKeys,
         }
       }
-      continue
+
+      // Multiline opening: find closing """ and skip through it (keeping continuation if not replacing).
+      const closingIdx = lines.findIndex((l, j) => j > i && l.includes(MULTILINE_DELIM))
+      const effectiveEnd = closingIdx === -1 ? lines.length - 1 : closingIdx
+      const continuation = replacing ? [] : lines.slice(i + 1, effectiveEnd + 1)
+
+      return {
+        ...state,
+        output: [...state.output, ...replacement, ...continuation],
+        hasEncryptedValue: true,
+        consumedKeys,
+        skipUntil: effectiveEnd,
+      }
     }
 
-    output.push(line)
+    return { ...state, output: [...state.output, line] }
   }
 
-  flushPending()
+  const initial: SealParseState = {
+    output: [],
+    currentMetaKey: Option.none<string>(),
+    insideMetaBlock: false,
+    hasEncryptedValue: false,
+    consumedKeys: Set.empty<string>(),
+    skipUntil: -1,
+  }
 
-  writeFileSync(configPath, output.join("\n"))
+  const walked = List(lines).zipWithIndex().foldLeft<SealParseState>(initial)((state, entry) =>
+    step(state, entry[0], entry[1]),
+  )
+
+  // Final flush for the last section (if it ended without an encrypted_value line).
+  const final = flushPending(walked)
+
+  writeFileSync(configPath, final.output.join("\n"))
 }
+
 export const runSeal = async (options: SealOptions): Promise<void> => {
   const configResult = resolveConfigPath(options.config)
 
