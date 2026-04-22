@@ -31,26 +31,25 @@ const validateOneSecret = (
     return Left({ _tag: "AliasValueConflict", key, kind: "secret", field: "encrypted_value" })
   }
 
-  return parseRef(ref).fold<Either<AliasError, Option<AliasEntry>>>(
-    () => Left({ _tag: "AliasInvalidSyntax", key, kind: "secret", value: ref }),
-    (parsed) => {
+  // eslint-disable-next-line functype/prefer-do-notation -- Do's generator-typing friction outweighs the readability win for this 4-step validation chain; Either.flatMap chain with toEither conversions is the cleanest alternative
+  const result: Either<AliasError, AliasEntry> = parseRef(ref)
+    .toEither<AliasError>({ _tag: "AliasInvalidSyntax", key, kind: "secret", value: ref })
+    .flatMap((parsed): Either<AliasError, AliasEntry> => {
       if (parsed.kind !== "secret") {
         return Left({ _tag: "AliasCrossType", key, kind: "secret", targetKind: parsed.kind })
       }
-      if (parsed.key === key) {
-        return Left({ _tag: "AliasSelfReference", key: `secret.${key}` })
-      }
-      return Option(secretEntries[parsed.key]).fold<Either<AliasError, Option<AliasEntry>>>(
-        () => Left({ _tag: "AliasTargetMissing", key: `secret.${key}`, target: ref }),
-        (target) => {
+      if (parsed.key === key) return Left({ _tag: "AliasSelfReference", key: `secret.${key}` })
+      // eslint-disable-next-line functype/prefer-do-notation -- nested Option.toEither + Either.flatMap inherits the outer rationale
+      return Option(secretEntries[parsed.key])
+        .toEither<AliasError>({ _tag: "AliasTargetMissing", key: `secret.${key}`, target: ref })
+        .flatMap((target): Either<AliasError, AliasEntry> => {
           if (target.from_key !== undefined) {
             return Left({ _tag: "AliasChained", key: `secret.${key}`, target: ref })
           }
-          return Right(Option({ kind: "secret", targetKind: "secret", targetKey: parsed.key }))
-        },
-      )
-    },
-  )
+          return Right({ kind: "secret", targetKind: "secret", targetKey: parsed.key })
+        })
+    })
+  return result.map((entry) => Option(entry))
 }
 
 const validateOneEnv = (
@@ -65,26 +64,25 @@ const validateOneEnv = (
     return Left({ _tag: "AliasValueConflict", key, kind: "env", field: "value" })
   }
 
-  return parseRef(ref).fold<Either<AliasError, Option<AliasEntry>>>(
-    () => Left({ _tag: "AliasInvalidSyntax", key, kind: "env", value: ref }),
-    (parsed) => {
+  // eslint-disable-next-line functype/prefer-do-notation -- Do's generator-typing friction outweighs the readability win for this 4-step validation chain; Either.flatMap chain with toEither conversions is the cleanest alternative
+  const result: Either<AliasError, AliasEntry> = parseRef(ref)
+    .toEither<AliasError>({ _tag: "AliasInvalidSyntax", key, kind: "env", value: ref })
+    .flatMap((parsed): Either<AliasError, AliasEntry> => {
       if (parsed.kind !== "env") {
         return Left({ _tag: "AliasCrossType", key, kind: "env", targetKind: parsed.kind })
       }
-      if (parsed.key === key) {
-        return Left({ _tag: "AliasSelfReference", key: `env.${key}` })
-      }
-      return Option(envEntries[parsed.key]).fold<Either<AliasError, Option<AliasEntry>>>(
-        () => Left({ _tag: "AliasTargetMissing", key: `env.${key}`, target: ref }),
-        (target) => {
+      if (parsed.key === key) return Left({ _tag: "AliasSelfReference", key: `env.${key}` })
+      // eslint-disable-next-line functype/prefer-do-notation -- nested Option.toEither + Either.flatMap inherits the outer rationale
+      return Option(envEntries[parsed.key])
+        .toEither<AliasError>({ _tag: "AliasTargetMissing", key: `env.${key}`, target: ref })
+        .flatMap((target): Either<AliasError, AliasEntry> => {
           if (target.from_key !== undefined) {
             return Left({ _tag: "AliasChained", key: `env.${key}`, target: ref })
           }
-          return Right(Option({ kind: "env", targetKind: "env", targetKey: parsed.key }))
-        },
-      )
-    },
-  )
+          return Right({ kind: "env", targetKind: "env", targetKey: parsed.key })
+        })
+    })
+  return result.map((entry) => Option(entry))
 }
 
 /**
@@ -101,39 +99,42 @@ const validateOneEnv = (
  * - An alias entry cannot also carry a value field (encrypted_value for
  *   secrets, value for env)
  */
+type ValidatedPair = readonly [string, AliasEntry]
+
+/** Fail-fast reduction: accumulates validated entries, short-circuits on first AliasError */
+const collectValidated = <M>(
+  items: ReadonlyArray<readonly [string, M]>,
+  validate: (key: string, meta: M) => Either<AliasError, Option<AliasEntry>>,
+  prefix: "secret" | "env",
+): Either<AliasError, ReadonlyArray<ValidatedPair>> =>
+  items.reduce<Either<AliasError, ReadonlyArray<ValidatedPair>>>(
+    (acc, [key, meta]) =>
+      acc.flatMap((entries) =>
+        validate(key, meta).map(
+          (opt): ReadonlyArray<ValidatedPair> =>
+            opt.fold(
+              () => entries,
+              (entry) => [...entries, [`${prefix}.${key}`, entry] as ValidatedPair],
+            ),
+        ),
+      ),
+    Right([]),
+  )
+
 export const validateAliases = (config: EnvpktConfig): Either<AliasError, AliasTable> => {
   const secretEntries = config.secret ?? {}
   const envEntries = config.env ?? {}
-  // eslint-disable-next-line functype/prefer-functype-map -- AliasTable.entries is public API ReadonlyMap
-  const entries = new Map<string, AliasEntry>()
 
-  const secretResults = Object.entries(secretEntries).map(
-    ([key, meta]) => [key, validateOneSecret(key, meta, secretEntries)] as const,
-  )
-  for (const [key, result] of secretResults) {
-    const outcome = result.fold<AliasError | AliasEntry | undefined>(
-      (err) => err,
-      (opt) => opt.orUndefined(),
+  return collectValidated(Object.entries(secretEntries), (k, m) => validateOneSecret(k, m, secretEntries), "secret")
+    .flatMap((secrets) =>
+      collectValidated(Object.entries(envEntries), (k, m) => validateOneEnv(k, m, envEntries), "env").map((envs) => [
+        ...secrets,
+        ...envs,
+      ]),
     )
-    if (outcome === undefined) continue
-    if ("_tag" in outcome) return Left(outcome)
-    entries.set(`secret.${key}`, outcome)
-  }
-
-  const envResults = Object.entries(envEntries).map(
-    ([key, meta]) => [key, validateOneEnv(key, meta, envEntries)] as const,
-  )
-  for (const [key, result] of envResults) {
-    const outcome = result.fold<AliasError | AliasEntry | undefined>(
-      (err) => err,
-      (opt) => opt.orUndefined(),
-    )
-    if (outcome === undefined) continue
-    if ("_tag" in outcome) return Left(outcome)
-    entries.set(`env.${key}`, outcome)
-  }
-
-  return Right({ entries })
+    .map((allEntries) => ({
+      entries: new Map<string, AliasEntry>(allEntries),
+    }))
 }
 
 /** Does this secret entry point at another entry? */
