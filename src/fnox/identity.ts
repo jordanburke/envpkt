@@ -21,6 +21,7 @@ export const ageAvailable = (): boolean =>
  * - Plain identity files (from `age-keygen`) contain `AGE-SECRET-KEY-*` lines directly
  * - Encrypted identity files need `age --decrypt` to unwrap
  */
+/* eslint-disable functype/prefer-do-notation -- two-branch fallback (plain key vs decrypt) with early-return semantics; fold makes the branching explicit */
 export const unwrapAgentKey = (identityPath: string): Either<IdentityError, string> => {
   if (!existsSync(identityPath)) {
     return Left({ _tag: "IdentityNotFound", path: identityPath } as const)
@@ -40,7 +41,6 @@ export const unwrapAgentKey = (identityPath: string): Either<IdentityError, stri
         return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
       }
 
-      // eslint-disable-next-line functype/prefer-do-notation
       return Try(() =>
         execFileSync("age", ["--decrypt", identityPath], {
           stdio: ["pipe", "pipe", "pipe"],
@@ -53,3 +53,4 @@ export const unwrapAgentKey = (identityPath: string): Either<IdentityError, stri
     },
   )
 }
+/* eslint-enable functype/prefer-do-notation */

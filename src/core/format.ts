@@ -94,7 +94,10 @@ export const formatPacket = (result: ResolveResult, options?: FormatPacketOption
     const envHeader = `env: ${envEntriesArr.length}`
     const envLines = envEntriesArr.map(([key, meta]) => {
       const aliasTag = meta.from_key ? ` [alias → ${meta.from_key}]` : ""
-      const valuePart = meta.value !== undefined ? ` = ${meta.value}` : ""
+      const valuePart = Option(meta.value).fold(
+        () => "",
+        (v) => ` = ${v}`,
+      )
       const purposePart = meta.purpose ? `\n    purpose: ${meta.purpose}` : ""
       return `  ${key}${aliasTag}${valuePart}${purposePart}`
     })

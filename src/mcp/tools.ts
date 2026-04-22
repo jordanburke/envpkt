@@ -219,14 +219,14 @@ const handleGetSecretMeta = (args: Record<string, unknown>): CallToolResult => {
       // If this entry is an alias, merge target metadata for a complete view,
       // then stamp alias_of so the caller knows the relationship.
       if (fromKey !== undefined) {
-        const match = /^secret\.(.+)$/.exec(fromKey)
-        const targetKey = match?.[1]
-        const target = targetKey !== undefined ? secretEntries[targetKey] : undefined
-        if (target) {
-          const { encrypted_value: __, from_key: ___, ...targetRest } = target
-          return textResult(JSON.stringify({ key, ...targetRest, ...rest, alias_of: fromKey }, null, 2))
-        }
-        return textResult(JSON.stringify({ key, ...rest, alias_of: fromKey }, null, 2))
+        const target = Option(fromKey.match(/^secret\.(.+)$/)?.[1]).flatMap((k) => Option(secretEntries[k]))
+        return target.fold(
+          () => textResult(JSON.stringify({ key, ...rest, alias_of: fromKey }, null, 2)),
+          (t) => {
+            const { encrypted_value: __, from_key: ___, ...targetRest } = t
+            return textResult(JSON.stringify({ key, ...targetRest, ...rest, alias_of: fromKey }, null, 2))
+          },
+        )
       }
       return textResult(JSON.stringify({ key, ...rest }, null, 2))
     },

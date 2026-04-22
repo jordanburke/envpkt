@@ -1,4 +1,4 @@
-import { Cond, List, Map as FMap, Option, Set as FSet } from "functype"
+import { $, Cond, Do, List, Map as FMap, Option, Set as FSet } from "functype"
 
 import type { EnvpktConfig } from "./schema.js"
 import type {
@@ -113,7 +113,10 @@ const classifyAlias = (
   status: targetHealth.status,
   days_remaining: targetHealth.days_remaining,
   rotation_url: targetHealth.rotation_url,
-  purpose: meta.purpose !== undefined ? Option(meta.purpose) : targetHealth.purpose,
+  purpose: Option(meta.purpose).fold<Option<string>>(
+    () => targetHealth.purpose,
+    (v) => Option(v),
+  ),
   created: targetHealth.created,
   expires: targetHealth.expires,
   issues: List<string>([]),
@@ -228,18 +231,19 @@ export const computeEnvAudit = (
 ): EnvAuditResult => {
   const envEntries = config.env ?? {}
 
+  const resolveEffectiveDefault = (entry: NonNullable<EnvpktConfig["env"]>[string]): string => {
+    const viaAlias = Do(function* (): Generator<Option<unknown>, string, never> {
+      const fk = yield* $(Option(entry.from_key))
+      const targetKey = yield* $(Option(fk.match(/^env\.(.+)$/)?.[1]))
+      const targetEntry = yield* $(Option(envEntries[targetKey]))
+      return yield* $(Option(targetEntry.value))
+    }) as Option<string>
+    return viaAlias.orElse(entry.value ?? "")
+  }
+
   const entries = Object.entries(envEntries).map(([key, entry]) => {
     const currentValue = env[key]
-    // Resolve effective default: for aliases, it's the target's value
-    const effectiveDefault =
-      entry.from_key !== undefined
-        ? (() => {
-            const match = /^env\.(.+)$/.exec(entry.from_key)
-            const targetKey = match?.[1]
-            const targetEntry = targetKey !== undefined ? envEntries[targetKey] : undefined
-            return targetEntry?.value ?? ""
-          })()
-        : (entry.value ?? "")
+    const effectiveDefault = resolveEffectiveDefault(entry)
 
     const status: EnvDriftStatus = Cond.of<EnvDriftStatus>()
       .when(currentValue === undefined, "missing")

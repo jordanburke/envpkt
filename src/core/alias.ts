@@ -125,16 +125,20 @@ export const validateAliases = (config: EnvpktConfig): Either<AliasError, AliasT
   const secretEntries = config.secret ?? {}
   const envEntries = config.env ?? {}
 
-  return collectValidated(Object.entries(secretEntries), (k, m) => validateOneSecret(k, m, secretEntries), "secret")
-    .flatMap((secrets) =>
-      collectValidated(Object.entries(envEntries), (k, m) => validateOneEnv(k, m, envEntries), "env").map((envs) => [
-        ...secrets,
-        ...envs,
-      ]),
-    )
+  const secretPairs = collectValidated(
+    Object.entries(secretEntries),
+    (k, m) => validateOneSecret(k, m, secretEntries),
+    "secret",
+  )
+  const envPairs = collectValidated(Object.entries(envEntries), (k, m) => validateOneEnv(k, m, envEntries), "env")
+
+  /* eslint-disable functype/prefer-flatmap -- rule misfires: this is Either.map combining two validated arrays, not nested Array.map */
+  return secretPairs
+    .flatMap((secrets) => envPairs.map((envs) => [...secrets, ...envs]))
     .map((allEntries) => ({
       entries: new Map<string, AliasEntry>(allEntries),
     }))
+  /* eslint-enable functype/prefer-flatmap */
 }
 
 /** Does this secret entry point at another entry? */

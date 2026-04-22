@@ -130,7 +130,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
   const warnOnly = opts.warnOnly ?? false
   const log = (opts.logger ?? directSilentLogger).withContext({ component: "envpkt.boot" })
 
-  // eslint-disable-next-line functype/prefer-do-notation -- multi-phase boot pipeline with side effects is clearer as explicit flatMap
+  /* eslint-disable functype/prefer-do-notation -- multi-phase boot pipeline with side-effectful logging at each step is clearer as explicit flatMap+fold; Do would obscure the log/warn calls that are part of each phase's behavior */
   return resolveAndLoad(opts).flatMap(({ config, configPath, configDir, configSource }) =>
     validateAliases(config).fold<Either<BootError, BootResult>>(
       (err) => {
@@ -188,7 +188,11 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
           const envDefaults: Record<string, string> = Object.fromEntries(
             nonAliasEnvEntries.flatMap(([key, entry]) =>
               Option(process.env[key]).fold<ReadonlyArray<readonly [string, string]>>(
-                () => (entry.value !== undefined ? [[key, entry.value] as const] : []),
+                () =>
+                  Option(entry.value).fold<ReadonlyArray<readonly [string, string]>>(
+                    () => [],
+                    (v) => [[key, v] as const],
+                  ),
                 () => [],
               ),
             ),
@@ -274,22 +278,29 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
             }
           }
 
-          // Phase 3: alias copy pass — aliases reuse their target's resolved value
+          // Phase 3: alias copy pass — aliases reuse their target's resolved value.
+          // Side-effectful pipeline: mutates `secrets`, appends to `injected`/`skipped` audit trails,
+          // and emits structured log events — all of which are load-bearing outputs of boot.
+          /* eslint-disable functype/prefer-map -- building three parallel audit-trail arrays via deliberate mutation; reducing would obscure the per-key trace events */
           aliasSecretKeys.forEach((aliasKey) => {
             const entry = aliasTable.entries.get(`secret.${aliasKey}`)
             if (!entry) return
-            const targetValue = secrets[entry.targetKey]
-            if (targetValue !== undefined) {
-              secrets[aliasKey] = targetValue
-              injected.push(aliasKey)
-              log.debug("phase.alias.copied", { alias: aliasKey, target: entry.targetKey })
-            } else {
-              skipped.push(aliasKey)
-              log.debug("phase.alias.target_unresolved", { alias: aliasKey, target: entry.targetKey })
-            }
+            Option(secrets[entry.targetKey]).fold(
+              () => {
+                skipped.push(aliasKey)
+                log.debug("phase.alias.target_unresolved", { alias: aliasKey, target: entry.targetKey })
+              },
+              (targetValue) => {
+                secrets[aliasKey] = targetValue
+                injected.push(aliasKey)
+                log.debug("phase.alias.copied", { alias: aliasKey, target: entry.targetKey })
+              },
+            )
           })
+          /* eslint-enable functype/prefer-map */
 
           // Env alias copy pass — copy target's resolved env default if canonical not already set
+          /* eslint-disable functype/prefer-map -- audit-trail mutation (overridden, envDefaults); see Phase 3 rationale */
           aliasEnvKeys.forEach((aliasKey) => {
             const entry = aliasTable.entries.get(`env.${aliasKey}`)
             if (!entry) return
@@ -303,6 +314,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
             const resolvedTarget = process.env[entry.targetKey] ?? targetEntry.value
             envDefaults[aliasKey] = resolvedTarget
           })
+          /* eslint-enable functype/prefer-map */
 
           if (inject) {
             // Inject env alias defaults (and any env defaults added by the alias pass)
@@ -330,6 +342,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
     ),
   )
 }
+/* eslint-enable functype/prefer-do-notation */
 
 /* eslint-disable functype/prefer-either -- boot() is the intentional throwing wrapper; bootSafe() returns Either */
 /** Programmatic boot — throws EnvpktBootError on failure (intentional throwing wrapper over bootSafe) */
