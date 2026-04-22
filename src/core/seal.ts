@@ -56,11 +56,12 @@ export const sealSecrets = (
   return Object.entries(meta).reduce<Either<SealError, Record<string, SecretMeta>>>(
     (acc, [key, secretMeta]) =>
       acc.flatMap((result) => {
-        if (!(key in values)) {
+        const value = values[key]
+        if (value === undefined) {
           return Right({ ...result, [key]: secretMeta })
         }
 
-        return ageEncrypt(values[key], recipient)
+        return ageEncrypt(value, recipient)
           .mapLeft((err) => ({ _tag: "EncryptFailed" as const, key, message: err.message }))
           .map((ciphertext) => ({ ...result, [key]: { ...secretMeta, encrypted_value: ciphertext } }))
       }),

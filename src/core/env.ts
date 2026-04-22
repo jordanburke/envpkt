@@ -83,8 +83,7 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
   }
 
   // Direction 1: TOML keys → check if present in env (aliases satisfied by target)
-  const secretDriftEntries: DriftEntry[] = metaKeys.map((key) => {
-    const meta = secretEntries[key]
+  const secretDriftEntries: DriftEntry[] = Object.entries(secretEntries).map(([key, meta]) => {
     const present = isSecretPresent(key)
     return {
       envVar: key,

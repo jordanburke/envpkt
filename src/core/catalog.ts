@@ -27,13 +27,14 @@ export const resolveSecrets = (
   return agentSecrets.reduce<Either<CatalogError, Record<string, SecretMeta>>>(
     (acc, key) =>
       acc.flatMap((resolved) => {
-        if (!(key in catalogMeta)) {
+        const catalogEntry = catalogMeta[key]
+        if (catalogEntry === undefined) {
           return Left({ _tag: "SecretNotInCatalog", key, catalogPath })
         }
-        const catalogEntry = catalogMeta[key]
+        const agentOverride = agentMeta[key]
         return Right({
           ...resolved,
-          [key]: key in agentMeta ? { ...catalogEntry, ...agentMeta[key] } : catalogEntry,
+          [key]: agentOverride !== undefined ? { ...catalogEntry, ...agentOverride } : catalogEntry,
         })
       }),
     Right({}),

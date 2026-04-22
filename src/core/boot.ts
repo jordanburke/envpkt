@@ -147,12 +147,16 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
         const nonAliasSecretEntries = Object.fromEntries(
           Object.entries(secretEntries).filter(([, meta]) => meta.from_key === undefined),
         )
-        const aliasSecretKeys = Object.keys(secretEntries).filter((k) => secretEntries[k].from_key !== undefined)
+        const aliasSecretKeys = Object.entries(secretEntries)
+          .filter(([, meta]) => meta.from_key !== undefined)
+          .map(([k]) => k)
         const nonAliasEnvEntries = Object.entries(envEntries).filter(([, meta]) => meta.from_key === undefined)
-        const aliasEnvKeys = Object.keys(envEntries).filter((k) => envEntries[k].from_key !== undefined)
+        const aliasEnvKeys = Object.entries(envEntries)
+          .filter(([, meta]) => meta.from_key !== undefined)
+          .map(([k]) => k)
 
         const nonAliasMetaKeys = Object.keys(nonAliasSecretEntries)
-        const hasSealedValues = nonAliasMetaKeys.some((k) => !!nonAliasSecretEntries[k].encrypted_value)
+        const hasSealedValues = Object.values(nonAliasSecretEntries).some((meta) => !!meta.encrypted_value)
 
         // Resolve identity key — non-fatal when sealed values exist (identity may be a plain age identity)
         const identityKeyResult = resolveIdentityKey(config, configDir)
