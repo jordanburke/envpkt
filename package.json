@@ -50,7 +50,7 @@
   "devDependencies": {
     "@types/node": "^24.12.2",
     "ts-builds": "^2.7.1",
-    "tsdown": "^0.21.9",
+    "tsdown": "^0.21.10",
     "tsx": "^4.21.0"
   },
   "type": "module",
