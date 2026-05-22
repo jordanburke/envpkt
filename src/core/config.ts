@@ -23,7 +23,6 @@ const normalizeDates = (obj: unknown): unknown => {
     return obj.map(normalizeDates)
   }
   if (obj !== null && typeof obj === "object") {
-    // eslint-disable-next-line functype/prefer-flatmap -- 1:1 recursive map, not a nested transformation
     return Object.fromEntries(Object.entries(obj as Record<string, unknown>).map(([k, v]) => [k, normalizeDates(v)]))
   }
   return obj

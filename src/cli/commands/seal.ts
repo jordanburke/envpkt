@@ -228,7 +228,6 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
       process.exit(2)
     }
 
-    // eslint-disable-next-line functype/prefer-flatmap -- Object.fromEntries requires tuple mapping, not flatMap
     const secretEntries = Object.fromEntries(editKeys.map((k) => [k, allSecretEntries[k]!]))
 
     console.log(
@@ -296,7 +295,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   }
 
   const targetKeys = options.reseal ? allKeys : unsealed
-  // eslint-disable-next-line functype/prefer-flatmap -- Object.fromEntries requires tuple mapping
+
   const secretEntries = Object.fromEntries(targetKeys.map((k) => [k, allSecretEntries[k]!]))
 
   // Resolve values via cascade
@@ -326,7 +325,6 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
         process.exit(2)
       }
 
-      // eslint-disable-next-line functype/prefer-flatmap -- Object.fromEntries requires tuple mapping
       const sealedEntries = Object.fromEntries(alreadySealed.map((k) => [k, allSecretEntries[k]!]))
       const decrypted = unsealSecrets(sealedEntries, identityPath).fold(
         (err) => {
