@@ -9,6 +9,7 @@ import { resolveValues } from "../../core/resolve-values.js"
 import { sealSecrets, unsealSecrets } from "../../core/seal.js"
 import { unwrapAgentKey } from "../../fnox/identity.js"
 import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
+import { validateOrExit } from "../write-gate.js"
 
 type SealOptions = {
   readonly config?: string
@@ -140,8 +141,10 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
 
   // Final flush for the last section (if it ended without an encrypted_value line).
   const final = flushPending(walked)
+  const finalContent = final.output.join("\n")
 
-  writeFileSync(configPath, final.output.join("\n"))
+  validateOrExit(finalContent)
+  writeFileSync(configPath, finalContent)
 }
 
 export const runSeal = async (options: SealOptions): Promise<void> => {

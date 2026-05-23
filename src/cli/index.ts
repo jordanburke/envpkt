@@ -17,6 +17,7 @@ import { runSeal } from "./commands/seal.js"
 import { registerSecretCommands } from "./commands/secret.js"
 import { runShellHook } from "./commands/shell-hook.js"
 import { runUpgrade } from "./commands/upgrade.js"
+import { runValidate } from "./commands/validate.js"
 
 const program = new Command()
 
@@ -88,6 +89,17 @@ program
   .option("--status <status>", "Filter agents by health status")
   .action((options) => {
     runFleet(options)
+  })
+
+program
+  .command("validate")
+  .description(
+    "Verify envpkt.toml integrity — runs TOML syntax, schema, catalog, alias, and sealed-block structural checks",
+  )
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .option("--json", "Output structured JSON instead of human-readable text")
+  .action((options) => {
+    runValidate(options)
   })
 
 program

@@ -7,6 +7,7 @@ import { parse } from "smol-toml"
 
 import type { ConfigError } from "../../core/types.js"
 import { BOLD, CYAN, GREEN, RED, RESET } from "../output.js"
+import { validateOrExit } from "../write-gate.js"
 
 const CONFIG_FILENAME = "envpkt.toml"
 
@@ -160,6 +161,7 @@ export const runInit = (dir: string, options: InitOptions): void => {
 
   const content = generateTemplate(options, fnoxKeys.orUndefined())
 
+  validateOrExit(content)
   const writeResult = Try(() => writeFileSync(outPath, content, "utf-8"))
   writeResult.fold(
     (err) => {

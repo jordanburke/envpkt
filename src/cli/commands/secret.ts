@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs"
+import { readFileSync } from "node:fs"
 
 import type { Command } from "commander"
 import { Option } from "functype"
@@ -6,6 +6,7 @@ import { Option } from "functype"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import { appendSection, removeSection, renameSection, updateSectionFields } from "../../core/toml-edit.js"
 import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
+import { writeIfValid } from "../write-gate.js"
 
 type AddOptions = {
   readonly config?: string
@@ -183,9 +184,11 @@ const runSecretAdd = (name: string, options: AddOptions): void => {
 
           const raw = readFileSync(configPath, "utf-8")
           const updated = appendSection(raw, block)
-          writeFileSync(configPath, updated, "utf-8")
-
-          console.log(`${GREEN}✓${RESET} Added ${BOLD}${name}${RESET} to ${CYAN}${configPath}${RESET}`)
+          writeIfValid(
+            configPath,
+            updated,
+            `${GREEN}✓${RESET} Added ${BOLD}${name}${RESET} to ${CYAN}${configPath}${RESET}`,
+          )
         },
       )
     },
@@ -229,8 +232,11 @@ const runSecretEdit = (name: string, options: EditOptions): void => {
               console.log(updated)
               return
             }
-            writeFileSync(configPath, updated, "utf-8")
-            console.log(`${GREEN}✓${RESET} Updated ${BOLD}${name}${RESET} in ${CYAN}${configPath}${RESET}`)
+            writeIfValid(
+              configPath,
+              updated,
+              `${GREEN}✓${RESET} Updated ${BOLD}${name}${RESET} in ${CYAN}${configPath}${RESET}`,
+            )
           },
         )
       },
@@ -252,8 +258,11 @@ const runSecretRm = (name: string, options: RmOptions): void => {
           console.log(updated)
           return
         }
-        writeFileSync(configPath, updated, "utf-8")
-        console.log(`${GREEN}✓${RESET} Removed ${BOLD}${name}${RESET} from ${CYAN}${configPath}${RESET}`)
+        writeIfValid(
+          configPath,
+          updated,
+          `${GREEN}✓${RESET} Removed ${BOLD}${name}${RESET} from ${CYAN}${configPath}${RESET}`,
+        )
       },
     )
   })
@@ -273,8 +282,9 @@ const runSecretRename = (oldName: string, newName: string, options: RenameOption
           console.log(updated)
           return
         }
-        writeFileSync(configPath, updated, "utf-8")
-        console.log(
+        writeIfValid(
+          configPath,
+          updated,
           `${GREEN}✓${RESET} Renamed ${BOLD}${oldName}${RESET} → ${BOLD}${newName}${RESET} in ${CYAN}${configPath}${RESET}`,
         )
       },
@@ -383,9 +393,9 @@ const runSecretAlias = (name: string, options: AliasOptions): void => {
               )
             : raw
           const updated = appendSection(base, block)
-          writeFileSync(configPath, updated, "utf-8")
-
-          console.log(
+          writeIfValid(
+            configPath,
+            updated,
             `${GREEN}✓${RESET} Aliased ${BOLD}${name}${RESET} → ${BOLD}${options.from}${RESET} in ${CYAN}${configPath}${RESET}`,
           )
         },

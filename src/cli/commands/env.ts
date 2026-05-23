@@ -24,6 +24,7 @@ import {
   RESET,
   YELLOW,
 } from "../output.js"
+import { validateOrExit, writeIfValid } from "../write-gate.js"
 
 type ScanOptions = {
   readonly config?: string
@@ -128,7 +129,9 @@ const runEnvScan = (options: ScanOptions): void => {
       }
 
       const newToml = generateTomlFromScan(newEntries)
-      const writeResult = Try(() => writeFileSync(configPath, `${existing.trimEnd()}\n\n${newToml}`, "utf-8"))
+      const combined = `${existing.trimEnd()}\n\n${newToml}`
+      validateOrExit(combined)
+      const writeResult = Try(() => writeFileSync(configPath, combined, "utf-8"))
       writeResult.fold(
         (err) => {
           console.error(`\n${RED}Error:${RESET} Failed to write: ${err}`)
@@ -144,7 +147,9 @@ const runEnvScan = (options: ScanOptions): void => {
     } else {
       // Create new file with header
       const header = `#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json\n\nversion = 1\n\n[lifecycle]\nstale_warning_days = 90\n\n`
-      const writeResult = Try(() => writeFileSync(configPath, header + toml, "utf-8"))
+      const combined = header + toml
+      validateOrExit(combined)
+      const writeResult = Try(() => writeFileSync(configPath, combined, "utf-8"))
       writeResult.fold(
         (err) => {
           console.error(`\n${RED}Error:${RESET} Failed to write: ${err}`)
@@ -329,9 +334,11 @@ const runEnvAdd = (name: string, value: string, options: AddEnvOptions): void =>
 
           const raw = readFileSync(configPath, "utf-8")
           const updated = appendSection(raw, block)
-          writeFileSync(configPath, updated, "utf-8")
-
-          console.log(`${GREEN}✓${RESET} Added ${BOLD}${name}${RESET} to ${CYAN}${configPath}${RESET}`)
+          writeIfValid(
+            configPath,
+            updated,
+            `${GREEN}✓${RESET} Added ${BOLD}${name}${RESET} to ${CYAN}${configPath}${RESET}`,
+          )
         },
       )
     },
@@ -381,8 +388,11 @@ const runEnvEdit = (name: string, options: EditEnvOptions): void => {
               console.log(updated)
               return
             }
-            writeFileSync(configPath, updated, "utf-8")
-            console.log(`${GREEN}✓${RESET} Updated ${BOLD}${name}${RESET} in ${CYAN}${configPath}${RESET}`)
+            writeIfValid(
+              configPath,
+              updated,
+              `${GREEN}✓${RESET} Updated ${BOLD}${name}${RESET} in ${CYAN}${configPath}${RESET}`,
+            )
           },
         )
       },
@@ -404,8 +414,11 @@ const runEnvRm = (name: string, options: RmEnvOptions): void => {
           console.log(updated)
           return
         }
-        writeFileSync(configPath, updated, "utf-8")
-        console.log(`${GREEN}✓${RESET} Removed ${BOLD}${name}${RESET} from ${CYAN}${configPath}${RESET}`)
+        writeIfValid(
+          configPath,
+          updated,
+          `${GREEN}✓${RESET} Removed ${BOLD}${name}${RESET} from ${CYAN}${configPath}${RESET}`,
+        )
       },
     )
   })
@@ -509,9 +522,9 @@ const runEnvAlias = (name: string, options: AliasEnvOptions): void => {
               )
             : raw
           const updated = appendSection(base, block)
-          writeFileSync(configPath, updated, "utf-8")
-
-          console.log(
+          writeIfValid(
+            configPath,
+            updated,
             `${GREEN}✓${RESET} Aliased ${BOLD}${name}${RESET} → ${BOLD}${options.from}${RESET} in ${CYAN}${configPath}${RESET}`,
           )
         },
@@ -534,8 +547,9 @@ const runEnvRename = (oldName: string, newName: string, options: RenameEnvOption
           console.log(updated)
           return
         }
-        writeFileSync(configPath, updated, "utf-8")
-        console.log(
+        writeIfValid(
+          configPath,
+          updated,
           `${GREEN}✓${RESET} Renamed ${BOLD}${oldName}${RESET} → ${BOLD}${newName}${RESET} in ${CYAN}${configPath}${RESET}`,
         )
       },
