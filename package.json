@@ -48,7 +48,7 @@
     "smol-toml": "^1.6.1"
   },
   "devDependencies": {
-    "@types/node": "^24.12.4",
+    "@types/node": "^25.9.1",
     "ts-builds": "^2.8.1",
     "tsdown": "^0.22.0",
     "tsx": "^4.22.3"
