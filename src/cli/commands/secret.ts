@@ -1,12 +1,15 @@
 import { readFileSync } from "node:fs"
+import { createInterface } from "node:readline"
 
 import type { Command } from "commander"
 import { Option } from "functype"
 
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
+import { ageEncrypt } from "../../core/seal.js"
 import { appendSection, removeSection, renameSection, updateSectionFields } from "../../core/toml-edit.js"
 import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 import { writeIfValid } from "../write-gate.js"
+import { applySealedToml } from "./seal.js"
 
 type AddOptions = {
   readonly config?: string
@@ -404,6 +407,147 @@ const runSecretAlias = (name: string, options: AliasOptions): void => {
   )
 }
 
+type RotateOptions = {
+  readonly config?: string
+  readonly dryRun?: boolean
+}
+
+const readNewValue = async (key: string): Promise<string> => {
+  // Piped stdin: read the entire buffer (trim trailing newline only).
+  if (!process.stdin.isTTY) {
+    const chunks: Buffer[] = []
+    return new Promise((resolveP, rejectP) => {
+      process.stdin.on("data", (c) => chunks.push(Buffer.from(c)))
+      process.stdin.on("end", () =>
+        resolveP(
+          Buffer.concat(chunks)
+            .toString("utf-8")
+            .replace(/\r?\n$/, ""),
+        ),
+      )
+      process.stdin.on("error", rejectP)
+    })
+  }
+  // TTY: prompt once. Empty input cancels.
+  const rl = createInterface({ input: process.stdin, output: process.stderr })
+  return new Promise((resolveP) => {
+    rl.question(`Enter new value for ${key}: `, (answer) => {
+      rl.close()
+      resolveP(answer)
+    })
+  })
+}
+
+const runSecretRotate = async (name: string, options: RotateOptions): Promise<void> => {
+  const configResult = resolveConfigPath(options.config)
+  const { configPath, source } = configResult.fold(
+    (err) => {
+      console.error(formatError(err))
+      process.exit(2)
+      return { configPath: "", source: "flag" as const } // unreachable
+    },
+    ({ path, source: s }) => ({ configPath: path, source: s }),
+  )
+
+  const sourceMsg = formatConfigSource(configPath, source)
+  if (sourceMsg) console.error(sourceMsg)
+
+  const config = loadConfig(configPath).fold(
+    (err) => {
+      console.error(formatError(err))
+      process.exit(2)
+      return undefined! // unreachable
+    },
+    (c) => c,
+  )
+
+  const meta = config.secret?.[name]
+  if (!meta) {
+    console.error(`${RED}Error:${RESET} Secret "${name}" not found in ${configPath}`)
+    process.exit(1)
+  }
+
+  if (meta.from_key) {
+    console.error(
+      `${RED}Error:${RESET} "${name}" is an alias (from_key = "${meta.from_key}"). Rotate the target secret instead.`,
+    )
+    process.exit(1)
+  }
+
+  const today = new Date().toISOString().split("T")[0]!
+  const wasSealed = !!meta.encrypted_value
+  const raw = readFileSync(configPath, "utf-8")
+
+  // Unsealed path: just stamp last_rotated_at. No value, no prompt.
+  if (!wasSealed) {
+    const updated = updateSectionFields(raw, `[secret.${name}]`, { last_rotated_at: `"${today}"` })
+    updated.fold(
+      (err) => {
+        console.error(`${RED}Error:${RESET} ${err._tag}: ${err.section}`)
+        process.exit(2)
+      },
+      (result) => {
+        if (options.dryRun) {
+          console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
+          console.log(result)
+          return
+        }
+        writeIfValid(
+          configPath,
+          result,
+          `${GREEN}✓${RESET} Stamped ${BOLD}last_rotated_at${RESET} on ${BOLD}${name}${RESET} (unsealed — no ciphertext to update)`,
+        )
+      },
+    )
+    return
+  }
+
+  // Sealed path: needs new value, recipient, encrypt, write atomically.
+  if (!config.identity?.recipient) {
+    console.error(`${RED}Error:${RESET} identity.recipient is required to rotate a sealed secret`)
+    console.error(`${DIM}Run ${CYAN}envpkt keygen${DIM} to configure one.${RESET}`)
+    process.exit(2)
+  }
+  const { recipient } = config.identity
+
+  const value = await readNewValue(name)
+  if (value === "") {
+    console.error(`${YELLOW}Cancelled:${RESET} no value provided — ${BOLD}${name}${RESET} was not rotated.`)
+    process.exit(1)
+  }
+
+  const ciphertext = ageEncrypt(value, recipient).fold(
+    (err) => {
+      console.error(`${RED}Error:${RESET} Encryption failed: ${err.message}`)
+      process.exit(2)
+      return "" // unreachable
+    },
+    (ct) => ct,
+  )
+
+  // Apply both edits in memory before writing.
+  const withSealed = applySealedToml(raw, { [name]: { encrypted_value: ciphertext } })
+  const withTimestamp = updateSectionFields(withSealed, `[secret.${name}]`, { last_rotated_at: `"${today}"` })
+  withTimestamp.fold(
+    (err) => {
+      console.error(`${RED}Error:${RESET} ${err._tag}: ${err.section}`)
+      process.exit(2)
+    },
+    (result) => {
+      if (options.dryRun) {
+        console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
+        console.log(result)
+        return
+      }
+      writeIfValid(
+        configPath,
+        result,
+        `${GREEN}✓${RESET} Rotated ${BOLD}${name}${RESET} (resealed + stamped ${CYAN}${today}${RESET})`,
+      )
+    },
+  )
+}
+
 const addSecretFlags = (cmd: Command): Command =>
   cmd
     .option("--service <service>", "Service this secret authenticates to")
@@ -465,6 +609,16 @@ export const registerSecretCommands = (program: Command): void => {
     .option("--dry-run", "Preview the result without writing")
     .action((oldName: string, newName: string, options: RenameOptions) => {
       runSecretRename(oldName, newName, options)
+    })
+
+  secret
+    .command("rotate")
+    .description("Rotate a secret's value (sealed: reseal + stamp; unsealed: stamp only)")
+    .argument("<name>", "Secret name to rotate")
+    .option("-c, --config <path>", "Path to envpkt.toml")
+    .option("--dry-run", "Preview the result without writing")
+    .action(async (name: string, options: RotateOptions) => {
+      await runSecretRotate(name, options)
     })
 
   secret

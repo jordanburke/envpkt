@@ -131,6 +131,11 @@
               "description": "Date the secret was provisioned (YYYY-MM-DD)",
               "type": "string"
             },
+            "last_rotated_at": {
+              "format": "date",
+              "description": "Date the secret value was most recently rotated (YYYY-MM-DD). Used by audit for staleness.",
+              "type": "string"
+            },
             "rotates": {
               "description": "Rotation schedule (e.g. '90d', 'quarterly')",
               "type": "string"

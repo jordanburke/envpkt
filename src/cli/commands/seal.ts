@@ -32,9 +32,12 @@ const ENCRYPTED_VALUE_RE = /^encrypted_value\s*=/
 const NEW_SECTION_RE = /^\[/
 const MULTILINE_DELIM = '"""'
 
-/** Write sealed values back into the TOML file, preserving structure. */
-const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encrypted_value?: string }>): void => {
-  const raw = readFileSync(configPath, "utf-8")
+/**
+ * In-memory transform: inject sealed encrypted_value blocks into raw TOML,
+ * replacing existing encrypted_value lines (single or multiline) or appending
+ * a new block at the end of the section. Pure — no I/O.
+ */
+export const applySealedToml = (raw: string, sealedMeta: Record<string, { encrypted_value?: string }>): string => {
   const lines = raw.split("\n")
 
   const getSeal = (key: string): Option<string> => Option(sealedMeta[key]?.encrypted_value)
@@ -141,8 +144,13 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
 
   // Final flush for the last section (if it ended without an encrypted_value line).
   const final = flushPending(walked)
-  const finalContent = final.output.join("\n")
+  return final.output.join("\n")
+}
 
+/** Write sealed values back into the TOML file, preserving structure. */
+const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encrypted_value?: string }>): void => {
+  const raw = readFileSync(configPath, "utf-8")
+  const finalContent = applySealedToml(raw, sealedMeta)
   validateOrExit(finalContent)
   writeFileSync(configPath, finalContent)
 }

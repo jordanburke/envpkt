@@ -62,6 +62,12 @@ export const SecretMetaSchema = Type.Object(
     created: Type.Optional(
       Type.String({ format: "date", description: "Date the secret was provisioned (YYYY-MM-DD)" }),
     ),
+    last_rotated_at: Type.Optional(
+      Type.String({
+        format: "date",
+        description: "Date the secret value was most recently rotated (YYYY-MM-DD). Used by audit for staleness.",
+      }),
+    ),
     // Tier 3: operational
     rotates: Type.Optional(Type.String({ description: "Rotation schedule (e.g. '90d', 'quarterly')" })),
     rate_limit: Type.Optional(Type.String({ description: "Rate limit or quota info (e.g. '1000/min')" })),

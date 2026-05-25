@@ -113,6 +113,62 @@ describe("computeAudit", () => {
     expect(result.stale).toBe(1)
   })
 
+  it("uses last_rotated_at over created for staleness when present", () => {
+    // Created long ago but rotated recently — should be healthy
+    const config = makeConfig({
+      RECENTLY_ROTATED: {
+        service: "svc",
+        created: "2023-01-01",
+        last_rotated_at: "2025-05-01", // 45 days before today
+      },
+    })
+
+    const result = computeAudit(config, undefined, today)
+    expect(result.stale).toBe(0)
+    expect(result.healthy).toBe(1)
+  })
+
+  it("flags stale when last_rotated_at exceeds threshold even if created is recent", () => {
+    const config = makeConfig({
+      NEVER_REROTATED: {
+        service: "svc",
+        created: "2025-05-01", // 45 days before today
+        last_rotated_at: "2023-01-01", // ancient — measure from here
+      },
+    })
+
+    const result = computeAudit(config, undefined, today)
+    expect(result.stale).toBe(1)
+    const secret = result.secrets.get(0)
+    secret.fold(
+      () => expect.unreachable(),
+      (s) => expect(s.issues.toArray().some((i) => i.includes("last rotated"))).toBe(true),
+    )
+  })
+
+  it("surfaces last_rotated_at on SecretHealth", () => {
+    const config = makeConfig({
+      ROTATED: {
+        service: "svc",
+        created: "2025-01-01",
+        last_rotated_at: "2025-06-01",
+      },
+    })
+
+    const result = computeAudit(config, undefined, today)
+    const secret = result.secrets.get(0)
+    secret.fold(
+      () => expect.unreachable(),
+      (s) => {
+        expect(s.last_rotated_at.isSome()).toBe(true)
+        s.last_rotated_at.fold(
+          () => expect.unreachable(),
+          (d) => expect(d).toBe("2025-06-01"),
+        )
+      },
+    )
+  })
+
   it("detects missing secrets when fnox keys are provided", () => {
     const config = makeConfig({
       KNOWN_KEY: { service: "api" },

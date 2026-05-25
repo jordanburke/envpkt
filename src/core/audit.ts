@@ -34,13 +34,17 @@ const classifySecret = (
 
   const created = Option(meta.created).flatMap(parseDate)
   const expires = Option(meta.expires).flatMap(parseDate)
+  const lastRotated = Option(meta.last_rotated_at).flatMap(parseDate)
   const rotationUrl = Option(meta.rotation_url)
   const purpose = Option(meta.purpose)
   const service = Option(meta.service)
 
   const daysRemaining = expires.map((exp) => daysBetween(today, exp))
 
-  const daysSinceCreated = created.map((c) => daysBetween(c, today))
+  // Staleness is measured from last_rotated_at when present, else falls back to created.
+  const staleFromRotation = lastRotated.isSome()
+  const staleReference: Option<Date> = staleFromRotation ? lastRotated : created
+  const daysSinceRotation = staleReference.map((d) => daysBetween(d, today))
 
   const isExpired = daysRemaining.fold(
     () => false,
@@ -50,7 +54,7 @@ const classifySecret = (
     () => false,
     (d) => d >= 0 && d <= WARN_BEFORE_DAYS,
   )
-  const isStale = daysSinceCreated.fold(
+  const isStale = daysSinceRotation.fold(
     () => false,
     (d) => d > staleWarningDays,
   )
@@ -68,7 +72,14 @@ const classifySecret = (
       )} days`,
     )
   }
-  if (isStale) issues.push("Secret is stale (no rotation detected)")
+  if (isStale) {
+    const since = daysSinceRotation.fold(
+      () => "?",
+      (d) => String(d),
+    )
+    const label = staleFromRotation ? "last rotated" : "created"
+    issues.push(`Secret is stale (${label} ${since} days ago)`)
+  }
   if (isMissing) issues.push("Key not found in fnox")
   if (isMissingMetadata) {
     if (requireExpiration && expires.isNone()) issues.push("Missing required expiration date")
@@ -92,6 +103,7 @@ const classifySecret = (
     purpose,
     created: Option(meta.created),
     expires: Option(meta.expires),
+    last_rotated_at: Option(meta.last_rotated_at),
     issues: List(issues),
     alias_of: Option<string>(undefined),
   }
@@ -119,6 +131,7 @@ const classifyAlias = (
   ),
   created: targetHealth.created,
   expires: targetHealth.expires,
+  last_rotated_at: targetHealth.last_rotated_at,
   issues: List<string>([]),
   alias_of: Option(targetRef),
 })
@@ -181,6 +194,7 @@ export const computeAudit = (
         purpose: Option(meta.purpose),
         created: Option(meta.created),
         expires: Option(meta.expires),
+        last_rotated_at: Option(meta.last_rotated_at),
         issues: List<string>(["Alias target not resolvable"]),
         alias_of: Option(targetRef),
       }),

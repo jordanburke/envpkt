@@ -35,6 +35,7 @@ export type SecretHealth = {
   readonly purpose: Option<string>
   readonly created: Option<string>
   readonly expires: Option<string>
+  readonly last_rotated_at: Option<string>
   readonly issues: List<string>
   /** If this entry is an alias (from_key), the reference it points at (e.g. "secret.X") */
   readonly alias_of: Option<string>
