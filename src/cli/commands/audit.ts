@@ -32,6 +32,7 @@ type AuditOptions = {
   readonly envOnly?: boolean
   readonly sealed?: boolean
   readonly external?: boolean
+  readonly sort?: boolean
 }
 
 export const runAudit = (options: AuditOptions): void => {
@@ -157,12 +158,16 @@ const runAuditOnConfig = (config: EnvpktConfig, options: AuditOptions): void => 
     }),
   )
 
+  // --sort: alphabetize secrets by key. Format groups by status bucket, and List.sortBy
+  // is stable, so within-bucket ordering becomes alphabetical without losing the grouping.
+  const sorted = options.sort ? { ...filtered, secrets: filtered.secrets.sortBy((s) => s.key) } : filtered
+
   if (options.format === "json") {
-    console.log(formatAuditJson(filtered))
+    console.log(formatAuditJson(sorted))
   } else if (options.format === "minimal") {
-    console.log(formatAuditMinimal(filtered))
+    console.log(formatAuditMinimal(sorted))
   } else {
-    console.log(formatAudit(filtered))
+    console.log(formatAudit(sorted))
   }
 
   // --all: also show env defaults

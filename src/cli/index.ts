@@ -16,6 +16,7 @@ import { runResolve } from "./commands/resolve.js"
 import { runSeal } from "./commands/seal.js"
 import { registerSecretCommands } from "./commands/secret.js"
 import { runShellHook } from "./commands/shell-hook.js"
+import { runSort } from "./commands/sort.js"
 import { runUpgrade } from "./commands/upgrade.js"
 import { runValidate } from "./commands/validate.js"
 
@@ -76,6 +77,7 @@ program
   .option("--env-only", "Show only env defaults (drift detection)")
   .option("--sealed", "Show only secrets with encrypted_value")
   .option("--external", "Show only secrets without encrypted_value")
+  .option("--sort", "Sort secrets alphabetically within each status bucket (no file mutation)")
   .action((options) => {
     runAudit(options)
   })
@@ -110,6 +112,7 @@ program
   .option("--resolved", "Show resolved view (catalog merged)")
   .option("--secrets", "Show secret values from environment (masked by default)")
   .option("--plaintext", "Show secret values in plaintext (requires --secrets)")
+  .option("--sort", "Display secrets and env entries in alphabetical order (no file mutation)")
   .action((options) => {
     runInspect(options)
   })
@@ -160,6 +163,15 @@ program
 
 registerSecretCommands(program)
 registerEnvCommands(program)
+
+program
+  .command("sort")
+  .description("Group [env.*] and [secret.*] sections and alphabetize within each region")
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .option("--dry-run", "Preview the result without writing")
+  .action((options) => {
+    runSort(options)
+  })
 
 program
   .command("upgrade")

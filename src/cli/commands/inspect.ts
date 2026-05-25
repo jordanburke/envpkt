@@ -18,6 +18,7 @@ type InspectOptions = {
   readonly resolved?: boolean
   readonly secrets?: boolean
   readonly plaintext?: boolean
+  readonly sort?: boolean
 }
 
 const printSecretMeta = (meta: SecretMeta, indent: string): void => {
@@ -54,7 +55,13 @@ const printSecretMeta = (meta: SecretMeta, indent: string): void => {
 type PrintOptions = {
   readonly secrets?: Readonly<Record<string, string>>
   readonly secretDisplay?: SecretDisplay
+  readonly sort?: boolean
 }
+
+const sortedIfRequested = <V>(
+  entries: ReadonlyArray<readonly [string, V]>,
+  sort?: boolean,
+): ReadonlyArray<readonly [string, V]> => (sort ? [...entries].sort((a, b) => a[0].localeCompare(b[0])) : entries)
 
 const printConfig = (config: EnvpktConfig, path: string, resolveResult?: ResolveResult, opts?: PrintOptions): void => {
   console.log(`${BOLD}envpkt.toml${RESET} ${DIM}(${path})${RESET}`)
@@ -82,7 +89,7 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
 
   const secretEntries = config.secret ?? {}
   console.log(`${BOLD}Secrets:${RESET} ${Object.keys(secretEntries).length}`)
-  Object.entries(secretEntries).forEach(([key, meta]) => {
+  sortedIfRequested(Object.entries(secretEntries), opts?.sort).forEach(([key, meta]) => {
     const valueSuffix = Option(opts?.secrets?.[key]).fold(
       () => "",
       (secretValue) =>
@@ -99,7 +106,7 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
   if (envKeys.length > 0) {
     console.log("")
     console.log(`${BOLD}Environment Defaults:${RESET} ${envKeys.length}`)
-    Object.entries(envEntries).forEach(([key, entry]) => {
+    sortedIfRequested(Object.entries(envEntries), opts?.sort).forEach(([key, entry]) => {
       console.log(`  ${BOLD}${key}${RESET} = ${GREEN}"${entry.value}"${RESET}`)
       if (entry.purpose) console.log(`    ${DIM}purpose:${RESET} ${entry.purpose}`)
       if (entry.comment) console.log(`    ${DIM}comment:${RESET} ${DIM}${entry.comment}${RESET}`)
@@ -214,7 +221,10 @@ export const runInspect = (options: InspectOptions): void => {
                   })()
                 : undefined
 
-              printConfig(showConfig, path, showResolved ? resolveResult : undefined, printOpts)
+              printConfig(showConfig, path, showResolved ? resolveResult : undefined, {
+                ...(printOpts ?? {}),
+                sort: options.sort,
+              })
             },
           )
         },
