@@ -234,6 +234,13 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
       process.exit(2)
     }
 
+    const aliasKeys = editKeys.filter((k) => allSecretEntries[k]!.from_key !== undefined)
+    if (aliasKeys.length > 0) {
+      console.error(`${RED}Error:${RESET} Cannot seal alias entries: ${aliasKeys.join(", ")}`)
+      console.error(`${DIM}Aliases reference another secret's value via from_key — seal the target instead.${RESET}`)
+      process.exit(2)
+    }
+
     if (!process.stdin.isTTY) {
       console.error(`${RED}Error:${RESET} --edit requires an interactive terminal`)
       process.exit(2)
@@ -286,11 +293,19 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     return
   }
 
-  // Partition secrets into already-sealed and unsealed
+  // Partition secrets into already-sealed and unsealed.
+  // Aliases (entries with from_key) are skipped entirely — they reference
+  // another secret's value and cannot themselves be sealed.
   const allSecretEntries = config.secret ?? {}
-  const allKeys = Object.keys(allSecretEntries)
+  const allKeys = Object.keys(allSecretEntries).filter((k) => allSecretEntries[k]!.from_key === undefined)
+  const skippedAliases = Object.keys(allSecretEntries).filter((k) => allSecretEntries[k]!.from_key !== undefined)
   const alreadySealed = allKeys.filter((k) => allSecretEntries[k]!.encrypted_value)
   const unsealed = allKeys.filter((k) => !allSecretEntries[k]!.encrypted_value)
+
+  if (skippedAliases.length > 0) {
+    const noun = skippedAliases.length === 1 ? "alias" : "aliases"
+    console.error(`${DIM}Skipping ${skippedAliases.length} ${noun}: ${skippedAliases.join(", ")}${RESET}`)
+  }
 
   // Skip already-sealed unless --reseal
   if (!options.reseal && alreadySealed.length > 0) {
