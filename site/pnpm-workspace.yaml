@@ -1,0 +1,9 @@
+allowBuilds:
+  esbuild: true
+  sharp: true
+
+minimumReleaseAgeExclude:
+  - "@types/mdx@2.0.14"           # auto-added (no aged alternative)
+  - "@types/node@24.13.1"         # auto-added (no aged alternative for ^24.13.1)
+  - "@types/react@19.2.17"        # auto-added (no aged alternative)
+  - "caniuse-lite@1.0.30001797"   # auto-added (browserslist data pkg; churns daily)
