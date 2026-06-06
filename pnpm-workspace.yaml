@@ -1,0 +1,17 @@
+allowBuilds:
+  esbuild: false # binary ships via @esbuild/<platform> optional deps; postinstall not needed
+
+minimumReleaseAgeExclude:
+  - "@types/node@24.13.1" # auto-added (no aged alternative for ^24.13.1)
+  - "ts-builds" # first-party, all versions always allowed
+  - "functype" # first-party functype libs, all versions always allowed
+  - "functype-log"
+  - "functype-os"
+
+publicHoistPattern:
+  - "*eslint*"
+  - "*prettier*"
+  - "*vitest*"
+  - "typescript"
+  - "*rimraf*"
+  - "*cross-env*"
