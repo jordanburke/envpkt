@@ -264,12 +264,13 @@ See `references/quick-reference.md` for a compact cheat sheet.
 
 ### Operations
 
-| Command                    | Description                                        |
-| -------------------------- | -------------------------------------------------- |
-| `envpkt exec <command...>` | Pre-flight audit then execute with injected env    |
-| `envpkt seal`              | Encrypt secret values into config using age        |
-| `envpkt resolve`           | Resolve catalog references into flat config        |
-| `envpkt env export`        | Output `export` statements for eval-ing into shell |
+| Command                    | Description                                                            |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `envpkt exec <command...>` | Pre-flight audit then execute with injected env                        |
+| `envpkt seal`              | Encrypt secret values into config using age                            |
+| `envpkt resolve`           | Resolve catalog references into flat config                            |
+| `envpkt env export`        | Output `export` statements for eval-ing into shell                     |
+| `envpkt env github`        | Inject resolved secrets into `$GITHUB_ENV` (masked) for GitHub Actions |
 
 **exec options**: `-c <path>`, `--profile <profile>`, `--skip-audit` / `--no-check`, `--warn-only`, `--strict`
 
@@ -278,6 +279,17 @@ See `references/quick-reference.md` for a compact cheat sheet.
 **resolve options**: `-c <path>`, `-o <path>`, `--format toml|json`, `--dry-run`
 
 **env export options**: `-c <path>`, `--profile <profile>`, `--skip-audit`
+
+**env github options**: `-c <path>`, `--profile <profile>`, `--strict`. For GitHub Actions
+CI: emits `::add-mask::` for each secret (redacts it from the log) and appends heredoc
+assignments to `$GITHUB_ENV` (using namespaced wire names) so later job steps inherit them;
+env defaults are written but not masked. `--strict` exits with the audit code (1/2) after
+injecting. There is also a composite Action: `uses: jordanburke/envpkt@v1`.
+
+**CI age-key contract**: supply the age private key inline via the `ENVPKT_AGE_KEY` env var
+(e.g. a GitHub secret) — `boot()` materializes it to a `0600` temp file to decrypt sealed
+packets, no key file needed. Precedence: `identity.key_file` → `ENVPKT_AGE_KEY_FILE` →
+`ENVPKT_AGE_KEY` (inline) → `~/.envpkt/age-key.txt`.
 
 ### Secret Management (CRUD)
 

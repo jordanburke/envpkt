@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
+import { mkdtempSync, readdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
@@ -344,6 +344,67 @@ describe("boot with sealed values", () => {
     )
 
     delete process.env["SEALED_KEY"]
+  })
+
+  it.skipIf(!ageInstalled)("decrypts sealed values from an inline ENVPKT_AGE_KEY with no key_file", () => {
+    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+    const recipient = keygenOutput
+      .split("\n")
+      .find((l) => l.startsWith("# public key:"))!
+      .replace("# public key: ", "")
+      .trim()
+    const secretKey = keygenOutput
+      .split("\n")
+      .find((l) => l.startsWith("AGE-SECRET-KEY-"))!
+      .trim()
+
+    const ciphertext = ageEncrypt("inline-ci-value", recipient).fold(
+      () => "",
+      (v) => v,
+    )
+
+    // No key_file — only an inline key, as in CI
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[identity]`,
+        `name = "ci"`,
+        `recipient = "${recipient}"`,
+        `[secret.CI_KEY]`,
+        `service = "test"`,
+        `encrypted_value = """`,
+        ciphertext,
+        `"""`,
+      ].join("\n"),
+    )
+
+    const origKey = process.env["ENVPKT_AGE_KEY"]
+    const origFile = process.env["ENVPKT_AGE_KEY_FILE"]
+    delete process.env["ENVPKT_AGE_KEY_FILE"]
+    process.env["ENVPKT_AGE_KEY"] = secretKey
+    delete process.env["CI_KEY"]
+
+    const tmpBefore = readdirSync(tmpdir()).filter((d) => d.startsWith("envpkt-age-")).length
+
+    try {
+      const result = bootSafe({ configPath, inject: false })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        (boot) => {
+          expect(boot.secrets["CI_KEY"]).toBe("inline-ci-value")
+          expect(boot.injected).toContain("CI_KEY")
+        },
+      )
+      // temp identity file must be cleaned up
+      const tmpAfter = readdirSync(tmpdir()).filter((d) => d.startsWith("envpkt-age-")).length
+      expect(tmpAfter).toBe(tmpBefore)
+    } finally {
+      if (origKey === undefined) delete process.env["ENVPKT_AGE_KEY"]
+      else process.env["ENVPKT_AGE_KEY"] = origKey
+      if (origFile === undefined) delete process.env["ENVPKT_AGE_KEY_FILE"]
+      else process.env["ENVPKT_AGE_KEY_FILE"] = origFile
+      delete process.env["CI_KEY"]
+    }
   })
 
   it.skipIf(!ageInstalled)("decrypts sealed values using default key path when key_file is unset", () => {

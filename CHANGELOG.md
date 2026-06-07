@@ -5,6 +5,34 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-06-07
+
+### Added
+
+- **GitHub Actions CI injection.** New `envpkt env github` command resolves the credentials
+  in `envpkt.toml` and injects them into `$GITHUB_ENV` under their namespaced wire names, so
+  later steps in the job inherit them. Secret values are masked in the log via
+  `::add-mask::`; env defaults are written but not masked. `--strict` gates the build on the
+  pre-flight audit.
+- **Composite GitHub Action** (`action.yml`) — `uses: jordanburke/envpkt@v1` with inputs
+  `config` / `version` / `strict` / `profile`, wrapping `env github`.
+- **Inline age key for CI.** `boot()` now honors an inline `ENVPKT_AGE_KEY` (e.g. a CI
+  secret): it is materialized to a `0600` temp file to decrypt sealed packets and removed
+  after use, so no key file is needed in CI. Identity precedence:
+  `identity.key_file` → `ENVPKT_AGE_KEY_FILE` → `ENVPKT_AGE_KEY` (inline) →
+  `~/.envpkt/age-key.txt`.
+
+### Documentation
+
+- New GitHub Action integration page and `env github` CLI page; CI/CD guide updated to use
+  the Action; skill updated with the `env github` command and the `ENVPKT_AGE_KEY` contract.
+
+## [0.11.9] - 2026-06-07
+
+### Documentation
+
+- Add changelog entries for 0.11.7 and 0.11.8 (no functional change; published as a release).
+
 ## [0.11.8] - 2026-06-07
 
 ### Changed
@@ -329,6 +357,8 @@ Initial public release.
 - Shared secret catalog with the `resolve` command.
 - Secret value display, golden fixtures, and demo HTML generation.
 
+[0.12.0]: https://github.com/jordanburke/envpkt/compare/v0.11.9...v0.12.0
+[0.11.9]: https://github.com/jordanburke/envpkt/compare/v0.11.8...v0.11.9
 [0.11.8]: https://github.com/jordanburke/envpkt/compare/v0.11.7...v0.11.8
 [0.11.7]: https://github.com/jordanburke/envpkt/compare/v0.11.6...v0.11.7
 [0.11.6]: https://github.com/jordanburke/envpkt/compare/v0.11.5...v0.11.6

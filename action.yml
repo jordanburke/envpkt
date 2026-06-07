@@ -1,0 +1,35 @@
+name: "envpkt"
+description: "Resolve envpkt.toml credentials into the job environment for GitHub Actions, with secret values masked in the log."
+author: "jordanburke"
+branding:
+  icon: "package"
+  color: "purple"
+
+inputs:
+  config:
+    description: "Path to envpkt.toml (defaults to envpkt's discovery: CWD, then ENVPKT_CONFIG, then the search chain)."
+    required: false
+  version:
+    description: "envpkt version to run via npx (e.g. 0.12.0). Defaults to the latest published version."
+    required: false
+    default: "latest"
+  strict:
+    description: "Fail the step if the pre-flight credential audit is not healthy."
+    required: false
+    default: "false"
+  profile:
+    description: "fnox profile to resolve secrets from (when using fnox)."
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    # Resolves sealed packets (via ENVPKT_AGE_KEY) / fnox, masks secret values with
+    # ::add-mask::, and appends them to $GITHUB_ENV so later steps in the job inherit them.
+    # Supply the age key as a secret on this step:  env: { ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }} }
+    - shell: bash
+      run: |
+        npx --yes "envpkt@${{ inputs.version }}" env github \
+          ${{ inputs.config && format('--config {0}', inputs.config) || '' }} \
+          ${{ inputs.strict == 'true' && '--strict' || '' }} \
+          ${{ inputs.profile && format('--profile {0}', inputs.profile) || '' }}

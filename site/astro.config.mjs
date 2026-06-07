@@ -38,6 +38,7 @@ export default defineConfig({
             { slug: "cli/env-scan" },
             { slug: "cli/env-check" },
             { slug: "cli/env-export" },
+            { slug: "cli/env-github" },
             { slug: "cli/shell-hook" },
             { slug: "cli/mcp" },
           ],
@@ -56,6 +57,7 @@ export default defineConfig({
         {
           label: "Integrations",
           items: [
+            { slug: "integrations/github-action" },
             { slug: "integrations/fnox" },
             { slug: "integrations/mcp-server" },
             { slug: "integrations/shell-hooks" },

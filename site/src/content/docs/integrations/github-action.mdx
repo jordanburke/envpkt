@@ -1,0 +1,81 @@
+---
+title: GitHub Action
+description: Resolve envpkt.toml credentials into a GitHub Actions job, with secrets masked
+---
+
+The `envpkt` GitHub Action resolves the credentials described in `envpkt.toml` and injects
+them into the job environment — masking secret values in the log and writing them to
+`$GITHUB_ENV` so every later step in the job can use them. It's a thin wrapper over
+[`envpkt env github`](/cli/env-github/).
+
+## Quick start
+
+```yaml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: jordanburke/envpkt@v1
+        with:
+          config: ./envpkt.toml
+          strict: "true"
+        env:
+          ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }}
+
+      - run: ./deploy.sh # sees the resolved variables; secret values redacted in the log
+```
+
+After the `envpkt` step, the secrets and env defaults from `envpkt.toml` are present in the
+environment for the rest of the job, under their [namespaced wire names](/reference/toml-schema/#namespace)
+(e.g. `CIV__API_KEY`).
+
+## Inputs
+
+| Input     | Description                                                        | Default  |
+| --------- | ------------------------------------------------------------------ | -------- |
+| `config`  | Path to `envpkt.toml` (otherwise envpkt's discovery chain is used) | —        |
+| `version` | envpkt version to run via `npx` (e.g. `0.12.0`)                    | `latest` |
+| `strict`  | Fail the step if the pre-flight credential audit is not healthy    | `false`  |
+| `profile` | fnox profile to resolve from (when using fnox)                     | —        |
+
+## Supplying the decryption key
+
+Sealed (`encrypted_value`) packets are the typical CI source: commit them to the repo
+(they're age-encrypted and safe to commit) and provide the **age private key** as a
+repository/organization secret named `ENVPKT_AGE_KEY` on the step's `env`:
+
+```yaml
+- uses: jordanburke/envpkt@v1
+  env:
+    ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }}
+```
+
+envpkt writes the inline key to a private (`0600`) temp file to decrypt and removes it
+afterwards — no key file needs to live in the repo or runner. Identity precedence:
+
+```
+identity.key_file  >  ENVPKT_AGE_KEY_FILE  >  ENVPKT_AGE_KEY (inline)  >  ~/.envpkt/age-key.txt
+```
+
+## Masking
+
+Every secret value is registered with GitHub via `::add-mask::` **before** it is written,
+so it is redacted everywhere in the job log. Env defaults (`[env.*]`) are non-secret by
+design and are not masked. Because masking and `$GITHUB_ENV` rely on a shell-safe variable
+name, keep any [`[namespace]`](/reference/toml-schema/#namespace) separator to `_`/`__`.
+
+## Audit gate
+
+With `strict: "true"`, the step fails (non-zero [exit code](/reference/exit-codes/)) when a
+credential is expired or otherwise unhealthy — a one-line pre-flight gate for your build.
+
+## Notes
+
+- **Node** is assumed present (GitHub-hosted runners ship it). To pin a version, add
+  `actions/setup-node` before the `envpkt` step.
+- For the **current shell** instead of a GitHub job (local dev, other CI), use
+  [`envpkt env export`](/cli/env-export/) with `eval`.
+- To run a single command with the credentials injected (without `$GITHUB_ENV`), use
+  [`envpkt exec`](/cli/exec/).
