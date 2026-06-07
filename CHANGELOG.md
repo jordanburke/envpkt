@@ -5,6 +5,22 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.8] - 2026-06-07
+
+### Changed
+
+- **CI:** bump workflow actions to their Node 24 runtimes ahead of GitHub's
+  forced switch ([#36]) — `actions/checkout` v4→v5, `actions/setup-node` v4→v5,
+  `pnpm/action-setup` v4→v6, `softprops/action-gh-release` v1→v3 (v2 is still
+  Node 20; only v3 is Node 24).
+
+## [0.11.7] - 2026-06-07
+
+### Documentation
+
+- Add `CHANGELOG.md` (Keep a Changelog format) and backfill entries for every
+  prior tagged release (0.2.0 through 0.11.6).
+
 ## [0.11.6] - 2026-06-07
 
 ### Added
@@ -313,6 +329,8 @@ Initial public release.
 - Shared secret catalog with the `resolve` command.
 - Secret value display, golden fixtures, and demo HTML generation.
 
+[0.11.8]: https://github.com/jordanburke/envpkt/compare/v0.11.7...v0.11.8
+[0.11.7]: https://github.com/jordanburke/envpkt/compare/v0.11.6...v0.11.7
 [0.11.6]: https://github.com/jordanburke/envpkt/compare/v0.11.5...v0.11.6
 [0.11.5]: https://github.com/jordanburke/envpkt/compare/v0.11.4...v0.11.5
 [0.11.4]: https://github.com/jordanburke/envpkt/compare/v0.11.3...v0.11.4
@@ -352,3 +370,4 @@ Initial public release.
 [#32]: https://github.com/jordanburke/envpkt/pull/32
 [#33]: https://github.com/jordanburke/envpkt/pull/33
 [#35]: https://github.com/jordanburke/envpkt/pull/35
+[#36]: https://github.com/jordanburke/envpkt/pull/36
