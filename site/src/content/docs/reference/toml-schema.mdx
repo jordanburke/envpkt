@@ -21,6 +21,43 @@ Enable editor autocompletion by adding the schema directive on line 1:
 | `version` | `number` | Yes      | Schema version number (currently `1`)                   |
 | `catalog` | `string` | No       | Path to shared secret catalog (relative to config file) |
 
+## `[namespace]` Section
+
+Optional. Prefixes the **injected** environment variable name for every
+`[secret.*]` and `[env.*]` entry, without changing the TOML keys you author or
+the names shown in audit/inspect. The TOML key stays the logical name; the
+prefix is applied only at the `process.env` boundary (`boot()`, `exec`, `env export`).
+
+| Field       | Type     | Required | Description                                                                                |
+| ----------- | -------- | -------- | ------------------------------------------------------------------------------------------ |
+| `prefix`    | `string` | Yes      | Prefix applied to injected names (e.g. `CIV` → `CIV__API_KEY`)                             |
+| `separator` | `string` | No       | Separator between prefix and key. Default `__`. **Must be shell-safe** — see warning below |
+
+```toml
+[namespace]
+prefix    = "CIV"
+separator = "__"   # optional, default
+
+[secret.API_KEY]   # injected as CIV__API_KEY
+service = "example"
+
+[env.LOG_LEVEL]    # injected as CIV__LOG_LEVEL
+value = "info"
+```
+
+:::caution[Use a shell-safe separator]
+A POSIX shell identifier may contain only `[A-Za-z0-9_]`. The default `__` is
+safe. `.` and `:` are **not** valid in shell variable names — `$CIV.API_KEY`
+fails to parse and `$CIV:API_KEY` silently misparses as a substring expansion.
+envpkt emits a boot warning if the separator isn't shell-safe, but does not
+reject it. Stick with `_` or `__` unless every consumer reads `process.env`
+directly (never via the shell).
+:::
+
+A logical key keeps its canonical name everywhere internal (audit, `from_key`
+references, fnox lookup, catalog merge); only the injected/exported name is
+prefixed. `BootResult.envNames` maps each logical key to its wire name.
+
 ## `[identity]` Section
 
 Identity and capabilities.
@@ -58,18 +95,20 @@ Per-secret metadata. Each key corresponds to an environment variable name.
 | `from_key`        | `string`        | No       | Alias       | Reference another secret entry (format: `"secret.<KEY>"`) — see [Aliases](#aliases) |
 | `required`        | `boolean`       | No       | Enforcement | Whether secret is required for operation                                            |
 | `tags`            | `object`        | No       | Enforcement | Key-value tags for grouping/filtering                                               |
+| `namespace`       | `string`        | No       | Enforcement | Override the file-level `[namespace]` prefix for this entry. `""` opts out entirely |
 
 ## `[env.<KEY>]` Sections
 
 Plaintext environment defaults. Each key corresponds to an environment variable. These are non-secret values that are safe to commit — use `[secret.*]` for sensitive credentials.
 
-| Field      | Type     | Required           | Description                                                                   |
-| ---------- | -------- | ------------------ | ----------------------------------------------------------------------------- |
-| `value`    | `string` | Yes unless aliased | Default value for this env variable — mutually exclusive with `from_key`      |
-| `from_key` | `string` | No                 | Reference another env entry (format: `"env.<KEY>"`) — see [Aliases](#aliases) |
-| `purpose`  | `string` | No                 | Why this env var exists                                                       |
-| `comment`  | `string` | No                 | Free-form annotation or note                                                  |
-| `tags`     | `object` | No                 | Key-value tags for grouping/filtering                                         |
+| Field       | Type     | Required           | Description                                                                   |
+| ----------- | -------- | ------------------ | ----------------------------------------------------------------------------- |
+| `value`     | `string` | Yes unless aliased | Default value for this env variable — mutually exclusive with `from_key`      |
+| `from_key`  | `string` | No                 | Reference another env entry (format: `"env.<KEY>"`) — see [Aliases](#aliases) |
+| `purpose`   | `string` | No                 | Why this env var exists                                                       |
+| `comment`   | `string` | No                 | Free-form annotation or note                                                  |
+| `tags`      | `object` | No                 | Key-value tags for grouping/filtering                                         |
+| `namespace` | `string` | No                 | Override the file-level `[namespace]` prefix for this entry. `""` opts out    |
 
 ```toml
 [env.NODE_ENV]
@@ -138,6 +177,24 @@ visible. Status (expiration, health) is inherited from the target — an alias
 is healthy iff its target is healthy.
 
 `envpkt audit --all` includes env default drift alongside secret health. Use `envpkt audit --env-only` to see only env defaults.
+
+**Aliases + namespace:** a `from_key` reference is always the **logical** key
+(`"secret.API_KEY"`), independent of any namespace. The alias is injected under
+its _own_ namespace resolution, so it can bridge a namespaced canonical value to
+a different injected name — e.g. expose a namespaced secret under a plain,
+un-prefixed legacy name:
+
+```toml
+[namespace]
+prefix = "CIV"
+
+[secret.API_KEY]                 # injected as CIV__API_KEY
+service = "example"
+
+[secret.LEGACY_API_KEY]
+from_key  = "secret.API_KEY"     # value copied from API_KEY
+namespace = ""                   # injected as plain LEGACY_API_KEY
+```
 
 ## `[lifecycle]` Section
 

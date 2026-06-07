@@ -602,6 +602,349 @@ describe("bootSafe with aliases", () => {
   })
 })
 
+describe("bootSafe with namespace", () => {
+  it("injects an env default under the namespaced wire name, keeping BootResult logical", () => {
+    const configPath = writeConfig(
+      [`version = 1`, `[namespace]`, `prefix = "CIV"`, `[env.NS_LOG_LEVEL]`, `value = "info"`].join("\n"),
+    )
+
+    delete process.env["CIV__NS_LOG_LEVEL"]
+    delete process.env["NS_LOG_LEVEL"]
+
+    try {
+      const result = bootSafe({ configPath, inject: true })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        (boot) => {
+          // wire name in the environment, logical name in the result
+          expect(process.env["CIV__NS_LOG_LEVEL"]).toBe("info")
+          expect(process.env["NS_LOG_LEVEL"]).toBeUndefined()
+          expect(boot.envDefaults).toEqual({ NS_LOG_LEVEL: "info" })
+        },
+      )
+    } finally {
+      delete process.env["CIV__NS_LOG_LEVEL"]
+      delete process.env["NS_LOG_LEVEL"]
+    }
+  })
+
+  it("opts an entry out of the namespace with an empty per-entry namespace", () => {
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[namespace]`,
+        `prefix = "CIV"`,
+        `[env.NS_SHARED]`,
+        `value = "shared-val"`,
+        `namespace = ""`,
+      ].join("\n"),
+    )
+
+    delete process.env["CIV__NS_SHARED"]
+    delete process.env["NS_SHARED"]
+
+    try {
+      const result = bootSafe({ configPath, inject: true })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        (boot) => {
+          expect(process.env["NS_SHARED"]).toBe("shared-val")
+          expect(process.env["CIV__NS_SHARED"]).toBeUndefined()
+          expect(boot.envDefaults).toEqual({ NS_SHARED: "shared-val" })
+        },
+      )
+    } finally {
+      delete process.env["CIV__NS_SHARED"]
+      delete process.env["NS_SHARED"]
+    }
+  })
+
+  it("uses a per-entry namespace override for the wire name", () => {
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[namespace]`,
+        `prefix = "CIV"`,
+        `[env.NS_LEGACY]`,
+        `value = "legacy-val"`,
+        `namespace = "OLD"`,
+      ].join("\n"),
+    )
+
+    delete process.env["OLD__NS_LEGACY"]
+    delete process.env["CIV__NS_LEGACY"]
+
+    try {
+      const result = bootSafe({ configPath, inject: true })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        (boot) => {
+          expect(process.env["OLD__NS_LEGACY"]).toBe("legacy-val")
+          expect(process.env["CIV__NS_LEGACY"]).toBeUndefined()
+          expect(boot.envDefaults).toEqual({ NS_LEGACY: "legacy-val" })
+        },
+      )
+    } finally {
+      delete process.env["OLD__NS_LEGACY"]
+      delete process.env["CIV__NS_LEGACY"]
+    }
+  })
+
+  it("detects an override against the namespaced wire name", () => {
+    const configPath = writeConfig(
+      [`version = 1`, `[namespace]`, `prefix = "CIV"`, `[env.NS_PORT]`, `value = "3000"`].join("\n"),
+    )
+
+    delete process.env["NS_PORT"]
+    process.env["CIV__NS_PORT"] = "8080"
+
+    try {
+      const result = bootSafe({ configPath, inject: true })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        (boot) => {
+          expect(boot.overridden).toContain("NS_PORT")
+          expect(boot.envDefaults).toEqual({})
+          expect(process.env["CIV__NS_PORT"]).toBe("8080")
+        },
+      )
+    } finally {
+      delete process.env["CIV__NS_PORT"]
+      delete process.env["NS_PORT"]
+    }
+  })
+
+  it("warns when the namespace separator is not shell-safe", () => {
+    const configPath = writeConfig(
+      [`version = 1`, `[namespace]`, `prefix = "CIV"`, `separator = "."`, `[env.NS_DOT]`, `value = "v"`].join("\n"),
+    )
+
+    const result = bootSafe({ configPath, inject: false })
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+      (boot) => {
+        expect(boot.warnings.some((w) => w.toLowerCase().includes("separator"))).toBe(true)
+      },
+    )
+  })
+
+  it("does not warn for the default shell-safe separator", () => {
+    const configPath = writeConfig(
+      [`version = 1`, `[namespace]`, `prefix = "CIV"`, `[env.NS_OK]`, `value = "v"`].join("\n"),
+    )
+
+    const result = bootSafe({ configPath, inject: false })
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+      (boot) => {
+        expect(boot.warnings.some((w) => w.toLowerCase().includes("separator"))).toBe(false)
+      },
+    )
+  })
+
+  it("exposes a logical→wire name map in BootResult.envNames", () => {
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[namespace]`,
+        `prefix = "CIV"`,
+        `[secret.API_KEY]`,
+        `service = "x"`,
+        `[secret.SHARED]`,
+        `service = "y"`,
+        `namespace = ""`,
+        `[env.LOG_LEVEL]`,
+        `value = "info"`,
+      ].join("\n"),
+    )
+
+    const result = bootSafe({ configPath, inject: false })
+    result.fold(
+      (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+      (boot) => {
+        expect(boot.envNames["API_KEY"]).toBe("CIV__API_KEY")
+        expect(boot.envNames["LOG_LEVEL"]).toBe("CIV__LOG_LEVEL")
+        expect(boot.envNames["SHARED"]).toBe("SHARED")
+      },
+    )
+  })
+
+  it("an env alias inherits the file namespace for its own wire name", () => {
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[namespace]`,
+        `prefix = "CIV"`,
+        `[env.SERVICE_URL]`,
+        `value = "https://api.example.com"`,
+        `[env.LEGACY_URL]`,
+        `from_key = "env.SERVICE_URL"`,
+      ].join("\n"),
+    )
+
+    delete process.env["CIV__SERVICE_URL"]
+    delete process.env["CIV__LEGACY_URL"]
+
+    try {
+      const result = bootSafe({ configPath, inject: true })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        () => {
+          // both canonical and alias land under the file namespace
+          expect(process.env["CIV__SERVICE_URL"]).toBe("https://api.example.com")
+          expect(process.env["CIV__LEGACY_URL"]).toBe("https://api.example.com")
+        },
+      )
+    } finally {
+      delete process.env["CIV__SERVICE_URL"]
+      delete process.env["CIV__LEGACY_URL"]
+    }
+  })
+
+  it("an env alias can opt out to bridge a legacy un-prefixed name to a namespaced canonical value", () => {
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[namespace]`,
+        `prefix = "CIV"`,
+        `[env.SERVICE_URL]`,
+        `value = "https://api.example.com"`,
+        `[env.LEGACY_URL]`,
+        `from_key = "env.SERVICE_URL"`,
+        `namespace = ""`,
+      ].join("\n"),
+    )
+
+    delete process.env["CIV__SERVICE_URL"]
+    delete process.env["LEGACY_URL"]
+
+    try {
+      const result = bootSafe({ configPath, inject: true })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        () => {
+          // canonical stays namespaced; the opted-out alias bridges to the plain name
+          expect(process.env["CIV__SERVICE_URL"]).toBe("https://api.example.com")
+          expect(process.env["LEGACY_URL"]).toBe("https://api.example.com")
+          expect(process.env["CIV__LEGACY_URL"]).toBeUndefined()
+        },
+      )
+    } finally {
+      delete process.env["CIV__SERVICE_URL"]
+      delete process.env["LEGACY_URL"]
+    }
+  })
+
+  it.skipIf(!ageInstalled)("a sealed secret alias bridges to a namespaced canonical value when opted out", () => {
+    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+    const recipient = keygenOutput
+      .split("\n")
+      .find((l) => l.startsWith("# public key:"))!
+      .replace("# public key: ", "")
+      .trim()
+    const identityPath = join(tmpDir, "identity.txt")
+    writeFileSync(identityPath, keygenOutput)
+
+    const ciphertext = ageEncrypt("canonical-value", recipient).fold(
+      () => "",
+      (v) => v,
+    )
+
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[namespace]`,
+        `prefix = "CIV"`,
+        `[identity]`,
+        `name = "test-alias-ns"`,
+        `recipient = "${recipient}"`,
+        `key_file = "identity.txt"`,
+        `[secret.API_KEY]`,
+        `service = "example"`,
+        `encrypted_value = """`,
+        ciphertext,
+        `"""`,
+        `[secret.LEGACY_API_KEY]`,
+        `from_key = "secret.API_KEY"`,
+        `namespace = ""`,
+      ].join("\n"),
+    )
+
+    delete process.env["CIV__API_KEY"]
+    delete process.env["LEGACY_API_KEY"]
+
+    try {
+      const result = bootSafe({ configPath, inject: true })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        (boot) => {
+          // BootResult stays logical; injection respects each entry's namespace
+          expect(boot.secrets["API_KEY"]).toBe("canonical-value")
+          expect(boot.secrets["LEGACY_API_KEY"]).toBe("canonical-value")
+          expect(process.env["CIV__API_KEY"]).toBe("canonical-value")
+          expect(process.env["LEGACY_API_KEY"]).toBe("canonical-value")
+        },
+      )
+    } finally {
+      delete process.env["CIV__API_KEY"]
+      delete process.env["LEGACY_API_KEY"]
+    }
+  })
+
+  it.skipIf(!ageInstalled)("injects a sealed secret under the namespaced wire name", () => {
+    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+    const recipient = keygenOutput
+      .split("\n")
+      .find((l) => l.startsWith("# public key:"))!
+      .replace("# public key: ", "")
+      .trim()
+    const identityPath = join(tmpDir, "identity.txt")
+    writeFileSync(identityPath, keygenOutput)
+
+    const ciphertext = ageEncrypt("sealed-ns-value", recipient).fold(
+      () => "",
+      (v) => v,
+    )
+
+    const configPath = writeConfig(
+      [
+        `version = 1`,
+        `[namespace]`,
+        `prefix = "CIV"`,
+        `[identity]`,
+        `name = "test-ns"`,
+        `recipient = "${recipient}"`,
+        `key_file = "identity.txt"`,
+        `[secret.SEALED_NS]`,
+        `service = "test"`,
+        `encrypted_value = """`,
+        ciphertext,
+        `"""`,
+      ].join("\n"),
+    )
+
+    delete process.env["CIV__SEALED_NS"]
+    delete process.env["SEALED_NS"]
+
+    try {
+      const result = bootSafe({ configPath, inject: true })
+      result.fold(
+        (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
+        (boot) => {
+          expect(process.env["CIV__SEALED_NS"]).toBe("sealed-ns-value")
+          expect(process.env["SEALED_NS"]).toBeUndefined()
+          // BootResult stays logical
+          expect(boot.secrets["SEALED_NS"]).toBe("sealed-ns-value")
+          expect(boot.injected).toContain("SEALED_NS")
+        },
+      )
+    } finally {
+      delete process.env["CIV__SEALED_NS"]
+      delete process.env["SEALED_NS"]
+    }
+  })
+})
+
 describe("EnvpktBootError", () => {
   it("has descriptive message for FileNotFound", () => {
     const err = new EnvpktBootError({ _tag: "FileNotFound", path: "/missing" })

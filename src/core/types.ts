@@ -11,6 +11,7 @@ export type {
   EnvpktConfig,
   Identity,
   LifecycleConfig,
+  Namespace,
   SecretMeta,
   ToolsConfig,
 } from "./schema.js"
@@ -212,6 +213,13 @@ export type BootResult = {
   readonly warnings: ReadonlyArray<string>
   readonly envDefaults: Readonly<Record<string, string>>
   readonly overridden: ReadonlyArray<string>
+  /**
+   * Map of logical key → injected wire name (e.g. API_KEY → CIV__API_KEY).
+   * `secrets`/`envDefaults` stay keyed by the logical name; this is how
+   * shell-facing consumers (exec, env export) recover the actual process.env
+   * name. Identity map when no namespace is configured.
+   */
+  readonly envNames: Readonly<Record<string, string>>
   readonly configPath: string
   readonly configSource: ConfigSource
 }

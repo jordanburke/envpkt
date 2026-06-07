@@ -257,6 +257,41 @@ describe("envpkt env export", () => {
     expect(result.status).toBe(0)
     expect(result.stdout).toContain("export MY_SECRET='sk-test-secret-value'")
   })
+
+  it("emits the namespaced wire name for env defaults", () => {
+    const toml = `version = 1\n\n[namespace]\nprefix = "CIV"\n\n[env.LOG_LEVEL]\nvalue = "info"\n`
+    writeFileSync(join(tmpDir, "envpkt.toml"), toml)
+
+    const result = run(["env", "export"], { cwd: tmpDir })
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain("export CIV__LOG_LEVEL='info'")
+    expect(result.stdout).not.toContain("export LOG_LEVEL='info'")
+  })
+
+  it.skipIf(!ageInstalled)("emits the namespaced wire name for sealed secrets", () => {
+    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+    const recipient = keygenOutput
+      .split("\n")
+      .find((l) => l.startsWith("# public key:"))!
+      .replace("# public key: ", "")
+      .trim()
+    writeFileSync(join(tmpDir, "identity.txt"), keygenOutput)
+
+    const encrypted = execFileSync("age", ["-r", recipient, "-a"], {
+      input: "sk-test-secret-value",
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    })
+
+    const toml = `version = 1\n\n[namespace]\nprefix = "CIV"\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
+    writeFileSync(join(tmpDir, "envpkt.toml"), toml)
+
+    const result = run(["env", "export"], { cwd: tmpDir })
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain("export CIV__MY_SECRET='sk-test-secret-value'")
+  })
 })
 
 describe("envpkt audit --format minimal", () => {

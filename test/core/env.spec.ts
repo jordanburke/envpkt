@@ -174,3 +174,49 @@ describe("env core", () => {
     })
   })
 })
+
+describe("envCheck with namespace", () => {
+  it("treats a namespaced secret present under its wire name as tracked, not missing or untracked", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      namespace: { prefix: "CIV" },
+      secret: { API_KEY: { service: "stripe" } },
+    }
+    const env = { CIV__API_KEY: "sk-livetest1234567890" }
+
+    const result = envCheck(config, env)
+    const apiEntry = result.entries.toArray().find((e) => e.envVar === "API_KEY")
+
+    expect(apiEntry?.status).toBe("tracked")
+    expect(result.untracked_credentials).toBe(0)
+  })
+
+  it("treats a namespaced env default present under its wire name as tracked", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      namespace: { prefix: "CIV" },
+      env: { LOG_LEVEL: { value: "info" } },
+    }
+    const env = { CIV__LOG_LEVEL: "debug" }
+
+    const result = envCheck(config, env)
+    const entry = result.entries.toArray().find((e) => e.envVar === "LOG_LEVEL")
+
+    expect(entry?.status).toBe("tracked")
+  })
+
+  it("honors a per-entry opt-out: a plain wire name satisfies an opted-out secret", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      namespace: { prefix: "CIV" },
+      secret: { SHARED_TOKEN: { service: "svc", namespace: "" } },
+    }
+    const env = { SHARED_TOKEN: "sk-livetest1234567890" }
+
+    const result = envCheck(config, env)
+    const entry = result.entries.toArray().find((e) => e.envVar === "SHARED_TOKEN")
+
+    expect(entry?.status).toBe("tracked")
+    expect(result.untracked_credentials).toBe(0)
+  })
+})

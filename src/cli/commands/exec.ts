@@ -72,19 +72,22 @@ export const runExec = (args: ReadonlyArray<string>, options: ExecOptions): void
     console.error(`${YELLOW}Warning:${RESET} ${warning}`)
   })
 
-  // Build environment: current env + env defaults + resolved secrets
+  // Build environment: current env + env defaults + resolved secrets.
+  // Inject under the namespaced wire name (boot.envNames), not the logical key.
   const env = { ...process.env }
+  const wireName = (key: string): string => boot.envNames[key] ?? key
 
-  // Apply env defaults (only if key not already set)
+  // Apply env defaults (only if the wire name is not already set)
   Object.entries(boot.envDefaults).forEach(([key, value]) => {
-    if (!(key in env)) {
-      env[key] = value
+    const name = wireName(key)
+    if (!(name in env)) {
+      env[name] = value
     }
   })
 
   // Apply secrets (always override)
   Object.entries(boot.secrets).forEach(([key, value]) => {
-    env[key] = value
+    env[wireName(key)] = value
   })
 
   // Execute the command

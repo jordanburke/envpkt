@@ -48,6 +48,10 @@ envpkt exec --profile staging -- node server.js
 
 Requires [fnox integration](/integrations/fnox/) or [sealed packets](/getting-started/the-toml-file/) for secret injection.
 
+If the config declares a [`[namespace]`](/reference/toml-schema/#namespace), the
+subprocess receives each value under its **wire name** (e.g. `CIV__API_KEY`),
+matching what `boot()` would inject — not the logical TOML key.
+
 :::tip
 Need secrets in the **current** shell instead of a subprocess? Use [`envpkt env export`](/cli/env-export/) with `eval`.
 :::

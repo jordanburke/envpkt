@@ -43,6 +43,25 @@ export type AgentIdentity = Identity
 /** @deprecated Use `IdentitySchema` instead */
 export const AgentIdentitySchema = IdentitySchema
 
+// --- Namespace ---
+
+export const NamespaceSchema = Type.Object(
+  {
+    prefix: Type.String({
+      description: "Namespace prefix applied to all injected env/secret names (e.g. 'CIV' -> CIV__API_KEY)",
+    }),
+    separator: Type.Optional(
+      Type.String({
+        default: "__",
+        description:
+          "Separator between prefix and key. Default '__' (shell-safe). Note: '.' and ':' are not valid in shell identifiers.",
+      }),
+    ),
+  },
+  { description: "Optional namespace/package prefix for injected environment variable names" },
+)
+export type Namespace = Static<typeof NamespaceSchema>
+
 // --- Secret Metadata ---
 
 export const SecretMetaSchema = Type.Object(
@@ -89,6 +108,12 @@ export const SecretMetaSchema = Type.Object(
     required: Type.Optional(Type.Boolean({ description: "Whether this secret is required for operation" })),
     tags: Type.Optional(
       Type.Record(Type.String(), Type.String(), { description: "Key-value tags for grouping and filtering" }),
+    ),
+    namespace: Type.Optional(
+      Type.String({
+        description:
+          "Override the file-level namespace for this entry's injected name. Empty string opts out of any prefix.",
+      }),
     ),
   },
   { description: "Metadata about a single secret" },
@@ -148,6 +173,12 @@ export const EnvMetaSchema = Type.Object(
     tags: Type.Optional(
       Type.Record(Type.String(), Type.String(), { description: "Key-value tags for grouping and filtering" }),
     ),
+    namespace: Type.Optional(
+      Type.String({
+        description:
+          "Override the file-level namespace for this entry's injected name. Empty string opts out of any prefix.",
+      }),
+    ),
   },
   { description: "Metadata for a plaintext environment default (non-secret)" },
 )
@@ -161,6 +192,7 @@ export const EnvpktConfigSchema = Type.Object(
     catalog: Type.Optional(
       Type.String({ description: "Path to shared secret catalog (relative to this config file)" }),
     ),
+    namespace: Type.Optional(NamespaceSchema),
     identity: Type.Optional(IdentitySchema),
     secret: Type.Optional(
       Type.Record(Type.String(), SecretMetaSchema, {

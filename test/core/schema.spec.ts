@@ -83,6 +83,26 @@ describe("EnvpktConfigSchema", () => {
     const config = { version: 1 }
     expect(configChecker.Check(config)).toBe(true)
   })
+
+  it("validates a config with a top-level namespace", () => {
+    const config = { version: 1, namespace: { prefix: "CIV", separator: "__" } }
+    expect(configChecker.Check(config)).toBe(true)
+  })
+
+  it("validates a namespace with only a prefix (separator optional)", () => {
+    const config = { version: 1, namespace: { prefix: "CIV" } }
+    expect(configChecker.Check(config)).toBe(true)
+  })
+
+  it("rejects a namespace with a non-string prefix", () => {
+    const config = { version: 1, namespace: { prefix: 123 } }
+    expect(configChecker.Check(config)).toBe(false)
+  })
+
+  it("rejects a namespace missing its prefix", () => {
+    const config = { version: 1, namespace: { separator: "__" } }
+    expect(configChecker.Check(config)).toBe(false)
+  })
 })
 
 describe("SecretMetaSchema", () => {
@@ -121,6 +141,18 @@ describe("SecretMetaSchema", () => {
     const meta = { service: "stripe", comment: "Rotated by ops team on Mondays" }
     expect(secretMetaChecker.Check(meta)).toBe(true)
   })
+
+  it("accepts a per-entry namespace override", () => {
+    expect(secretMetaChecker.Check({ namespace: "OLD" })).toBe(true)
+  })
+
+  it("accepts an empty per-entry namespace (opt-out)", () => {
+    expect(secretMetaChecker.Check({ namespace: "" })).toBe(true)
+  })
+
+  it("rejects a non-string per-entry namespace", () => {
+    expect(secretMetaChecker.Check({ namespace: 123 })).toBe(false)
+  })
 })
 
 describe("EnvMetaSchema", () => {
@@ -141,6 +173,14 @@ describe("EnvMetaSchema", () => {
       tags: { env: "prod" },
     }
     expect(envMetaChecker.Check(meta)).toBe(true)
+  })
+
+  it("accepts a per-entry namespace override", () => {
+    expect(envMetaChecker.Check({ value: "x", namespace: "OLD" })).toBe(true)
+  })
+
+  it("rejects a non-string per-entry namespace", () => {
+    expect(envMetaChecker.Check({ value: "x", namespace: 123 })).toBe(false)
   })
 })
 

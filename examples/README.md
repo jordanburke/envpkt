@@ -10,6 +10,7 @@ Standalone example configurations demonstrating envpkt features. All standalone 
 | `full-agent.toml`         | Full agent with lifecycle policies, callbacks, and tool integrations | `npx envpkt audit -c examples/full-agent.toml`           |
 | `ci-agent.toml`           | CI/CD deployment agent (GitHub, GHCR, Kubernetes)                    | `npx envpkt audit -c examples/ci-agent.toml`             |
 | `saas-integration.toml`   | SaaS billing service (Stripe, SendGrid, Redis)                       | `npx envpkt audit -c examples/saas-integration.toml`     |
+| `namespaced-agent.toml`   | Namespace prefix (`CIV__`) with a per-entry opt-out and alias bridge | `npx envpkt inspect -c examples/namespaced-agent.toml`   |
 | `catalog.toml`            | Shared secret catalog — team-owned metadata                          | `npx envpkt inspect -c examples/catalog.toml`            |
 | `agent-with-catalog.toml` | Agent referencing a shared catalog with capability narrowing         | `npx envpkt resolve -c examples/agent-with-catalog.toml` |
 | `sealed-agent.toml`       | Sealed packets — age-encrypted secrets safe to commit                | `npx envpkt inspect -c examples/sealed-agent.toml`       |
