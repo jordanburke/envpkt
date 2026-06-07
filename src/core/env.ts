@@ -1,5 +1,6 @@
 import { List, Option, Set as FSet } from "functype"
 
+import { makeEnvNamer } from "./namespace.js"
 import type { ConfidenceLevel, MatchResult } from "./patterns.js"
 import { scanEnv } from "./patterns.js"
 import type { EnvpktConfig } from "./types.js"
@@ -71,15 +72,25 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
   const metaKeys = Object.keys(secretEntries)
   const metaKeysSet = FSet(metaKeys)
 
+  // Namespace boundary: the live environment holds wire names (e.g. CIV__API_KEY),
+  // so presence checks and the tracked-key set must use wire names too. References
+  // (from_key) stay logical — a target's presence is checked at the target's wire name.
+  const namer = makeEnvNamer(config)
+  const envDefaultsForWire = config.env ?? {}
+  const secretWire = (key: string): string => namer(key, secretEntries[key]?.namespace)
+  const envWire = (key: string): string => namer(key, envDefaultsForWire[key]?.namespace)
+
+  const isPresentAt = (wire: string): boolean => env[wire] !== undefined && env[wire] !== ""
+
   // A secret entry is "satisfied" if its canonical name is set, OR (for aliases)
   // its target name is set — because at boot the alias will copy from target.
   const isSecretPresent = (key: string): boolean => {
-    if (env[key] !== undefined && env[key] !== "") return true
+    if (isPresentAt(secretWire(key))) return true
     const meta = secretEntries[key]
     if (meta?.from_key === undefined) return false
     return parseAliasRef(meta.from_key, "secret").fold(
       () => false,
-      (targetKey) => env[targetKey] !== undefined && env[targetKey] !== "",
+      (targetKey) => isPresentAt(secretWire(targetKey)),
     )
   }
 
@@ -97,12 +108,12 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
   // Direction 1b: [env.*] keys → check if present (non-secret defaults; aliases satisfied by target)
   const envDefaults = config.env ?? {}
   const isEnvPresent = (key: string): boolean => {
-    if (env[key] !== undefined && env[key] !== "") return true
+    if (isPresentAt(envWire(key))) return true
     const meta = envDefaults[key]
     if (meta?.from_key === undefined) return false
     return parseAliasRef(meta.from_key, "env").fold(
       () => false,
-      (targetKey) => env[targetKey] !== undefined && env[targetKey] !== "",
+      (targetKey) => isPresentAt(envWire(targetKey)),
     )
   }
 
@@ -119,8 +130,10 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
       }
     })
 
-  // Keys considered "tracked" = secrets ∪ env defaults (after dedup above)
-  const trackedKeys = FSet([...metaKeys, ...envDefaultEntries.map((e) => e.envVar)])
+  // Keys considered "tracked" = secrets ∪ env defaults (after dedup above).
+  // Use wire names so credential-shaped env vars injected under a namespace
+  // (e.g. CIV__API_KEY) match their tracking entry instead of looking untracked.
+  const trackedKeys = FSet([...metaKeys.map(secretWire), ...envDefaultEntries.map((e) => envWire(e.envVar))])
 
   // Direction 2: env vars → find credential-shaped vars not in TOML
   const envMatches = scanEnv(env)

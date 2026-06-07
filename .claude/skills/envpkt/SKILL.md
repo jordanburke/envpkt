@@ -198,6 +198,37 @@ rows with inherited status and an `alias_of` marker — lifecycle tracking lives
 on the target, so an alias is healthy iff its target is. Cross-type aliasing
 (secret → env) is rejected at config load time.
 
+### Namespace (`[namespace]`)
+
+Prefix the **injected** env var name for every `[secret.*]`/`[env.*]` entry
+without changing the TOML keys you author or the names shown in audit/inspect.
+The TOML key stays logical; the prefix is applied only at the `process.env`
+boundary (`boot()`, `exec`, `env export`).
+
+```toml
+[namespace]
+prefix    = "CIV"
+separator = "__"   # optional, default; MUST be shell-safe ([A-Za-z0-9_])
+
+[secret.API_KEY]   # injected as CIV__API_KEY
+service = "example"
+
+[env.LOG_LEVEL]    # injected as CIV__LOG_LEVEL
+value = "info"
+
+[secret.SHARED]    # per-entry override; "" opts out → injected as plain SHARED
+service = "svc"
+namespace = ""
+```
+
+- **Use `_` or `__`** as the separator. `.` and `:` are not valid in shell
+  variable names — `$CIV.API_KEY` fails to parse, `$CIV:API_KEY` silently
+  misparses. envpkt warns at boot on a non-shell-safe separator but does not reject it.
+- A per-entry `namespace` overrides the file-level prefix; `""` opts out entirely.
+- `from_key` references stay logical regardless of namespace, so an alias can
+  bridge a namespaced canonical value to a plain legacy name (alias sets `namespace = ""`).
+- `BootResult.envNames` maps each logical key → its injected wire name.
+
 ## CLI Command Reference
 
 See `references/quick-reference.md` for a compact cheat sheet.
@@ -327,9 +358,12 @@ const result: Either<BootError, BootResult> = bootSafe({ inject: true })
 **BootResult**:
 
 - `audit: AuditResult` — full audit of all secrets
-- `injected: ReadonlyArray<string>` — keys successfully injected
-- `skipped: ReadonlyArray<string>` — keys that could not be resolved
-- `secrets: Readonly<Record<string, string>>` — resolved secret values
+- `injected: ReadonlyArray<string>` — keys successfully injected (logical names)
+- `skipped: ReadonlyArray<string>` — keys that could not be resolved (logical names)
+- `secrets: Readonly<Record<string, string>>` — resolved secret values, keyed by logical name
+- `envDefaults: Readonly<Record<string, string>>` — applied plaintext defaults, keyed by logical name
+- `overridden: ReadonlyArray<string>` — env defaults skipped because already set (logical names)
+- `envNames: Readonly<Record<string, string>>` — logical key → injected wire name (e.g. `API_KEY` → `CIV__API_KEY`); identity map when no namespace is set
 - `warnings: ReadonlyArray<string>` — non-fatal warnings
 - `configPath: string` — resolved path to the config file
 - `configSource: ConfigSource` — how the config was found: `"flag"` | `"env"` | `"cwd"` | `"search"`

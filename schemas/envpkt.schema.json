@@ -17,6 +17,24 @@
       "description": "Path to shared secret catalog (relative to this config file)",
       "type": "string"
     },
+    "namespace": {
+      "description": "Optional namespace/package prefix for injected environment variable names",
+      "type": "object",
+      "required": [
+        "prefix"
+      ],
+      "properties": {
+        "prefix": {
+          "description": "Namespace prefix applied to all injected env/secret names (e.g. 'CIV' -> CIV__API_KEY)",
+          "type": "string"
+        },
+        "separator": {
+          "default": "__",
+          "description": "Separator between prefix and key. Default '__' (shell-safe). Note: '.' and ':' are not valid in shell identifiers.",
+          "type": "string"
+        }
+      }
+    },
     "identity": {
       "description": "Identity and capabilities of the principal using this envpkt",
       "type": "object",
@@ -172,6 +190,10 @@
                   "type": "string"
                 }
               }
+            },
+            "namespace": {
+              "description": "Override the file-level namespace for this entry's injected name. Empty string opts out of any prefix.",
+              "type": "string"
             }
           }
         }
@@ -209,6 +231,10 @@
                   "type": "string"
                 }
               }
+            },
+            "namespace": {
+              "description": "Override the file-level namespace for this entry's injected name. Empty string opts out of any prefix.",
+              "type": "string"
             }
           }
         }

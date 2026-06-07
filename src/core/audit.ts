@@ -1,5 +1,6 @@
 import { $, Cond, Do, List, Map as FMap, Option, Set as FSet } from "functype"
 
+import { makeEnvNamer } from "./namespace.js"
 import type { EnvpktConfig } from "./schema.js"
 import type {
   AliasTable,
@@ -245,6 +246,11 @@ export const computeEnvAudit = (
 ): EnvAuditResult => {
   const envEntries = config.env ?? {}
 
+  // The live environment holds wire names (e.g. CIV__LOG_LEVEL), so drift is
+  // measured against the namespaced name, not the logical key.
+  const namer = makeEnvNamer(config)
+  const envWire = (key: string): string => namer(key, envEntries[key]?.namespace)
+
   const resolveEffectiveDefault = (entry: NonNullable<EnvpktConfig["env"]>[string]): string => {
     const viaAlias = Do(function* (): Generator<Option<unknown>, string, never> {
       const fk = yield* $(Option(entry.from_key))
@@ -256,7 +262,7 @@ export const computeEnvAudit = (
   }
 
   const entries = Object.entries(envEntries).map(([key, entry]) => {
-    const currentValue = env[key]
+    const currentValue = env[envWire(key)]
     const effectiveDefault = resolveEffectiveDefault(entry)
 
     const status: EnvDriftStatus = Cond.of<EnvDriftStatus>()

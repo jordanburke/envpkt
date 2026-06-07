@@ -236,8 +236,12 @@ const runEnvExport = (options: ExportOptions): void => {
         console.error(`${YELLOW}Warning:${RESET} ${warning}`)
       })
 
+      // Emit under the namespaced wire name (boot.envNames), not the logical key,
+      // so `eval "$(envpkt env export)"` sets the variable the consumer actually reads.
+      const wireName = (key: string): string => boot.envNames[key] ?? key
+
       Object.entries(boot.envDefaults).forEach(([key, value]) => {
-        console.log(`export ${key}='${shellEscape(value)}'`)
+        console.log(`export ${wireName(key)}='${shellEscape(value)}'`)
       })
 
       // Emit env entries that boot skipped (already in process.env).
@@ -251,15 +255,16 @@ const runEnvExport = (options: ExportOptions): void => {
             boot.overridden.forEach((key) => {
               if (!(key in envEntries)) return
               const entry = envEntries[key]!
-              const value = entry.value ?? process.env[key] ?? ""
-              console.log(`export ${key}='${shellEscape(value)}'`)
+              const name = wireName(key)
+              const value = entry.value ?? process.env[name] ?? ""
+              console.log(`export ${name}='${shellEscape(value)}'`)
             })
           },
         )
       }
 
       Object.entries(boot.secrets).forEach(([key, value]) => {
-        console.log(`export ${key}='${shellEscape(value)}'`)
+        console.log(`export ${wireName(key)}='${shellEscape(value)}'`)
       })
     },
   )

@@ -52,6 +52,19 @@ Warnings are emitted to stderr so they don't pollute the `eval` output.
 
 Values containing single quotes are safely escaped (`'` becomes `'\''`).
 
+## Namespace
+
+If the config declares a [`[namespace]`](/reference/toml-schema/#namespace),
+the emitted `export` statements use the **wire name** (e.g. `CIV__API_KEY`), not
+the logical TOML key — so the variable you eval into your shell matches what the
+consumer reads. This is why the separator must be shell-safe (`_`/`__`):
+
+```bash
+$ envpkt env export
+export CIV__API_KEY='sk-...'
+export CIV__LOG_LEVEL='info'
+```
+
 ## Aliases
 
 Entries with `from_key` (see [Aliases](/reference/toml-schema/#aliases)) are

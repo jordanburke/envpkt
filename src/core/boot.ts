@@ -15,6 +15,7 @@ import { computeAudit } from "./audit.js"
 import { resolveConfig } from "./catalog.js"
 import { expandPath, loadConfig, resolveConfigPath } from "./config.js"
 import { resolveKeyPath } from "./keygen.js"
+import { isShellSafeSeparator, makeEnvNamer } from "./namespace.js"
 import { unsealSecrets } from "./seal.js"
 import type { AuditResult, BootError, BootOptions, BootResult, ConfigSource, EnvpktConfig } from "./types.js"
 
@@ -142,6 +143,20 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
         const secretEntries = config.secret ?? {}
         const envEntries = config.env ?? {}
 
+        // Namespace boundary: internal records stay keyed by the logical name;
+        // only process.env reads/writes use the namespaced wire name. Per-entry
+        // `namespace` overrides the file-level prefix ("" opts out).
+        const namer = makeEnvNamer(config)
+        const secretEnv = (key: string): string => namer(key, secretEntries[key]?.namespace)
+        const envEnv = (key: string): string => namer(key, envEntries[key]?.namespace)
+
+        // Logical → wire name map for every known key, surfaced on BootResult so
+        // shell-facing consumers (exec, env export) inject under the real name.
+        const envNames: Record<string, string> = {
+          ...Object.fromEntries(Object.keys(envEntries).map((k) => [k, envEnv(k)])),
+          ...Object.fromEntries(Object.keys(secretEntries).map((k) => [k, secretEnv(k)])),
+        }
+
         // Separate alias from non-alias entries. Aliases carry no value of
         // their own; they copy from their target after the real entries resolve.
         const nonAliasSecretEntries = Object.fromEntries(
@@ -184,10 +199,19 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
           // Phase 0: apply env defaults + misclassification check
           warnings.push(...checkEnvMisclassification(config))
 
+          // Flag a namespace separator that would break shell consumers (e.g. '.', ':').
+          // Non-fatal: injection still works for process.env-based consumers.
+          const nsSeparator = config.namespace?.separator
+          if (nsSeparator !== undefined && !isShellSafeSeparator(nsSeparator)) {
+            warnings.push(
+              `[namespace] separator "${nsSeparator}" is not shell-safe — injected names won't be usable via shell $VAR/export. Use '_' or '__'.`,
+            )
+          }
+
           // Non-alias env defaults: inject literal values only if process.env[key] is unset
           const envDefaults: Record<string, string> = Object.fromEntries(
             nonAliasEnvEntries.flatMap(([key, entry]) =>
-              Option(process.env[key]).fold<ReadonlyArray<readonly [string, string]>>(
+              Option(process.env[envEnv(key)]).fold<ReadonlyArray<readonly [string, string]>>(
                 () =>
                   Option(entry.value).fold<ReadonlyArray<readonly [string, string]>>(
                     () => [],
@@ -198,7 +222,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
             ),
           )
           const overridden: string[] = nonAliasEnvEntries.flatMap(([key]) =>
-            Option(process.env[key]).fold<string[]>(
+            Option(process.env[envEnv(key)]).fold<string[]>(
               () => [],
               () => [key],
             ),
@@ -206,7 +230,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
 
           if (inject) {
             Object.entries(envDefaults).forEach(([key, value]) => {
-              process.env[key] = value
+              process.env[envEnv(key)] = value
             })
           }
 
@@ -304,14 +328,14 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
           aliasEnvKeys.forEach((aliasKey) => {
             const entry = aliasTable.entries.get(`env.${aliasKey}`)
             if (!entry) return
-            if (process.env[aliasKey] !== undefined) {
+            if (process.env[envEnv(aliasKey)] !== undefined) {
               overridden.push(aliasKey)
               return
             }
             const targetEntry = envEntries[entry.targetKey]
             if (targetEntry?.value === undefined) return
             // Prefer the already-injected/overriding value so alias tracks its target at runtime
-            const resolvedTarget = process.env[entry.targetKey] ?? targetEntry.value
+            const resolvedTarget = process.env[envEnv(entry.targetKey)] ?? targetEntry.value
             envDefaults[aliasKey] = resolvedTarget
           })
           /* eslint-enable functype/prefer-map */
@@ -319,10 +343,10 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
           if (inject) {
             // Inject env alias defaults (and any env defaults added by the alias pass)
             Object.entries(envDefaults).forEach(([key, value]) => {
-              process.env[key] ??= value
+              process.env[envEnv(key)] ??= value
             })
             Object.entries(secrets).forEach(([key, value]) => {
-              process.env[key] = value
+              process.env[secretEnv(key)] = value
             })
           }
 
@@ -334,6 +358,7 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
             warnings: warnings as ReadonlyArray<string>,
             envDefaults: envDefaults as Readonly<Record<string, string>>,
             overridden: overridden as ReadonlyArray<string>,
+            envNames: envNames as Readonly<Record<string, string>>,
             configPath,
             configSource,
           }

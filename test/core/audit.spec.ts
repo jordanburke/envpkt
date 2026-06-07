@@ -492,4 +492,32 @@ describe("computeEnvAudit", () => {
     const result = computeEnvAudit(config, { NODE_ENV: "production" })
     expect(result.entries[0]!.purpose).toBe("Runtime environment")
   })
+
+  it("reads the current value from the namespaced wire name", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      namespace: { prefix: "CIV" },
+      env: { LOG_LEVEL: { value: "info" } },
+    }
+
+    const result = computeEnvAudit(config, { CIV__LOG_LEVEL: "info" })
+    const entry = result.entries.find((e) => e.key === "LOG_LEVEL")
+
+    expect(entry?.status).toBe("default")
+    expect(entry?.currentValue).toBe("info")
+  })
+
+  it("reports overridden when the wire-name value differs from the default", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      namespace: { prefix: "CIV" },
+      env: { LOG_LEVEL: { value: "info" } },
+    }
+
+    const result = computeEnvAudit(config, { CIV__LOG_LEVEL: "debug" })
+    const entry = result.entries.find((e) => e.key === "LOG_LEVEL")
+
+    expect(entry?.status).toBe("overridden")
+    expect(entry?.currentValue).toBe("debug")
+  })
 })

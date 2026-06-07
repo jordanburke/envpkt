@@ -1,0 +1,48 @@
+#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json
+
+# envpkt with a namespace prefix.
+#
+# Every [secret.*]/[env.*] entry is INJECTED under a prefixed wire name
+# (CIV__API_KEY, CIV__LOG_LEVEL, ...), while the TOML keys you author and the
+# names shown in `audit`/`inspect` stay logical (API_KEY, LOG_LEVEL).
+# The prefix is applied only at the process.env boundary (boot, exec, env export).
+
+version = 1
+
+[namespace]
+prefix    = "CIV"
+separator = "__" # default; MUST be shell-safe ([A-Za-z0-9_]) — '.' and ':' break $VAR/export
+
+[identity]
+name = "civala-gateway"
+consumer = "service"
+description = "Namespaced credential set for the Civala API gateway"
+
+[lifecycle]
+stale_warning_days = 90
+
+[secret.API_KEY] # injected as CIV__API_KEY
+service = "civala"
+purpose = "Authenticates the gateway to the Civala core API"
+created = "2026-05-15"
+expires = "2027-05-15"
+last_rotated_at = "2026-05-15"
+rotation_url = "https://console.civala.com/keys"
+source = "vault"
+
+# Alias bridge: a `from_key` reference is always logical (independent of the
+# namespace), and this alias opts out of the prefix — so the same governed
+# value is also injected under the plain, un-prefixed name a legacy client reads.
+[secret.LEGACY_API_KEY] # injected as plain LEGACY_API_KEY
+from_key = "secret.API_KEY"
+namespace = ""
+purpose = "Un-prefixed name a legacy consumer still hardcodes"
+
+[env.LOG_LEVEL] # injected as CIV__LOG_LEVEL
+value = "info"
+purpose = "Gateway log verbosity"
+
+[env.REGION] # per-entry opt-out → injected as plain REGION
+value = "us-east-1"
+namespace = ""
+purpose = "Shared infra region, read by un-prefixed tooling"

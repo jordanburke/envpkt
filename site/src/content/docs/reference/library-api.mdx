@@ -95,6 +95,12 @@ type BootResult = {
   readonly skipped: ReadonlyArray<string>
   readonly secrets: Readonly<Record<string, string>>
   readonly warnings: ReadonlyArray<string>
+  readonly envDefaults: Readonly<Record<string, string>>
+  readonly overridden: ReadonlyArray<string>
+  // Logical key → injected wire name (e.g. API_KEY → CIV__API_KEY).
+  // Identity map when no [namespace] is configured. secrets/envDefaults
+  // stay keyed by the logical name; this recovers the actual process.env name.
+  readonly envNames: Readonly<Record<string, string>>
   readonly configPath: string
   readonly configSource: ConfigSource
 }
