@@ -210,6 +210,29 @@ const result = boot() // decrypts sealed values, injects into process.env
 
 Mixed mode is supported — sealed values take priority, with fnox as fallback for keys without `encrypted_value`.
 
+## GitHub Actions
+
+A composite action resolves the credentials in `envpkt.toml` into the CI job — with secret values masked in the log — so later steps just see them as environment variables:
+
+```yaml
+- uses: actions/checkout@v5
+
+- uses: jordanburke/envpkt@v0.12.0
+  with:
+    config: ./envpkt.toml
+    strict: "true" # fail the build if a credential is expired/unhealthy
+  env:
+    ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }}
+
+- run: ./deploy.sh # sees the resolved vars; secret values redacted in the log
+```
+
+**How it works.** Commit sealed (`encrypted_value`) packets to the repo and supply the age private key as the `ENVPKT_AGE_KEY` secret. `boot()` materializes the inline key to a `0600` temp file to decrypt, then [`env github`](#envpkt-env-github) masks each secret (`::add-mask::`) and writes it to `$GITHUB_ENV`. Identity precedence: `identity.key_file` → `ENVPKT_AGE_KEY_FILE` → `ENVPKT_AGE_KEY` (inline) → `~/.envpkt/age-key.txt`.
+
+**Inputs:** `config`, `version` (npm version to run, default `latest`), `strict`, `profile`.
+
+> Pin to a released tag (e.g. `@v0.12.0`). No moving major tag (`@v1`) is published yet. Node is assumed present on the runner; add `actions/setup-node` first to pin a version.
+
 ## Fleet Management
 
 When you're running multiple agents, `envpkt fleet` scans a directory tree for `envpkt.toml` files and aggregates credential health across your entire fleet.
@@ -435,6 +458,15 @@ Add to your shell startup (e.g. `~/.zshrc` or `~/.bashrc`) for automatic secret 
 
 ```bash
 eval "$(envpkt env export 2>/dev/null)"
+```
+
+### `envpkt env github`
+
+Inject resolved secrets into a GitHub Actions job. Emits `::add-mask::` for each secret value (redacting it from the log) and appends assignments to `$GITHUB_ENV` — under their namespaced wire names — so later steps in the job inherit them. Env defaults are written but not masked. `--strict` exits non-zero if the pre-flight audit is unhealthy. This is the engine behind the [GitHub Action](#github-actions).
+
+```bash
+# Run as a step; later steps in the job see the resolved vars
+npx envpkt env github --strict
 ```
 
 ### `envpkt shell-hook`

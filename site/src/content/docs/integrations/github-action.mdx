@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: jordanburke/envpkt@v1
+      - uses: jordanburke/envpkt@v0.12.0
         with:
           config: ./envpkt.toml
           strict: "true"
@@ -47,7 +47,7 @@ Sealed (`encrypted_value`) packets are the typical CI source: commit them to the
 repository/organization secret named `ENVPKT_AGE_KEY` on the step's `env`:
 
 ```yaml
-- uses: jordanburke/envpkt@v1
+- uses: jordanburke/envpkt@v0.12.0
   env:
     ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }}
 ```
