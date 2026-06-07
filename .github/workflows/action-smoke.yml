@@ -1,0 +1,73 @@
+name: Action Smoke Test
+
+# Manually-triggered end-to-end check of the composite action (action.yml).
+# Fully self-contained: generates a throwaway age keypair, seals a test value,
+# runs the LOCAL action (uses: ./), and asserts the secret was decrypted, masked,
+# and propagated to a later step via $GITHUB_ENV. No repository secrets required.
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "envpkt version the action should run via npx"
+        required: false
+        default: "latest"
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      # Sealed packets are decrypted with the `age` CLI, which is not preinstalled.
+      - name: Install age
+        run: sudo apt-get update && sudo apt-get install -y age
+
+      - name: Create an ephemeral sealed config
+        shell: bash
+        run: |
+          set -euo pipefail
+          keys="$(age-keygen 2>/dev/null)"
+          recipient="$(echo "$keys" | sed -n 's/# public key: //p')"
+          secret="$(echo "$keys" | grep '^AGE-SECRET-KEY-')"
+          ciphertext="$(printf 'smoke-value' | age -r "$recipient" -a)"
+
+          cfg="$RUNNER_TEMP/envpkt.toml"
+          {
+            echo 'version = 1'
+            echo '[namespace]'
+            echo 'prefix = "CIV"'
+            echo '[secret.SMOKE_KEY]'
+            echo 'service = "smoke"'
+            printf 'encrypted_value = """\n%s"""\n' "$ciphertext"
+          } > "$cfg"
+
+          # Throwaway key — mask it and hand it to the action via the job env.
+          echo "::add-mask::$secret"
+          {
+            echo "ENVPKT_SMOKE_CONFIG=$cfg"
+            echo "ENVPKT_AGE_KEY=$secret"
+          } >> "$GITHUB_ENV"
+
+      - name: Run the envpkt action
+        uses: ./
+        with:
+          config: ${{ env.ENVPKT_SMOKE_CONFIG }}
+          version: ${{ inputs.version }}
+          strict: "true"
+        env:
+          ENVPKT_AGE_KEY: ${{ env.ENVPKT_AGE_KEY }}
+
+      - name: Verify injection into $GITHUB_ENV
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${CIV__SMOKE_KEY:-}" != "smoke-value" ]; then
+            echo "FAIL: CIV__SMOKE_KEY was not injected (got: '${CIV__SMOKE_KEY:-<unset>}')"
+            exit 1
+          fi
+          # The plain/logical name must NOT be set — only the namespaced wire name.
+          if [ -n "${SMOKE_KEY:-}" ]; then
+            echo "FAIL: unexpected logical name SMOKE_KEY is set"
+            exit 1
+          fi
+          echo "OK: sealed secret resolved (inline ENVPKT_AGE_KEY), masked, and injected as CIV__SMOKE_KEY"
