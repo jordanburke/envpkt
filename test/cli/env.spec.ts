@@ -294,6 +294,68 @@ describe("envpkt env export", () => {
   })
 })
 
+describe("envpkt env github", () => {
+  it("writes env defaults to $GITHUB_ENV under the wire name, unmasked", () => {
+    const toml = `version = 1\n\n[namespace]\nprefix = "CIV"\n\n[env.LOG_LEVEL]\nvalue = "info"\n`
+    writeFileSync(join(tmpDir, "envpkt.toml"), toml)
+    const githubEnv = join(tmpDir, "github_env")
+    writeFileSync(githubEnv, "")
+
+    const result = run(["env", "github"], { cwd: tmpDir, env: { GITHUB_ENV: githubEnv } })
+
+    expect(result.status).toBe(0)
+    const written = readFileSync(githubEnv, "utf-8")
+    expect(written).toMatch(/CIV__LOG_LEVEL<<__ENVPKT_[0-9a-f]+__\ninfo\n__ENVPKT_[0-9a-f]+__/)
+    // env defaults are non-secret — never masked
+    expect(result.stdout).not.toContain("::add-mask::info")
+  })
+
+  it("masks sealed secret values and writes them to $GITHUB_ENV", { skip: !ageInstalled }, () => {
+    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+    const recipient = keygenOutput
+      .split("\n")
+      .find((l) => l.startsWith("# public key:"))!
+      .replace("# public key: ", "")
+      .trim()
+    const secretKey = keygenOutput
+      .split("\n")
+      .find((l) => l.startsWith("AGE-SECRET-KEY-"))!
+      .trim()
+    const encrypted = execFileSync("age", ["-r", recipient, "-a"], {
+      input: "sk-ci-secret-value",
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    })
+
+    const toml = `version = 1\n\n[namespace]\nprefix = "CIV"\n\n[identity]\nname = "ci"\nrecipient = "${recipient}"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
+    writeFileSync(join(tmpDir, "envpkt.toml"), toml)
+    const githubEnv = join(tmpDir, "github_env")
+    writeFileSync(githubEnv, "")
+
+    const result = run(["env", "github"], {
+      cwd: tmpDir,
+      env: { GITHUB_ENV: githubEnv, ENVPKT_AGE_KEY: secretKey },
+    })
+
+    expect(result.status).toBe(0)
+    expect(result.stdout).toContain("::add-mask::sk-ci-secret-value")
+    const written = readFileSync(githubEnv, "utf-8")
+    expect(written).toContain("CIV__MY_SECRET<<")
+    expect(written).toContain("sk-ci-secret-value")
+  })
+
+  it("exits non-zero under --strict when a secret is expired", () => {
+    const toml = `version = 1\n\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`
+    writeFileSync(join(tmpDir, "envpkt.toml"), toml)
+    const githubEnv = join(tmpDir, "github_env")
+    writeFileSync(githubEnv, "")
+
+    const result = run(["env", "github", "--strict"], { cwd: tmpDir, env: { GITHUB_ENV: githubEnv } })
+
+    expect(result.status).toBe(2)
+  })
+})
+
 describe("envpkt audit --format minimal", () => {
   it("outputs single-line status for healthy audit", () => {
     const created = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10)

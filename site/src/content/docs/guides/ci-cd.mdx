@@ -56,32 +56,42 @@ Exit codes:
 
 ## GitHub Actions
 
-```yaml
-name: Credential Audit
-on:
-  schedule:
-    - cron: "0 9 * * 1" # Weekly Monday 9am
-  push:
-    paths:
-      - "envpkt.toml"
+The [`envpkt` GitHub Action](/integrations/github-action/) resolves your sealed credentials
+into the job environment (masked in the log) and, with `strict`, gates the build on
+credential health — no hand-rolled install steps:
 
+```yaml
 jobs:
-  audit:
+  deploy:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v5
+
+      - uses: jordanburke/envpkt@v1
         with:
-          node-version: 20
+          config: ./envpkt.toml
+          strict: "true"
+        env:
+          ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }}
 
-      - name: Install envpkt
-        run: npm install -g envpkt
+      - run: ./deploy.sh # sees resolved vars; secret values redacted in the log
+```
 
-      - name: Audit credentials
-        run: envpkt audit --strict --format json
+Commit sealed (`encrypted_value`) packets to the repo and supply the age private key as the
+`ENVPKT_AGE_KEY` secret — see the [GitHub Action](/integrations/github-action/) and
+[`env github`](/cli/env-github/) docs for the resolution model and masking details.
 
-      - name: Check drift
-        run: envpkt env check --strict
+### Audit-only (no injection)
+
+For a standalone health gate that doesn't inject anything, run the CLI directly:
+
+```yaml
+- uses: actions/checkout@v5
+- uses: actions/setup-node@v5
+  with:
+    node-version: 24
+- run: npx envpkt audit --strict --format json
+- run: npx envpkt env check --strict
 ```
 
 ## Fleet Scanning in CI

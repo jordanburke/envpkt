@@ -1,5 +1,6 @@
-import { existsSync } from "node:fs"
-import { dirname, resolve } from "node:path"
+import { chmodSync, existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
+import { homedir, tmpdir } from "node:os"
+import { dirname, join, resolve } from "node:path"
 
 import { type Either, Left, Option, Right } from "functype"
 // Import from the /direct subpath, not the barrel — the barrel eagerly loads
@@ -14,7 +15,7 @@ import { formatAliasError, validateAliases } from "./alias.js"
 import { computeAudit } from "./audit.js"
 import { resolveConfig } from "./catalog.js"
 import { expandPath, loadConfig, resolveConfigPath } from "./config.js"
-import { resolveKeyPath } from "./keygen.js"
+import { resolveInlineKey, resolveKeyPath } from "./keygen.js"
 import { isShellSafeSeparator, makeEnvNamer } from "./namespace.js"
 import { unsealSecrets } from "./seal.js"
 import type { AuditResult, BootError, BootOptions, BootResult, ConfigSource, EnvpktConfig } from "./types.js"
@@ -56,6 +57,46 @@ const resolveIdentityFilePath = (
   if (!useDefaultFallback) return Option<string>(undefined)
   const defaultPath = resolveKeyPath()
   return existsSync(defaultPath) ? Option(defaultPath) : Option<string>(undefined)
+}
+
+/** An age identity to unseal with, plus a cleanup hook (no-op for real files). */
+type IdentitySource = { readonly path: string; readonly dispose: () => void }
+
+const noop = (): void => {}
+
+/** Write an inline age key to a private temp file so the `age` CLI (file-based) can use it. */
+const materializeInlineKey = (key: string): IdentitySource => {
+  const dir = mkdtempSync(join(tmpdir(), "envpkt-age-"))
+  const keyPath = join(dir, "age-key.txt")
+  writeFileSync(keyPath, key.endsWith("\n") ? key : `${key}\n`)
+  chmodSync(keyPath, 0o600)
+  return { path: keyPath, dispose: () => rmSync(dir, { recursive: true, force: true }) }
+}
+
+/**
+ * Resolve an age identity for unsealing sealed packets. Precedence:
+ *   config.identity.key_file > ENVPKT_AGE_KEY_FILE > ENVPKT_AGE_KEY (inline) > ~/.envpkt/age-key.txt
+ * The inline key (CI secret) ranks above the homedir default so an explicit
+ * env var beats a stray local key. Inline keys are written to a 0600 temp file
+ * the caller must dispose().
+ */
+const resolveSealIdentity = (config: EnvpktConfig, configDir: string): Option<IdentitySource> => {
+  if (config.identity?.key_file) {
+    return Option<IdentitySource>({ path: resolve(configDir, expandPath(config.identity.key_file)), dispose: noop })
+  }
+  const envFile = process.env["ENVPKT_AGE_KEY_FILE"]
+  if (envFile && existsSync(envFile)) {
+    return Option<IdentitySource>({ path: envFile, dispose: noop })
+  }
+  const inlineKey = resolveInlineKey().orUndefined()
+  if (inlineKey) {
+    return Option<IdentitySource>(materializeInlineKey(inlineKey))
+  }
+  const defaultPath = join(homedir(), ".envpkt", "age-key.txt")
+  if (existsSync(defaultPath)) {
+    return Option<IdentitySource>({ path: defaultPath, dispose: noop })
+  }
+  return Option<IdentitySource>(undefined)
 }
 
 const resolveIdentityKey = (config: EnvpktConfig, configDir: string): IdentityKeyResult => {
@@ -236,32 +277,36 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
 
           // Phase 1: try sealed values (encrypted_value in meta) — non-alias only
           const sealedKeys = new Set<string>()
-          const identityFilePath = resolveIdentityFilePath(config, configDir, true)
 
           if (hasSealedValues) {
-            identityFilePath.fold(
+            resolveSealIdentity(config, configDir).fold(
               () => {
                 log.warn("phase.sealed.no_identity_file", {
                   sealed_keys: nonAliasMetaKeys.filter((k) => !!nonAliasSecretEntries[k]?.encrypted_value).length,
                 })
                 warnings.push("Sealed values found but no identity file available for decryption")
               },
-              (idPath) => {
-                unsealSecrets(nonAliasSecretEntries, idPath).fold(
-                  (err) => {
-                    log.warn("phase.sealed.decrypt_failed", { message: err.message })
-                    warnings.push(`Sealed value decryption failed: ${err.message}`)
-                  },
-                  (unsealed) => {
-                    const unsealedEntries = Object.entries(unsealed)
-                    Object.assign(secrets, unsealed)
-                    injected.push(...unsealedEntries.map(([key]) => key))
-                    unsealedEntries.forEach(([key]) => {
-                      sealedKeys.add(key)
-                      log.debug("phase.sealed.resolved", { key })
-                    })
-                  },
-                )
+              ({ path: idPath, dispose }) => {
+                // eslint-disable-next-line functype/prefer-either -- try/finally is resource cleanup (temp key file), not error handling
+                try {
+                  unsealSecrets(nonAliasSecretEntries, idPath).fold(
+                    (err) => {
+                      log.warn("phase.sealed.decrypt_failed", { message: err.message })
+                      warnings.push(`Sealed value decryption failed: ${err.message}`)
+                    },
+                    (unsealed) => {
+                      const unsealedEntries = Object.entries(unsealed)
+                      Object.assign(secrets, unsealed)
+                      injected.push(...unsealedEntries.map(([key]) => key))
+                      unsealedEntries.forEach(([key]) => {
+                        sealedKeys.add(key)
+                        log.debug("phase.sealed.resolved", { key })
+                      })
+                    },
+                  )
+                } finally {
+                  dispose()
+                }
               },
             )
           }

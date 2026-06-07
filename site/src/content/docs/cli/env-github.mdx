@@ -1,0 +1,77 @@
+---
+title: envpkt env github
+description: Inject resolved secrets into $GITHUB_ENV for GitHub Actions, with values masked in the log
+---
+
+Resolve the credentials described in `envpkt.toml` and inject them into the GitHub Actions
+job environment — masking secret values in the log and writing them to `$GITHUB_ENV` so the
+rest of the job can use them. This is the CLI engine behind the [GitHub Action](/integrations/github-action/).
+
+## Usage
+
+```bash
+envpkt env github [options]
+```
+
+Run it as a step in a job; later steps in the same job inherit the variables:
+
+```yaml
+- run: npx envpkt env github --strict
+  env:
+    ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }}
+- run: ./build.sh # sees the resolved vars
+```
+
+## Options
+
+| Option                | Description                                          | Default       |
+| --------------------- | ---------------------------------------------------- | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`                                | Auto-detected |
+| `--profile <profile>` | fnox profile to use                                  | —             |
+| `--strict`            | Exit non-zero if the pre-flight audit is not healthy | `false`       |
+
+## What it emits
+
+For each resolved entry, using the namespaced [wire name](/reference/toml-schema/#namespace):
+
+- **Secrets** (`[secret.*]`) — a `::add-mask::<value>` workflow command on **stdout** so
+  GitHub redacts the value everywhere in the log, then the assignment is appended to
+  `$GITHUB_ENV`.
+- **Env defaults** (`[env.*]`) — appended to `$GITHUB_ENV`. These are non-secret by design
+  and are **not** masked.
+
+Assignments use the multiline heredoc form, so values with newlines or special characters
+are safe:
+
+```bash
+$ envpkt env github       # (GITHUB_ENV pointed at the runner's env file)
+::add-mask::sk-live-...
+# appended to $GITHUB_ENV:
+CIV__API_KEY<<__ENVPKT_59bbd943__
+sk-live-...
+__ENVPKT_59bbd943__
+```
+
+When `$GITHUB_ENV` is not set (e.g. running locally), the assignments are printed to stdout
+with a warning instead — useful for previewing output off-runner.
+
+## Resolving secrets in CI
+
+Sealed (`encrypted_value`) packets are the typical CI source. Commit them to the repo and
+supply the age private key as a GitHub secret via **`ENVPKT_AGE_KEY`** — `boot()` materializes
+it to a private temp file to decrypt, no key file needed. Identity precedence:
+
+```
+identity.key_file  >  ENVPKT_AGE_KEY_FILE  >  ENVPKT_AGE_KEY (inline)  >  ~/.envpkt/age-key.txt
+```
+
+## Audit gate
+
+With `--strict`, the command exits with the audit's [exit code](/reference/exit-codes/)
+(`1` degraded, `2` critical) after injecting — failing the build on expired or missing
+credentials. Without `--strict` it always exits `0`.
+
+## See also
+
+- [GitHub Action](/integrations/github-action/) — the `uses: jordanburke/envpkt@v1` wrapper.
+- [`envpkt env export`](/cli/env-export/) — the shell-`eval` analog for local/non-GitHub use.

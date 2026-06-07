@@ -1,7 +1,9 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import { randomBytes } from "node:crypto"
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, join, resolve } from "node:path"
 
 import type { Command } from "commander"
+import type { Either } from "functype"
 import { Option, Try } from "functype"
 
 import { bootSafe } from "../../core/boot.js"
@@ -9,10 +11,12 @@ import { resolveConfig } from "../../core/catalog.js"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import { envCheck, envScan, generateTomlFromScan } from "../../core/env.js"
 import { appendSection, removeSection, renameSection, updateSectionFields } from "../../core/toml-edit.js"
+import type { BootError, BootResult } from "../../core/types.js"
 import {
   BOLD,
   CYAN,
   DIM,
+  exitCodeForAudit,
   formatCheckJson,
   formatCheckTable,
   formatConfigSource,
@@ -44,6 +48,12 @@ type ExportOptions = {
   readonly config?: string
   readonly profile?: string
   readonly skipAudit?: boolean
+}
+
+type GithubOptions = {
+  readonly config?: string
+  readonly profile?: string
+  readonly strict?: boolean
 }
 
 type AddEnvOptions = {
@@ -215,57 +225,119 @@ const runEnvCheck = (options: CheckOptions): void => {
 
 const shellEscape = (value: string): string => value.replace(/'/g, "'\\''")
 
-const runEnvExport = (options: ExportOptions): void => {
-  const result = bootSafe({
+type EmitEntry = { readonly name: string; readonly value: string; readonly secret: boolean }
+
+/** Shared resolution for the emit commands (`export`, `github`): resolve without injecting. */
+const resolveForEmit = (options: {
+  readonly config?: string
+  readonly profile?: string
+}): Either<BootError, BootResult> =>
+  bootSafe({
     inject: false,
     configPath: options.config,
     profile: options.profile,
     warnOnly: true,
   })
 
-  result.fold(
+/**
+ * Flatten a resolved BootResult into the ordered (wire-name, value) pairs to emit:
+ * env defaults, then overridden env entries (value from config), then secrets (which
+ * override). `secret` marks values that consumers must redact (e.g. GitHub masking).
+ */
+const collectEmitEntries = (boot: BootResult): EmitEntry[] => {
+  const wireName = (key: string): string => boot.envNames[key] ?? key
+
+  const defaults: EmitEntry[] = Object.entries(boot.envDefaults).map(([key, value]) => ({
+    name: wireName(key),
+    value,
+    secret: false,
+  }))
+
+  // Env entries already set in the environment (boot skipped them); re-emit from config value.
+  const overridden: EmitEntry[] =
+    boot.overridden.length === 0
+      ? []
+      : loadConfig(boot.configPath).fold<EmitEntry[]>(
+          () => [],
+          (config) => {
+            const envEntries = config.env ?? {}
+            return boot.overridden.flatMap((key) => {
+              const entry = envEntries[key]
+              if (!entry) return []
+              const name = wireName(key)
+              return [{ name, value: entry.value ?? process.env[name] ?? "", secret: false }]
+            })
+          },
+        )
+
+  const secrets: EmitEntry[] = Object.entries(boot.secrets).map(([key, value]) => ({
+    name: wireName(key),
+    value,
+    secret: true,
+  }))
+
+  return [...defaults, ...overridden, ...secrets]
+}
+
+const emitWarnings = (boot: BootResult): void => {
+  const sourceMsg = formatConfigSource(boot.configPath, boot.configSource)
+  if (sourceMsg) console.error(sourceMsg)
+  boot.warnings.forEach((warning) => {
+    console.error(`${YELLOW}Warning:${RESET} ${warning}`)
+  })
+}
+
+const runEnvExport = (options: ExportOptions): void => {
+  resolveForEmit(options).fold(
     (err) => {
       console.error(formatError(err))
       process.exit(2)
     },
     (boot) => {
-      const sourceMsg = formatConfigSource(boot.configPath, boot.configSource)
-      if (sourceMsg) console.error(sourceMsg)
+      emitWarnings(boot)
+      // Emit under the namespaced wire name so `eval "$(envpkt env export)"` sets the
+      // variable the consumer actually reads.
+      collectEmitEntries(boot).forEach(({ name, value }) => {
+        console.log(`export ${name}='${shellEscape(value)}'`)
+      })
+    },
+  )
+}
 
-      boot.warnings.forEach((warning) => {
-        console.error(`${YELLOW}Warning:${RESET} ${warning}`)
+const runEnvGithub = (options: GithubOptions): void => {
+  resolveForEmit(options).fold(
+    (err) => {
+      console.error(formatError(err))
+      process.exit(2)
+    },
+    (boot) => {
+      emitWarnings(boot)
+
+      const entries = collectEmitEntries(boot)
+
+      // Mask every secret value first so GitHub redacts it everywhere in the job log.
+      // Env defaults are non-secret by design and are not masked.
+      entries.filter((e) => e.secret).forEach((e) => console.log(`::add-mask::${e.value}`))
+
+      // Build $GITHUB_ENV assignments using the heredoc form (safe for multiline / special chars).
+      const lines = entries.map(({ name, value }) => {
+        const delim = `__ENVPKT_${randomBytes(9).toString("hex")}__`
+        return `${name}<<${delim}\n${value}\n${delim}`
       })
 
-      // Emit under the namespaced wire name (boot.envNames), not the logical key,
-      // so `eval "$(envpkt env export)"` sets the variable the consumer actually reads.
-      const wireName = (key: string): string => boot.envNames[key] ?? key
-
-      Object.entries(boot.envDefaults).forEach(([key, value]) => {
-        console.log(`export ${wireName(key)}='${shellEscape(value)}'`)
-      })
-
-      // Emit env entries that boot skipped (already in process.env).
-      // Alias entries have no value of their own; fall back to reading the
-      // current process.env value (which is what they would have copied).
-      if (boot.overridden.length > 0) {
-        loadConfig(boot.configPath).fold(
-          () => {},
-          (config) => {
-            const envEntries = config.env ?? {}
-            boot.overridden.forEach((key) => {
-              if (!(key in envEntries)) return
-              const entry = envEntries[key]!
-              const name = wireName(key)
-              const value = entry.value ?? process.env[name] ?? ""
-              console.log(`export ${name}='${shellEscape(value)}'`)
-            })
-          },
+      const githubEnv = process.env["GITHUB_ENV"]
+      if (githubEnv) {
+        appendFileSync(githubEnv, lines.length > 0 ? `${lines.join("\n")}\n` : "")
+      } else {
+        console.error(
+          `${YELLOW}Warning:${RESET} GITHUB_ENV not set — printing assignments to stdout (not a GitHub Actions runner)`,
         )
+        lines.forEach((l) => console.log(l))
       }
 
-      Object.entries(boot.secrets).forEach(([key, value]) => {
-        console.log(`export ${wireName(key)}='${shellEscape(value)}'`)
-      })
+      if (options.strict) {
+        process.exit(exitCodeForAudit(boot.audit))
+      }
     },
   )
 }
@@ -599,6 +671,18 @@ export const registerEnvCommands = (program: Command): void => {
     .option("--skip-audit", "Skip the pre-flight audit")
     .action((options: ExportOptions) => {
       runEnvExport(options)
+    })
+
+  env
+    .command("github")
+    .description(
+      "Inject resolved secrets into $GITHUB_ENV for GitHub Actions, masking secret values in the log (::add-mask::)",
+    )
+    .option("-c, --config <path>", "Path to envpkt.toml")
+    .option("--profile <profile>", "fnox profile to use")
+    .option("--strict", "Exit non-zero if the pre-flight audit is not healthy")
+    .action((options: GithubOptions) => {
+      runEnvGithub(options)
     })
 
   env
