@@ -284,7 +284,8 @@ See `references/quick-reference.md` for a compact cheat sheet.
 CI: emits `::add-mask::` for each secret (redacts it from the log) and appends heredoc
 assignments to `$GITHUB_ENV` (using namespaced wire names) so later job steps inherit them;
 env defaults are written but not masked. `--strict` exits with the audit code (1/2) after
-injecting. There is also a composite Action: `uses: jordanburke/envpkt@v1`.
+injecting. There is also a composite Action: `uses: jordanburke/envpkt@v0.12.0` (pin to a
+released tag; no moving major tag is published yet).
 
 **CI age-key contract**: supply the age private key inline via the `ENVPKT_AGE_KEY` env var
 (e.g. a GitHub secret) — `boot()` materializes it to a `0600` temp file to decrypt sealed

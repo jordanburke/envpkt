@@ -3,7 +3,9 @@ name: Publish to NPM
 on:
   push:
     tags:
-      - "v*"
+      # Full semver tags only (e.g. v0.12.0). Moving/major tags like `v1` or `v0`
+      # (used to reference the GitHub Action) intentionally do NOT trigger a publish.
+      - "v[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
   publish:

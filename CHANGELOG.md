@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   later steps in the job inherit them. Secret values are masked in the log via
   `::add-mask::`; env defaults are written but not masked. `--strict` gates the build on the
   pre-flight audit.
-- **Composite GitHub Action** (`action.yml`) — `uses: jordanburke/envpkt@v1` with inputs
+- **Composite GitHub Action** (`action.yml`) — `uses: jordanburke/envpkt@v0.12.0` with inputs
   `config` / `version` / `strict` / `profile`, wrapping `env github`.
 - **Inline age key for CI.** `boot()` now honors an inline `ENVPKT_AGE_KEY` (e.g. a CI
   secret): it is materialized to a `0600` temp file to decrypt sealed packets and removed
