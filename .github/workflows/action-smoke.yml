@@ -11,6 +11,19 @@ on:
         description: "envpkt version the action should run via npx"
         required: false
         default: "latest"
+  # Gate changes to the action itself / this workflow.
+  pull_request:
+    paths:
+      - "action.yml"
+      - ".github/workflows/action-smoke.yml"
+  push:
+    branches: [main]
+    paths:
+      - "action.yml"
+      - ".github/workflows/action-smoke.yml"
+  # Catch drift in the published CLI that the action runs (no commit required).
+  schedule:
+    - cron: "0 9 * * 1" # Mondays 09:00 UTC
 
 jobs:
   smoke:
@@ -52,7 +65,7 @@ jobs:
         uses: ./
         with:
           config: ${{ env.ENVPKT_SMOKE_CONFIG }}
-          version: ${{ inputs.version }}
+          version: ${{ inputs.version || 'latest' }}
           strict: "true"
         env:
           ENVPKT_AGE_KEY: ${{ env.ENVPKT_AGE_KEY }}
