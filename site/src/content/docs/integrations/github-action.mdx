@@ -59,6 +59,17 @@ afterwards — no key file needs to live in the repo or runner. Identity precede
 identity.key_file  >  ENVPKT_AGE_KEY_FILE  >  ENVPKT_AGE_KEY (inline)  >  ~/.envpkt/age-key.txt
 ```
 
+:::caution[Sealed packets need the `age` CLI on the runner]
+Decrypting `encrypted_value` packets shells out to [`age`](https://github.com/FiloSottile/age),
+which is **not** preinstalled on GitHub-hosted runners. Install it before the `envpkt` step:
+
+```yaml
+- run: sudo apt-get update && sudo apt-get install -y age
+```
+
+(Not needed if you only inject plaintext `[env.*]` defaults, or resolve via fnox.)
+:::
+
 ## Masking
 
 Every secret value is registered with GitHub via `::add-mask::` **before** it is written,
