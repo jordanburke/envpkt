@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Top-level `scope` field** (`"shell"` | `"exec"`, default `"exec"`) gates whether
+  `envpkt env export` emits a package's **secret** values for ambient shell loading. `shell`
+  exports them (for `eval`/the shell hook); `exec` (default) withholds them so they're only
+  available via `envpkt exec`. Env defaults (non-secret) are always exported. `scope` never
+  affects `envpkt exec`, `env github`, or `env dotenv` — those are deliberate, not ambient.
+- **`envpkt env export --track`** wraps each assignment with an in-shell prior-value snapshot
+  (`_ENVPKT_HAD_*` / `_ENVPKT_PREV_*`) and emits an `_ENVPKT_INJECTED` name list, so a shell
+  hook can restore — not just unset — variables when leaving a directory. Plain `env export`
+  output is unchanged.
 - **`envpkt env dotenv`** emits resolved credentials in `.env` format (`KEY=value`), for the
   tools that auto-discover `.env` files — Wrangler, Docker `--env-file`, Vite/Next/Astro,
   GitHub Actions, direnv. A sibling of `env export` (shell) and `env github` (`$GITHUB_ENV`).
@@ -22,6 +31,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with a flag; unknown field names are rejected rather than silently ignored. Previously the
   only way to drop a field was hand-editing the TOML, since `--field ""` failed schema
   validation. ([#31](https://github.com/jordanburke/envpkt/issues/31))
+
+### Changed
+
+- **`envpkt env export` no longer emits secret values by default.** With the new `scope` field
+  defaulting to `"exec"`, ambient `eval "$(envpkt env export)"` now exports only env defaults; add
+  top-level `scope = "shell"` to a package to restore secret export (e.g. for a global package
+  loaded at shell start). Withheld secrets print a one-line note to stderr. `envpkt exec`,
+  `env github`, and `env dotenv` are unaffected — they still resolve everything.
 
 ### Fixed
 

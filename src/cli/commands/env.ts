@@ -49,6 +49,7 @@ type ExportOptions = {
   readonly config?: string
   readonly profile?: string
   readonly skipAudit?: boolean
+  readonly track?: boolean
 }
 
 type GithubOptions = {
@@ -303,11 +304,38 @@ const runEnvExport = (options: ExportOptions): void => {
     },
     (boot) => {
       emitWarnings(boot)
+
+      // Secrets are emitted into the ambient shell only when the package opts in with
+      // top-level `scope = "shell"`. Default `exec` withholds them (use `envpkt exec`).
+      // Env defaults (non-secret) are always emitted. `scope` never affects `exec`/`github`/`dotenv`.
+      const scope = loadConfig(boot.configPath).fold(
+        () => "exec",
+        (config) => config.scope ?? "exec",
+      )
+      const entries = collectEmitEntries(boot)
+      const emit = scope === "shell" ? entries : entries.filter((e) => !e.secret)
+
+      const withheld = entries.length - emit.length
+      if (withheld > 0) {
+        console.error(
+          `${DIM}${withheld} secret(s) withheld (scope="${scope}") — use \`envpkt exec\` or set top-level scope="shell".${RESET}`,
+        )
+      }
+
       // Emit under the namespaced wire name so `eval "$(envpkt env export)"` sets the
-      // variable the consumer actually reads.
-      collectEmitEntries(boot).forEach(({ name, value }) => {
-        console.log(`export ${name}='${shellEscape(value)}'`)
+      // variable the consumer actually reads. With --track, wrap each assignment in an
+      // in-shell snapshot (prior value + presence marker) and emit the injected-name list,
+      // so the shell hook can restore — not just unset — on the next `cd`.
+      emit.forEach(({ name, value }) => {
+        console.log(
+          options.track
+            ? `_ENVPKT_HAD_${name}=\${${name}+1}; _ENVPKT_PREV_${name}="\${${name}-}"; export ${name}='${shellEscape(value)}'`
+            : `export ${name}='${shellEscape(value)}'`,
+        )
       })
+      if (options.track) {
+        console.log(`_ENVPKT_INJECTED='${emit.map((e) => e.name).join(" ")}'`)
+      }
     },
   )
 }
@@ -716,6 +744,7 @@ export const registerEnvCommands = (program: Command): void => {
     .option("-c, --config <path>", "Path to envpkt.toml")
     .option("--profile <profile>", "fnox profile to use")
     .option("--skip-audit", "Skip the pre-flight audit")
+    .option("--track", "Emit prior-value snapshots + an _ENVPKT_INJECTED list (for the shell hook to restore on cd)")
     .action((options: ExportOptions) => {
       runEnvExport(options)
     })

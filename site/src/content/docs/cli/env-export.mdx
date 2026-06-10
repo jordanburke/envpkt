@@ -13,11 +13,26 @@ envpkt env export [options]
 
 ## Options
 
-| Option                | Description               | Default       |
-| --------------------- | ------------------------- | ------------- |
-| `-c, --config <path>` | Path to `envpkt.toml`     | Auto-detected |
-| `--profile <profile>` | fnox profile to use       | Default       |
-| `--skip-audit`        | Skip the pre-flight audit | `false`       |
+| Option                | Description                                                              | Default       |
+| --------------------- | ------------------------------------------------------------------------ | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`                                                    | Auto-detected |
+| `--profile <profile>` | fnox profile to use                                                      | Default       |
+| `--skip-audit`        | Skip the pre-flight audit                                                | `false`       |
+| `--track`             | Emit prior-value snapshots + an `_ENVPKT_INJECTED` list for a shell hook | `false`       |
+
+## Scope: secrets are withheld unless opted in
+
+Putting **secret** values into your ambient shell is gated by the top-level
+[`scope`](/reference/toml-schema/) field:
+
+- `scope = "exec"` (**default**) — `env export` emits only **env defaults**; secrets are
+  withheld (a one-line note goes to stderr). Use [`envpkt exec`](/cli/exec/) to run a tool with
+  the secrets scoped to that process.
+- `scope = "shell"` — `env export` also emits secret values, for `eval`-ing into your shell
+  (e.g. a global package loaded at shell start).
+
+`scope` only governs this ambient path. `envpkt exec`, [`env github`](/cli/env-github/), and
+[`env dotenv`](/cli/env-dotenv/) always resolve everything regardless of `scope`.
 
 ## Examples
 
@@ -71,3 +86,20 @@ Entries with `from_key` (see [Aliases](/reference/toml-schema/#aliases)) are
 exported as separate `export` statements alongside their target, each holding
 the same resolved value. If the target resolves, its aliases resolve; if the
 target is skipped, aliases are skipped too.
+
+## `--track` (for shell hooks)
+
+`--track` makes the output safe for a directory-change hook that loads a package on `cd` and
+restores the previous environment on leave. For each variable it emits an in-shell snapshot of
+the prior value plus a presence marker, then the assignment, and finally an `_ENVPKT_INJECTED`
+list of the names it set:
+
+```bash
+$ envpkt env export --track
+_ENVPKT_HAD_CIV__API_KEY=${CIV__API_KEY+1}; _ENVPKT_PREV_CIV__API_KEY="${CIV__API_KEY-}"; export CIV__API_KEY='sk-...'
+_ENVPKT_INJECTED='CIV__API_KEY'
+```
+
+A hook unsets/restores the names in `_ENVPKT_INJECTED` before loading the next directory's
+package, so leaving a project doesn't leak its variables into the next. Plain `env export`
+(without `--track`) output is unchanged.

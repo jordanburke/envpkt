@@ -192,6 +192,14 @@ export const EnvpktConfigSchema = Type.Object(
     catalog: Type.Optional(
       Type.String({ description: "Path to shared secret catalog (relative to this config file)" }),
     ),
+    scope: Type.Optional(
+      Type.Union([Type.Literal("shell"), Type.Literal("exec")], {
+        description:
+          "Whether `env export` emits this package's secrets for ambient/shell loading (`shell`) " +
+          "or withholds them so they are only available via `envpkt exec` (`exec`). Default `exec`. " +
+          "Never affects `envpkt exec`, which always injects everything.",
+      }),
+    ),
     namespace: Type.Optional(NamespaceSchema),
     identity: Type.Optional(IdentitySchema),
     secret: Type.Optional(
