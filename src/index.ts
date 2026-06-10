@@ -110,6 +110,10 @@ export { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigIdentity
 // Value resolution
 export { resolveValues } from "./core/resolve-values.js"
 
+// Dotenv export
+export type { DotenvEntry, FormatDotenvOptions } from "./core/dotenv.js"
+export { formatDotenv, quoteDotenvValue } from "./core/dotenv.js"
+
 // TOML editing
 export { appendSection, removeSection, renameSection, updateSectionFields } from "./core/toml-edit.js"
 

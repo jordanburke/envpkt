@@ -38,6 +38,7 @@ export default defineConfig({
             { slug: "cli/env-scan" },
             { slug: "cli/env-check" },
             { slug: "cli/env-export" },
+            { slug: "cli/env-dotenv" },
             { slug: "cli/env-github" },
             { slug: "cli/shell-hook" },
             { slug: "cli/mcp" },
