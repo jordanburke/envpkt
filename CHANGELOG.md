@@ -5,6 +5,23 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`secret edit --unset <field>`** removes an optional metadata field (repeatable). Field
+  names are the canonical TOML keys (e.g. `rate_limit`). You can unset any field you can set
+  with a flag; unknown field names are rejected rather than silently ignored. Previously the
+  only way to drop a field was hand-editing the TOML, since `--field ""` failed schema
+  validation. ([#31](https://github.com/jordanburke/envpkt/issues/31))
+
+### Fixed
+
+- **`--dry-run` now runs the same schema validation as the real write** across `secret`
+  subcommands. Previously a dry-run could preview a change (e.g. `expires = ""`) that the
+  actual write would then reject, so the preview no longer misrepresents what will be
+  accepted. ([#31](https://github.com/jordanburke/envpkt/issues/31))
+
 ## [0.12.0] - 2026-06-07
 
 ### Added
