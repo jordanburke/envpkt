@@ -121,7 +121,12 @@ scope: Type.Optional(
   exports secrets. The only ambient consumer today is the global package — handled by migration
   (A4).
 
-### A3. shell-hook injection (`src/cli/commands/shell-hook.ts`)
+### A3. shell-hook injection (`src/cli/commands/shell-hook.ts`) — ✅ done
+
+> Shipped with **upward-walk config discovery** (`discoverConfig` walks up to the nearest
+> `envpkt.toml` before the global/search fallback) so the hook works from any subdirectory, not
+> just the project root. `envpkt config-path` added as the resolve-only per-`cd` gate. Integration
+> tests cover zsh (chpwd) and bash (`_envpkt_prompt`) load/restore/dedup.
 
 Extend the emitted `chpwd` (zsh) / `PROMPT_COMMAND` (bash) hook from audit-only to
 **unset → inject → audit**. The hook already fires on every directory change and resolves the

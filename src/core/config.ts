@@ -1,4 +1,4 @@
-import { join, resolve } from "node:path"
+import { dirname, join, resolve } from "node:path"
 
 import { TypeCompiler } from "@sinclair/typebox/compiler"
 import type { Either } from "functype"
@@ -110,12 +110,26 @@ const buildSearchPaths = (): ReadonlyArray<string> => {
 
 type DiscoveredConfig = { readonly path: string; readonly source: "cwd" | "search" }
 
-/** Discover config by checking CWD, then ENVPKT_SEARCH_PATH, then dynamic Platform paths */
+/**
+ * Walk up from `dir` to the filesystem root, returning the nearest `envpkt.toml`.
+ * Makes a project's config apply throughout its subtree (like git/.env/direnv finding
+ * their root file), not only in the directory that literally contains the file.
+ * The global package lives in `~/.envpkt/` (a subdir), so it is not matched by this
+ * walk — it is resolved by the search-path/Platform fallback below.
+ */
+const walkUpForConfig = (dir: string): Option<string> => {
+  const candidate = join(dir, CONFIG_FILENAME)
+  if (Fs.existsSync(candidate)) return Option(candidate)
+  const parent = dirname(dir)
+  return parent === dir ? Option<string>(undefined) : walkUpForConfig(parent)
+}
+
+/** Discover config by walking up from CWD, then ENVPKT_SEARCH_PATH, then dynamic Platform paths */
 export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
   const dir = cwd ?? process.cwd()
-  const cwdCandidate = join(dir, CONFIG_FILENAME)
-  if (Fs.existsSync(cwdCandidate)) {
-    const found: DiscoveredConfig = { path: cwdCandidate, source: "cwd" }
+  const walked = walkUpForConfig(dir).orUndefined()
+  if (walked) {
+    const found: DiscoveredConfig = { path: walked, source: "cwd" }
     return Option(found)
   }
 

@@ -243,6 +243,22 @@ describe("discoverConfig", () => {
     )
   })
 
+  it("walks up to find a parent envpkt.toml from a subdirectory (source 'cwd')", () => {
+    writeFileSync(join(tmpDir, "envpkt.toml"), "version = 1\n[secret]\n")
+    const deep = join(tmpDir, "src", "lib")
+    mkdirSync(deep, { recursive: true })
+
+    const result = discoverConfig(deep)
+    expect(result.isSome()).toBe(true)
+    result.fold(
+      () => expect.unreachable("Expected Some"),
+      ({ path, source }) => {
+        expect(path).toBe(join(tmpDir, "envpkt.toml"))
+        expect(source).toBe("cwd")
+      },
+    )
+  })
+
   it("returns None when no config found anywhere", () => {
     const emptyDir = mkdtempSync(join(tmpdir(), "envpkt-empty-"))
     // Override HOME so built-in ~/.envpkt/envpkt.toml isn't found

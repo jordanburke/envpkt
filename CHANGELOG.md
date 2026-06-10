@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`envpkt shell-hook` now loads and unloads project credentials on `cd`** (previously
+  audit-only). The emitted zsh/bash hook resolves the directory's package, injects it via
+  `env export --track`, restores the previously-injected package on leave (prior values, not a
+  blind unset — no cross-project bleed), and prints a health warning. Secret values load only
+  for `scope = "shell"` packages; env defaults always load. Decryption happens only when the
+  resolved package changes.
+- **`envpkt config-path`** — resolve-only command that prints the `envpkt.toml` path for the
+  current directory (empty if none), with no config load or decryption. Powers the shell hook's
+  per-`cd` gate and is useful in scripts.
+- **Upward-walk config discovery** — `discoverConfig` now walks up from the current directory to
+  the nearest `envpkt.toml` (like `git`/`direnv`) before the global/search fallback, so a
+  project's config applies throughout its subtree. Affects `exec`, `env export`, `audit`, and the
+  shell hook — running any of them from a subdirectory now finds the enclosing project.
 - **Top-level `scope` field** (`"shell"` | `"exec"`, default `"exec"`) gates whether
   `envpkt env export` emits a package's **secret** values for ambient shell loading. `shell`
   exports them (for `eval`/the shell hook); `exec` (default) withholds them so they're only

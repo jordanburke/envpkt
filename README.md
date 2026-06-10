@@ -457,11 +457,25 @@ eval "$(envpkt env export --profile staging)"
 eval "$(envpkt env export -c path/to/envpkt.toml)"
 ```
 
-Add to your shell startup (e.g. `~/.zshrc` or `~/.bashrc`) for automatic secret loading. envpkt's [config discovery chain](#config-resolution) finds your config automatically — no platform-specific shell logic needed:
+Add to your shell startup (e.g. `~/.zshrc`) to load a global package once at login:
 
 ```bash
 eval "$(envpkt env export 2>/dev/null)"
 ```
+
+Secret values are emitted **only when the package sets top-level `scope = "shell"`** — the default `scope = "exec"` withholds them (use `envpkt exec`). For **per-project** credentials that load on `cd`, use [`envpkt shell-hook`](#envpkt-shell-hook) rather than a one-time startup eval.
+
+### `envpkt shell-hook`
+
+Generate a `cd` hook (zsh/bash) that loads a project's credentials when you enter its directory tree and restores your environment when you leave:
+
+```bash
+eval "$(envpkt shell-hook zsh)"   # add to ~/.zshrc (or: shell-hook bash)
+```
+
+On each directory change it resolves the **nearest `envpkt.toml`, walking up from the current directory** (like `git`/`direnv` — so it works from any subdirectory, not just the project root), injects that package via `env export --track`, and restores the previous package on leave (prior values, not a blind unset). Env defaults always load; secret values load only for `scope = "shell"` packages. Backed by `envpkt config-path` — a resolve-only command that prints the active config path (no decryption).
+
+> **Upward-walk discovery**: config resolution now walks up the directory tree to the nearest `envpkt.toml` before falling back to the global package. This also applies to `exec`, `env export`, and `audit` — running any of them from a subdirectory finds the enclosing project.
 
 ### `envpkt env github`
 

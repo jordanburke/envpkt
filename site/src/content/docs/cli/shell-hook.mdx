@@ -1,32 +1,63 @@
 ---
 title: envpkt shell-hook
-description: Output shell function for ambient credential warnings on cd
+description: Shell function that loads a project's credentials on cd and restores them on leave
 ---
 
-Generate a shell function that runs `envpkt audit --format minimal` on every directory change. Config discovery is handled by envpkt itself — it searches CWD, `~/.envpkt/`, cloud storage paths, and any custom `ENVPKT_SEARCH_PATH` locations.
+Generate a shell function that, on every directory change, **loads the credentials for the
+directory you're in** and restores your environment when you leave. It resolves the nearest
+`envpkt.toml` (walking up from the current directory), injects that package, and prints a
+one-line credential-health warning.
 
 ## Usage
 
 ```bash
-envpkt shell-hook <shell>
+envpkt shell-hook <shell>     # shell: zsh | bash
 ```
-
-**Argument**: Shell type — `zsh` or `bash`
 
 ## Setup
 
-Add to your shell configuration file:
-
 ```bash
-# For zsh (~/.zshrc)
+# zsh (~/.zshrc)
 eval "$(envpkt shell-hook zsh)"
 
-# For bash (~/.bashrc)
+# bash (~/.bashrc)
 eval "$(envpkt shell-hook bash)"
 ```
 
 ## Behavior
 
-After setup, every `cd` triggers a minimal audit display showing credential health at a glance. envpkt handles config discovery internally — if no config is found anywhere in the resolution chain, it silently exits. This provides ambient awareness without requiring manual audit runs.
+On each `cd` the hook:
 
-See the [Shell Hooks integration](/integrations/shell-hooks/) for details.
+1. **Resolves the package** for the new directory via `envpkt config-path` (walks up to the
+   nearest `envpkt.toml`, like `git`/`direnv`). If it's the same package as before — e.g. you
+   moved between subdirectories of one project — it does nothing.
+2. **Restores the previous package's variables** to their prior values (or unsets them if they
+   had none), so leaving a project never leaks its credentials into the next one.
+3. **Injects the new package** via `envpkt env export --track`. Env defaults are always loaded;
+   **secret values load only when the package sets [`scope = "shell"`](/cli/env-export/)** —
+   otherwise use [`envpkt exec`](/cli/exec/).
+4. **Warns on credential health** via `envpkt audit --format minimal`.
+
+Decryption happens only when the resolved package changes (not on every `cd`), and only the
+resolve step runs in subdirectories of the same project — so the hook stays cheap.
+
+:::caution[Ambient loading needs an unlocked key]
+Because the hook decrypts on `cd`, it can't prompt for a passphrase. A `scope = "shell"` package
+must use a key that resolves non-interactively (a plain `0600` key file, or `ENVPKT_AGE_KEY`/
+`ENVPKT_AGE_KEY_FILE`). Passphrase- or manager-locked keys are for bootstrapping or for
+`scope = "exec"` packages, where you launch deliberately. If a `shell`-scope package's key is
+missing, the hook surfaces a clear error on `cd` and injects nothing (see
+[fail-fast key handling](/reference/error-types/)).
+:::
+
+## Related: `envpkt config-path`
+
+The hook gates on `envpkt config-path`, a resolve-only command that prints the `envpkt.toml`
+path for the current directory (empty if none) — no decryption, no boot. It's handy in scripts
+too:
+
+```bash
+envpkt config-path            # /Users/me/proj/envpkt.toml   (from anywhere in proj/)
+```
+
+See the [Shell Hooks integration](/integrations/shell-hooks/) for the full setup.

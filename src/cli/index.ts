@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url"
 import { Command } from "commander"
 
 import { runAudit } from "./commands/audit.js"
+import { runConfigPath } from "./commands/config-path.js"
 import { registerEnvCommands } from "./commands/env.js"
 import { runExec } from "./commands/exec.js"
 import { runFleet } from "./commands/fleet.js"
@@ -178,6 +179,16 @@ program
   .description("Upgrade envpkt to the latest version (npm install -g envpkt@latest)")
   .action(() => {
     runUpgrade()
+  })
+
+program
+  .command("config-path")
+  .description(
+    "Print the envpkt.toml path resolved for the current directory (empty if none). Resolve-only — no decryption.",
+  )
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .action((options) => {
+    runConfigPath(options)
   })
 
 program
