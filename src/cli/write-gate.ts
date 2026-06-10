@@ -33,3 +33,18 @@ export const writeIfValid = (configPath: string, updated: string, successMsg: st
   writeFileSync(configPath, updated, "utf-8")
   console.log(successMsg)
 }
+
+/**
+ * Validate then preview (no write) — the `--dry-run` counterpart of `writeIfValid`.
+ * Runs the same structural validation the real write would, so a dry-run can never
+ * show a result that the actual write would reject. On invalid output it prints the
+ * same error and exits 1, exactly as the write path does.
+ *
+ * `display` lets callers preview a focused slice (e.g. just the new block for `add`)
+ * while still validating the full resulting config.
+ */
+export const previewIfValid = (updated: string, display?: string): void => {
+  validateOrExit(updated)
+  console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
+  console.log(display ?? updated)
+}

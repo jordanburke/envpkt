@@ -1,6 +1,8 @@
+import { execFileSync } from "node:child_process"
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
-import { join } from "node:path"
+import { dirname, join, resolve } from "node:path"
+import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
@@ -141,5 +143,123 @@ describe("secret rename (via renameSection)", () => {
       (err) => expect(err._tag).toBe("SectionAlreadyExists"),
       () => expect.unreachable("Should be Left"),
     )
+  })
+})
+
+// CLI-level tests for behavior that lives in the command layer (flag parsing,
+// --unset, dry-run validation) rather than in the core toml-edit functions.
+const __testDir = dirname(fileURLToPath(import.meta.url))
+const CLI_SRC = resolve(__testDir, "../..", "src/cli/index.ts")
+const TSX = resolve(__testDir, "../..", "node_modules/.bin/tsx")
+
+const runCli = (args: string[]): { stdout: string; stderr: string; status: number } => {
+  try {
+    const stdout = execFileSync(TSX, [CLI_SRC, ...args], {
+      env: { ...process.env },
+      encoding: "utf-8",
+      timeout: 15000,
+    })
+    return { stdout, stderr: "", status: 0 }
+  } catch (err) {
+    const e = err as { stdout?: string; stderr?: string; status?: number }
+    return { stdout: e.stdout ?? "", stderr: e.stderr ?? "", status: e.status ?? 1 }
+  }
+}
+
+describe("secret edit --unset (CLI)", () => {
+  const tomlWithOptionals = `version = 1
+
+[secret.MY_KEY]
+service = "stripe"
+expires = "2026-12-31"
+rate_limit = "1000/min"
+`
+
+  it("removes an optional field and preserves the rest", () => {
+    writeFileSync(configPath, tomlWithOptionals)
+    const { status } = runCli(["secret", "edit", "MY_KEY", "--unset", "expires", "-c", configPath])
+    expect(status).toBe(0)
+
+    const content = readFileSync(configPath, "utf-8")
+    expect(content).not.toContain("expires")
+    expect(content).toContain('service = "stripe"')
+    expect(content).toContain('rate_limit = "1000/min"')
+  })
+
+  it("removes multiple fields when --unset is repeated", () => {
+    writeFileSync(configPath, tomlWithOptionals)
+    const { status } = runCli([
+      "secret",
+      "edit",
+      "MY_KEY",
+      "--unset",
+      "expires",
+      "--unset",
+      "rate_limit",
+      "-c",
+      configPath,
+    ])
+    expect(status).toBe(0)
+
+    const content = readFileSync(configPath, "utf-8")
+    expect(content).not.toContain("expires")
+    expect(content).not.toContain("rate_limit")
+    expect(content).toContain('service = "stripe"')
+  })
+
+  it("rejects an unknown field instead of silently doing nothing", () => {
+    writeFileSync(configPath, tomlWithOptionals)
+    const { stderr, status } = runCli(["secret", "edit", "MY_KEY", "--unset", "bogus", "-c", configPath])
+    expect(status).toBe(1)
+    expect(stderr).toContain("unknown field")
+    // File must be untouched
+    expect(readFileSync(configPath, "utf-8")).toBe(tomlWithOptionals)
+  })
+
+  it("the result still loads as a valid config after unsetting", () => {
+    writeFileSync(configPath, tomlWithOptionals)
+    runCli(["secret", "edit", "MY_KEY", "--unset", "expires", "-c", configPath])
+    loadConfig(configPath).fold(
+      (err) => expect.unreachable(`Config should be valid after unset, got: ${err._tag}`),
+      (config) => expect(config.secret!["MY_KEY"]!.expires).toBeUndefined(),
+    )
+  })
+})
+
+describe("secret edit --dry-run validation (CLI)", () => {
+  const tomlWithExpires = `version = 1
+
+[secret.MY_KEY]
+service = "stripe"
+expires = "2026-12-31"
+`
+
+  it("dry-run rejects an edit the real write would reject (no misleading preview)", () => {
+    // The secondary bug in #31: --dry-run skipped the schema validation the real
+    // write runs, so it happily previewed expires = "" which then failed on write.
+    writeFileSync(configPath, tomlWithExpires)
+    const { stderr, status } = runCli(["secret", "edit", "MY_KEY", "--expires", "", "--dry-run", "-c", configPath])
+    expect(status).toBe(1)
+    expect(stderr).toContain("invalid config")
+    // dry-run never writes
+    expect(readFileSync(configPath, "utf-8")).toBe(tomlWithExpires)
+  })
+
+  it("dry-run previews a valid edit without writing", () => {
+    writeFileSync(configPath, tomlWithExpires)
+    const { stdout, status } = runCli([
+      "secret",
+      "edit",
+      "MY_KEY",
+      "--expires",
+      "2027-01-01",
+      "--dry-run",
+      "-c",
+      configPath,
+    ])
+    expect(status).toBe(0)
+    expect(stdout).toContain("2027-01-01")
+    // file unchanged by dry-run
+    expect(readFileSync(configPath, "utf-8")).toBe(tomlWithExpires)
   })
 })

@@ -8,7 +8,7 @@ import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import { ageEncrypt } from "../../core/seal.js"
 import { appendSection, removeSection, renameSection, updateSectionFields } from "../../core/toml-edit.js"
 import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
-import { writeIfValid } from "../write-gate.js"
+import { previewIfValid, writeIfValid } from "../write-gate.js"
 import { applySealedToml } from "./seal.js"
 
 type AddOptions = {
@@ -42,8 +42,31 @@ type EditOptions = {
   readonly required?: boolean
   readonly rotationUrl?: string
   readonly tags?: string
+  readonly unset?: ReadonlyArray<string>
   readonly dryRun?: boolean
 }
+
+/**
+ * Fields removable via `--unset` — exactly the metadata fields settable via a flag.
+ * Mental model: you can unset any field you can set. Structural/managed fields
+ * (`created`, `last_rotated_at`, `encrypted_value`, `from_key`, `namespace`) are
+ * intentionally excluded — they're owned by `seal`/`rotate`/`alias`, not `edit`.
+ * Field names are the canonical TOML keys (e.g. `rate_limit`, not `rate-limit`).
+ */
+const UNSETTABLE_FIELDS: ReadonlyArray<string> = [
+  "service",
+  "purpose",
+  "comment",
+  "expires",
+  "rotates",
+  "rate_limit",
+  "model_hint",
+  "source",
+  "rotation_url",
+  "required",
+  "capabilities",
+  "tags",
+]
 
 type RmOptions = {
   readonly config?: string
@@ -128,6 +151,11 @@ const buildFieldUpdates = (options: EditOptions): Record<string, string | null> 
     })
     updates["tags"] = `{ ${pairs.join(", ")} }`
   }
+  // Removals last so `--unset X` wins if X was also set via a value flag.
+  // A null value tells updateSectionFields to drop the field entirely.
+  options.unset?.forEach((field) => {
+    updates[field] = null
+  })
   return updates
 }
 
@@ -178,15 +206,15 @@ const runSecretAdd = (name: string, options: AddOptions): void => {
           }
 
           const block = buildSecretBlock(name, options)
+          const raw = readFileSync(configPath, "utf-8")
+          const updated = appendSection(raw, block)
 
           if (options.dryRun) {
-            console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
-            console.log(block)
+            // Validate the full resulting config, but preview just the new block.
+            previewIfValid(updated, block)
             return
           }
 
-          const raw = readFileSync(configPath, "utf-8")
-          const updated = appendSection(raw, block)
           writeIfValid(
             configPath,
             updated,
@@ -201,6 +229,13 @@ const runSecretAdd = (name: string, options: AddOptions): void => {
 const runSecretEdit = (name: string, options: EditOptions): void => {
   if (options.expires && !DATE_RE.test(options.expires)) {
     console.error(`${RED}Error:${RESET} Invalid date format for --expires: "${options.expires}" (expected YYYY-MM-DD)`)
+    process.exit(1)
+  }
+
+  const unknownUnset = (options.unset ?? []).filter((f) => !UNSETTABLE_FIELDS.includes(f))
+  if (unknownUnset.length > 0) {
+    console.error(`${RED}Error:${RESET} Cannot --unset unknown field(s): ${unknownUnset.join(", ")}`)
+    console.error(`${DIM}Unsettable fields: ${UNSETTABLE_FIELDS.join(", ")}${RESET}`)
     process.exit(1)
   }
 
@@ -231,8 +266,7 @@ const runSecretEdit = (name: string, options: EditOptions): void => {
           },
           (updated) => {
             if (options.dryRun) {
-              console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
-              console.log(updated)
+              previewIfValid(updated)
               return
             }
             writeIfValid(
@@ -257,8 +291,7 @@ const runSecretRm = (name: string, options: RmOptions): void => {
       },
       (updated) => {
         if (options.dryRun) {
-          console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
-          console.log(updated)
+          previewIfValid(updated)
           return
         }
         writeIfValid(
@@ -281,8 +314,7 @@ const runSecretRename = (oldName: string, newName: string, options: RenameOption
       },
       (updated) => {
         if (options.dryRun) {
-          console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
-          console.log(updated)
+          previewIfValid(updated)
           return
         }
         writeIfValid(
@@ -488,8 +520,7 @@ const runSecretRotate = async (name: string, options: RotateOptions): Promise<vo
       },
       (result) => {
         if (options.dryRun) {
-          console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
-          console.log(result)
+          previewIfValid(result)
           return
         }
         writeIfValid(
@@ -535,8 +566,7 @@ const runSecretRotate = async (name: string, options: RotateOptions): Promise<vo
     },
     (result) => {
       if (options.dryRun) {
-        console.log(`${DIM}# Preview (--dry-run):${RESET}\n`)
-        console.log(result)
+        previewIfValid(result)
         return
       }
       writeIfValid(
@@ -577,6 +607,8 @@ export const registerSecretCommands = (program: Command): void => {
     runSecretAdd(name, options)
   })
 
+  const collect = (value: string, previous: ReadonlyArray<string>): ReadonlyArray<string> => [...previous, value]
+
   const editCmd = secret
     .command("edit")
     .description("Update metadata fields on an existing secret")
@@ -584,6 +616,12 @@ export const registerSecretCommands = (program: Command): void => {
     .option("-c, --config <path>", "Path to envpkt.toml")
     .option("--required", "Mark this secret as required")
     .option("--no-required", "Mark this secret as not required")
+    .option(
+      "--unset <field>",
+      "Remove an optional field (repeatable). Field names match TOML keys, e.g. expires, rate_limit",
+      collect,
+      [],
+    )
     .option("--dry-run", "Preview the changes without writing")
 
   addSecretFlags(editCmd).action((name: string, options: EditOptions) => {
