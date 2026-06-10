@@ -515,6 +515,91 @@ describe("boot with sealed values", () => {
   })
 })
 
+describe("bootSafe fail-fast on missing seal key (B1)", () => {
+  const FAKE_CIPHERTEXT = ["-----BEGIN AGE ENCRYPTED FILE-----", "ZmFrZQ==", "-----END AGE ENCRYPTED FILE-----"].join(
+    "\n",
+  )
+
+  let savedHome: string | undefined
+  let savedKey: string | undefined
+  let savedKeyFile: string | undefined
+  let isolatedHome: string
+
+  beforeEach(() => {
+    // Neutralize every key source so resolveSealIdentity finds nothing:
+    // HOME → empty tmp (no ~/.envpkt/age-key.txt), and clear the inline/file env keys.
+    isolatedHome = mkdtempSync(join(tmpdir(), "envpkt-home-"))
+    savedHome = process.env["HOME"]
+    savedKey = process.env["ENVPKT_AGE_KEY"]
+    savedKeyFile = process.env["ENVPKT_AGE_KEY_FILE"]
+    process.env["HOME"] = isolatedHome
+    delete process.env["ENVPKT_AGE_KEY"]
+    delete process.env["ENVPKT_AGE_KEY_FILE"]
+  })
+
+  afterEach(() => {
+    if (savedHome === undefined) delete process.env["HOME"]
+    else process.env["HOME"] = savedHome
+    if (savedKey === undefined) delete process.env["ENVPKT_AGE_KEY"]
+    else process.env["ENVPKT_AGE_KEY"] = savedKey
+    if (savedKeyFile === undefined) delete process.env["ENVPKT_AGE_KEY_FILE"]
+    else process.env["ENVPKT_AGE_KEY_FILE"] = savedKeyFile
+    rmSync(isolatedHome, { recursive: true, force: true })
+  })
+
+  const sealedConfig = (extraIdentityLines: ReadonlyArray<string> = []): string =>
+    writeConfig(
+      [
+        `version = 1`,
+        `[identity]`,
+        `name = "x"`,
+        `recipient = "age1ql3z7hjy54pw3hyww5ayyfg7zqgvc7w3j2elw8zmrj2kg5sfn9aqmcac8p"`,
+        ...extraIdentityLines,
+        `[secret.SEALED_KEY]`,
+        `service = "test"`,
+        `encrypted_value = """`,
+        FAKE_CIPHERTEXT,
+        `"""`,
+      ].join("\n"),
+    )
+
+  it("returns SealKeyUnavailable when sealed values exist and no key resolves", () => {
+    const result = bootSafe({ configPath: sealedConfig(), inject: false })
+    result.fold(
+      (err) => expect(err._tag).toBe("SealKeyUnavailable"),
+      () => expect.unreachable("Expected Left(SealKeyUnavailable)"),
+    )
+  })
+
+  it("fails fast even under warnOnly (the export/exec path)", () => {
+    const result = bootSafe({ configPath: sealedConfig(), inject: false, warnOnly: true })
+    expect(result.isLeft()).toBe(true)
+    result.fold(
+      (err) => expect(err._tag).toBe("SealKeyUnavailable"),
+      () => expect.unreachable("Expected Left"),
+    )
+  })
+
+  it("treats a configured-but-missing key_file as no key, and lists searched paths", () => {
+    const result = bootSafe({ configPath: sealedConfig([`key_file = "missing-key.txt"`]), inject: false })
+    result.fold(
+      (err) => {
+        expect(err._tag).toBe("SealKeyUnavailable")
+        if (err._tag === "SealKeyUnavailable") {
+          expect(err.sealedKeys).toContain("SEALED_KEY")
+          expect(err.searched.join("\n")).toMatch(/missing-key\.txt/)
+        }
+      },
+      () => expect.unreachable("Expected Left(SealKeyUnavailable)"),
+    )
+  })
+
+  it("does not fail when there are no sealed values (no key needed)", () => {
+    const configPath = writeConfig([`version = 1`, `[secret.PLAIN]`, `service = "test"`].join("\n"))
+    expect(bootSafe({ configPath, inject: false }).isRight()).toBe(true)
+  })
+})
+
 describe("bootSafe with aliases", () => {
   it.skipIf(!ageInstalled)("secret alias inherits target's sealed value", () => {
     const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
