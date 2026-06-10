@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **`envpkt env dotenv`** emits resolved credentials in `.env` format (`KEY=value`), for the
+  tools that auto-discover `.env` files — Wrangler, Docker `--env-file`, Vite/Next/Astro,
+  GitHub Actions, direnv. A sibling of `env export` (shell) and `env github` (`$GITHUB_ENV`).
+  Secret values are included by default (consistent with those commands); `--no-secrets`
+  emits value-less placeholders. `-o <file>` writes to a file (with a `.gitignore` reminder
+  when secrets are present). Values are quoted only when needed and output is deterministic.
+  New library API: `formatDotenv` / `quoteDotenvValue`.
+  ([#23](https://github.com/jordanburke/envpkt/issues/23))
 - **`secret edit --unset <field>`** removes an optional metadata field (repeatable). Field
   names are the canonical TOML keys (e.g. `rate_limit`). You can unset any field you can set
   with a flag; unknown field names are rejected rather than silently ignored. Previously the
