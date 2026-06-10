@@ -230,6 +230,13 @@ export type BootError =
   | CatalogError
   | AliasError
   | { readonly _tag: "AuditFailed"; readonly audit: AuditResult; readonly message: string }
+  | {
+      // Sealed values are declared but no decryption key resolves anywhere. Hard error
+      // (never inject empty). `searched` lists the precedence chain with per-entry status.
+      readonly _tag: "SealKeyUnavailable"
+      readonly sealedKeys: ReadonlyArray<string>
+      readonly searched: ReadonlyArray<string>
+    }
   | IdentityError
 
 export type IdentityError =

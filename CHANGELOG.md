@@ -25,6 +25,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`boot()`/`bootSafe()` now fail fast when a sealed packet's decryption key is absent**, instead
+  of warning and injecting empty values. A package with `encrypted_value` entries and no resolvable
+  key (`identity.key_file` → `ENVPKT_AGE_KEY_FILE` → `ENVPKT_AGE_KEY` → `~/.envpkt/age-key.txt`)
+  returns a `SealKeyUnavailable` error listing the searched paths and how to fix it — so a missing
+  key surfaces immediately (in `exec` / `env export`·`github`·`dotenv`) rather than as a confusing
+  empty-credential failure downstream. A configured-but-missing `key_file` now also falls through
+  the rest of the precedence chain (so a local `key_file` no longer blocks an inline CI key).
+  `audit` is unaffected — it reads metadata only and still reports health without the key.
 - **`--dry-run` now runs the same schema validation as the real write** across `secret`
   subcommands. Previously a dry-run could preview a change (e.g. `expires = ""`) that the
   actual write would then reject, so the preview no longer misrepresents what will be

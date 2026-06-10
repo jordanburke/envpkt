@@ -82,7 +82,14 @@ const materializeInlineKey = (key: string): IdentitySource => {
  */
 const resolveSealIdentity = (config: EnvpktConfig, configDir: string): Option<IdentitySource> => {
   if (config.identity?.key_file) {
-    return Option<IdentitySource>({ path: resolve(configDir, expandPath(config.identity.key_file)), dispose: noop })
+    // Existence-check the configured key file. If it's missing, fall through to the rest of the
+    // precedence chain (ENVPKT_AGE_KEY_FILE → inline → default) rather than returning a dead path
+    // — so a config that declares a local key_file still resolves an inline CI key, and a truly
+    // absent key surfaces as SealKeyUnavailable rather than a downstream decrypt failure.
+    const keyFilePath = resolve(configDir, expandPath(config.identity.key_file))
+    if (existsSync(keyFilePath)) {
+      return Option<IdentitySource>({ path: keyFilePath, dispose: noop })
+    }
   }
   const envFile = process.env["ENVPKT_AGE_KEY_FILE"]
   if (envFile && existsSync(envFile)) {
@@ -97,6 +104,22 @@ const resolveSealIdentity = (config: EnvpktConfig, configDir: string): Option<Id
     return Option<IdentitySource>({ path: defaultPath, dispose: noop })
   }
   return Option<IdentitySource>(undefined)
+}
+
+/** Describe the seal-identity precedence chain with per-entry status, for a clear no-key error. */
+const describeSealKeySearch = (config: EnvpktConfig, configDir: string): ReadonlyArray<string> => {
+  const keyFile = config.identity?.key_file
+  const keyFileLine = keyFile
+    ? `identity.key_file → ${resolve(configDir, expandPath(keyFile))} (${existsSync(resolve(configDir, expandPath(keyFile))) ? "found" : "missing"})`
+    : `identity.key_file (not set)`
+  const envFile = process.env["ENVPKT_AGE_KEY_FILE"]
+  const envFileLine = envFile
+    ? `ENVPKT_AGE_KEY_FILE → ${envFile} (${existsSync(envFile) ? "found" : "missing"})`
+    : `ENVPKT_AGE_KEY_FILE (unset)`
+  const inlineLine = resolveInlineKey().isEmpty ? `ENVPKT_AGE_KEY (unset)` : `ENVPKT_AGE_KEY (set, inline)`
+  const defaultPath = join(homedir(), ".envpkt", "age-key.txt")
+  const defaultLine = `${defaultPath} (${existsSync(defaultPath) ? "found" : "missing"})`
+  return [keyFileLine, envFileLine, inlineLine, defaultLine]
 }
 
 const resolveIdentityKey = (config: EnvpktConfig, configDir: string): IdentityKeyResult => {
@@ -232,6 +255,21 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
         const fnoxKeys = detectFnoxKeys(configDir)
         const audit = computeAudit(config, fnoxKeys, undefined, aliasTable)
 
+        // Fail fast: sealed values are declared but no decryption key resolves anywhere. We cannot
+        // produce the declared values, so refuse rather than inject empty — even under warnOnly
+        // (which governs soft issues like expiry, not an absent key). Resolved once here and
+        // threaded into Phase 1 below so an inline key is materialized a single time.
+        const sealIdentity: Option<IdentitySource> = hasSealedValues
+          ? resolveSealIdentity(config, configDir)
+          : Option<IdentitySource>(undefined)
+        if (hasSealedValues && sealIdentity.isEmpty) {
+          return Left({
+            _tag: "SealKeyUnavailable" as const,
+            sealedKeys: nonAliasMetaKeys.filter((k) => !!nonAliasSecretEntries[k]?.encrypted_value),
+            searched: describeSealKeySearch(config, configDir),
+          })
+        }
+
         return checkExpiration(audit, failOnExpired, warnOnly).map((warnings) => {
           const secrets: Record<string, string> = {}
           const injected: string[] = []
@@ -279,12 +317,13 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
           const sealedKeys = new Set<string>()
 
           if (hasSealedValues) {
-            resolveSealIdentity(config, configDir).fold(
+            sealIdentity.fold(
               () => {
+                // Unreachable — the SealKeyUnavailable guard above returns Left before we get here
+                // when hasSealedValues and no identity resolves. Kept as a defensive no-op.
                 log.warn("phase.sealed.no_identity_file", {
                   sealed_keys: nonAliasMetaKeys.filter((k) => !!nonAliasSecretEntries[k]?.encrypted_value).length,
                 })
-                warnings.push("Sealed values found but no identity file available for decryption")
               },
               ({ path: idPath, dispose }) => {
                 // eslint-disable-next-line functype/prefer-either -- try/finally is resource cleanup (temp key file), not error handling
@@ -468,6 +507,19 @@ const formatBootError = (error: BootError): string => {
       return `Decrypt failed: ${error.message}`
     case "IdentityNotFound":
       return `Identity file not found: ${error.path}`
+    case "SealKeyUnavailable": {
+      const keys = error.sealedKeys.length
+      const searched = error.searched.map((line) => `  • ${line}`).join("\n")
+      return [
+        `${keys} sealed secret(s) can't be decrypted — no age key found.`,
+        `Searched (in order):`,
+        searched,
+        `Fix one:`,
+        `  • Restore your key to ~/.envpkt/age-key.txt (or set ENVPKT_AGE_KEY_FILE / ENVPKT_AGE_KEY)`,
+        `  • Re-provision from source: envpkt seal --edit <KEY>`,
+        `Refusing to inject empty values for sealed secrets.`,
+      ].join("\n")
+    }
     case "AliasInvalidSyntax":
     case "AliasTargetMissing":
     case "AliasSelfReference":
