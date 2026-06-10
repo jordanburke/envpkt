@@ -249,7 +249,7 @@ describe("envpkt env export", () => {
       stdio: ["pipe", "pipe", "pipe"],
     })
 
-    const toml = `version = 1\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
+    const toml = `version = 1\nscope = "shell"\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["env", "export"], { cwd: tmpDir })
@@ -284,13 +284,50 @@ describe("envpkt env export", () => {
       stdio: ["pipe", "pipe", "pipe"],
     })
 
-    const toml = `version = 1\n\n[namespace]\nprefix = "CIV"\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
+    const toml = `version = 1\nscope = "shell"\n\n[namespace]\nprefix = "CIV"\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
     const result = run(["env", "export"], { cwd: tmpDir })
 
     expect(result.status).toBe(0)
     expect(result.stdout).toContain("export CIV__MY_SECRET='sk-test-secret-value'")
+  })
+
+  it("emits env defaults regardless of scope, and tracks them with --track", () => {
+    // Env defaults are non-secret — always exported, even at the default scope=exec.
+    const toml = `version = 1\n\n[env.LOG_LEVEL]\nvalue = "info"\n`
+    writeFileSync(join(tmpDir, "envpkt.toml"), toml)
+
+    expect(run(["env", "export"], { cwd: tmpDir }).stdout).toContain("export LOG_LEVEL='info'")
+
+    const tracked = run(["env", "export", "--track"], { cwd: tmpDir })
+    expect(tracked.stdout).toContain(
+      `_ENVPKT_HAD_LOG_LEVEL=\${LOG_LEVEL+1}; _ENVPKT_PREV_LOG_LEVEL="\${LOG_LEVEL-}"; export LOG_LEVEL='info'`,
+    )
+    expect(tracked.stdout).toContain(`_ENVPKT_INJECTED='LOG_LEVEL'`)
+  })
+
+  it.skipIf(!ageInstalled)("withholds sealed secrets at the default scope (exec)", () => {
+    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+    const recipient = keygenOutput
+      .split("\n")
+      .find((l) => l.startsWith("# public key:"))!
+      .replace("# public key: ", "")
+      .trim()
+    writeFileSync(join(tmpDir, "identity.txt"), keygenOutput)
+    const encrypted = execFileSync("age", ["-r", recipient, "-a"], {
+      input: "sk-test-secret-value",
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    })
+
+    // No top-level scope → defaults to "exec" → secret withheld from ambient export.
+    const toml = `version = 1\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
+    writeFileSync(join(tmpDir, "envpkt.toml"), toml)
+
+    const result = run(["env", "export"], { cwd: tmpDir })
+    expect(result.status).toBe(0)
+    expect(result.stdout).not.toContain("MY_SECRET")
   })
 })
 

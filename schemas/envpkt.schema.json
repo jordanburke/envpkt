@@ -17,6 +17,19 @@
       "description": "Path to shared secret catalog (relative to this config file)",
       "type": "string"
     },
+    "scope": {
+      "description": "Whether `env export` emits this package's secrets for ambient/shell loading (`shell`) or withholds them so they are only available via `envpkt exec` (`exec`). Default `exec`. Never affects `envpkt exec`, which always injects everything.",
+      "anyOf": [
+        {
+          "const": "shell",
+          "type": "string"
+        },
+        {
+          "const": "exec",
+          "type": "string"
+        }
+      ]
+    },
     "namespace": {
       "description": "Optional namespace/package prefix for injected environment variable names",
       "type": "object",

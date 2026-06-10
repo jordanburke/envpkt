@@ -16,10 +16,11 @@ Enable editor autocompletion by adding the schema directive on line 1:
 
 ## Root Fields
 
-| Field     | Type     | Required | Description                                             |
-| --------- | -------- | -------- | ------------------------------------------------------- |
-| `version` | `number` | Yes      | Schema version number (currently `1`)                   |
-| `catalog` | `string` | No       | Path to shared secret catalog (relative to config file) |
+| Field     | Type                  | Required | Description                                                                                                                                                                                                                          |
+| --------- | --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `version` | `number`              | Yes      | Schema version number (currently `1`)                                                                                                                                                                                                |
+| `catalog` | `string`              | No       | Path to shared secret catalog (relative to config file)                                                                                                                                                                              |
+| `scope`   | `"shell"` \| `"exec"` | No       | Whether `env export` emits this package's secrets for ambient shell loading (`shell`) or withholds them so they're only available via `envpkt exec` (`exec`). Default `exec`. Never affects `envpkt exec`/`env github`/`env dotenv`. |
 
 ## `[namespace]` Section
 
