@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
+import { collectEditedValues } from "../../src/cli/commands/seal.js"
 import { loadConfig } from "../../src/core/config.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
@@ -115,5 +116,58 @@ from_key = "secret.REAL_KEY"
     expect(status).toBe(2)
     expect(stdout).toContain("alias")
     expect(stdout).toContain("from_key")
+  })
+})
+
+describe("collectEditedValues (--edit confirm-on-overwrite)", () => {
+  // Fake prompt that answers based on the question text, recording every prompt shown.
+  const scriptedPrompt = (answers: { confirm?: string; value?: string }, asked: string[]) => {
+    return (question: string): Promise<string> => {
+      asked.push(question)
+      if (question.startsWith("Replace the sealed value")) return Promise.resolve(answers.confirm ?? "")
+      return Promise.resolve(answers.value ?? "")
+    }
+  }
+
+  const sealed = { S: { service: "x", encrypted_value: "ct" } }
+  const unsealed = { U: { service: "x" } }
+
+  it("does not prompt for confirmation on an unsealed entry", async () => {
+    const asked: string[] = []
+    const values = await collectEditedValues(["U"], unsealed, scriptedPrompt({ value: "newval" }, asked))
+    expect(values).toEqual({ U: "newval" })
+    expect(asked.some((q) => q.startsWith("Replace the sealed value"))).toBe(false)
+  })
+
+  it("confirms before overwriting an already-sealed entry, and skips on a non-affirmative answer", async () => {
+    const asked: string[] = []
+    const skips: string[] = []
+    const values = await collectEditedValues(
+      ["S"],
+      sealed,
+      scriptedPrompt({ confirm: "n", value: "newval" }, asked),
+      (k) => skips.push(k),
+    )
+    expect(asked[0]).toContain("Replace the sealed value for S?")
+    expect(values).toEqual({}) // declined → not changed, value never prompted/applied
+    expect(skips).toEqual(["S"])
+    // value prompt must not have been reached after declining
+    expect(asked.some((q) => q.startsWith("Enter new value"))).toBe(false)
+  })
+
+  it("overwrites a sealed entry when the confirmation is affirmative", async () => {
+    const asked: string[] = []
+    const values = await collectEditedValues(["S"], sealed, scriptedPrompt({ confirm: "y", value: "fresh" }, asked))
+    expect(values).toEqual({ S: "fresh" })
+    expect(asked.some((q) => q.startsWith("Enter new value for S"))).toBe(true)
+  })
+
+  it("skips an empty value even after an affirmative confirm", async () => {
+    const skips: string[] = []
+    const values = await collectEditedValues(["S"], sealed, scriptedPrompt({ confirm: "yes", value: "" }, []), (k, r) =>
+      skips.push(`${k}:${r}`),
+    )
+    expect(values).toEqual({})
+    expect(skips).toEqual(["S:empty"])
   })
 })
