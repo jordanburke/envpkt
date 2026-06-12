@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **`envpkt seal --edit` now confirms before overwriting an already-sealed value.** Replacing a
+  sealed `encrypted_value` discards the only ciphertext, so `--edit` asks `Replace the sealed
+value for <KEY>? [y/N]` first (declining keeps the existing value). Editing an unsealed entry is
+  unaffected. Makes the "lost the key, re-provision from source" path a deliberate act.
 - **`envpkt env export` no longer emits secret values by default.** With the new `scope` field
   defaulting to `"exec"`, ambient `eval "$(envpkt env export)"` now exports only env defaults; add
   top-level `scope = "shell"` to a package to restore secret export (e.g. for a global package

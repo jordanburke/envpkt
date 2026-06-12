@@ -6,6 +6,7 @@ import { List, Option, Set } from "functype"
 import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import { resolveKeyPath } from "../../core/keygen.js"
 import { resolveValues } from "../../core/resolve-values.js"
+import type { SecretMeta } from "../../core/schema.js"
 import { sealSecrets, unsealSecrets } from "../../core/seal.js"
 import { unwrapAgentKey } from "../../fnox/identity.js"
 import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
@@ -147,6 +148,45 @@ export const applySealedToml = (raw: string, sealedMeta: Record<string, { encryp
   return final.output.join("\n")
 }
 
+/** Affirmative answer to a `[y/N]` confirm prompt. */
+const isAffirmative = (answer: string): boolean => /^y(es)?$/i.test(answer.trim())
+
+/**
+ * Collect new plaintext values for the `--edit`ed keys via the injected `prompt`. Before
+ * overwriting an entry that is **already sealed** (`encrypted_value` present), require an
+ * explicit confirmation — replacing it discards the only ciphertext, and the prior value
+ * can't be recovered without the original key. Declined or empty entries are skipped (reported
+ * via `onSkip`). I/O flows only through `prompt`/`onSkip`, so the confirm/skip logic is
+ * unit-testable without a TTY.
+ */
+export const collectEditedValues = async (
+  editKeys: ReadonlyArray<string>,
+  entries: Readonly<Record<string, SecretMeta>>,
+  prompt: (question: string) => Promise<string>,
+  onSkip?: (key: string, reason: "declined" | "empty") => void,
+): Promise<Record<string, string>> => {
+  const values: Record<string, string> = {}
+  // eslint-disable-next-line functype/no-imperative-loops -- sequential await required for interactive prompts
+  for (const key of editKeys) {
+    if (entries[key]?.encrypted_value) {
+      const confirm = await prompt(
+        `Replace the sealed value for ${key}? The previous value can't be recovered without the original key. [y/N] `,
+      )
+      if (!isAffirmative(confirm)) {
+        onSkip?.(key, "declined")
+        continue
+      }
+    }
+    const value = await prompt(`Enter new value for ${key}: `)
+    if (value === "") {
+      onSkip?.(key, "empty")
+      continue
+    }
+    values[key] = value
+  }
+  return values
+}
+
 /** Write sealed values back into the TOML file, preserving structure. */
 const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encrypted_value?: string }>): void => {
   const raw = readFileSync(configPath, "utf-8")
@@ -262,16 +302,11 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
         rl.question(question, (answer) => resolve(answer))
       })
 
-    const values: Record<string, string> = {}
-    // eslint-disable-next-line functype/no-imperative-loops -- sequential await required for interactive prompts
-    for (const key of editKeys) {
-      const value = await prompt(`Enter new value for ${key}: `)
-      if (value === "") {
-        console.error(`${YELLOW}Skipped${RESET} ${key} (empty value)`)
-        continue
-      }
-      values[key] = value
-    }
+    const values = await collectEditedValues(editKeys, secretEntries, prompt, (key, reason) => {
+      console.error(
+        `${YELLOW}Skipped${RESET} ${key} (${reason === "empty" ? "empty value" : "kept existing sealed value"})`,
+      )
+    })
     rl.close()
 
     if (Object.keys(values).length === 0) {

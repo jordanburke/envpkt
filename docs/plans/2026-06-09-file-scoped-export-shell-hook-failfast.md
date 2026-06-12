@@ -228,7 +228,7 @@ Now promoted to a distinct, hard error:
   gap was specific to **boot/inject**. Decrypt failure with a _present_ key (wrong/corrupt) remains
   a warning for now — separate follow-up.
 
-### B2. Make `seal --edit` a deliberate "start over" (`src/cli/commands/seal.ts`)
+### B2. Make `seal --edit` a deliberate "start over" (`src/cli/commands/seal.ts`) — ✅ done
 
 `--edit` is the no-original-key recovery path (re-type values from your source of truth, reseal
 against the current recipient). Harden it so overwriting a sealed value is a conscious act:
