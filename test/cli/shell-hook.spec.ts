@@ -81,36 +81,45 @@ describe("shell-hook integration", () => {
     return execFileSync(shell, ["-c", shim + script], { encoding: "utf-8", timeout: 60000, env })
   }
 
-  it.skipIf(!zshAvail)("zsh: loads on cd, dedups in a subdir, unsets on leave", () => {
-    // chpwd fires in `zsh -c`, so cd alone drives the hook.
-    const out = runShell(
-      "zsh",
-      [
-        `cd "${empty}"`,
-        `eval "$(envpkt shell-hook zsh)"`,
-        `cd "${pkg}";         printf 'A=[%s]\\n' "\${GREETING-unset}"`,
-        `cd "${pkg}/src/lib"; printf 'B=[%s]\\n' "\${GREETING-unset}"`,
-        `cd "${empty}";       printf 'C=[%s]\\n' "\${GREETING-unset}"`,
-      ].join("\n"),
-    )
-    expect(out).toContain("A=[hi]") // loaded from the package
-    expect(out).toContain("B=[hi]") // subdir resolves the same package (upward-walk + dedup)
-    expect(out).toContain("C=[unset]") // unset on leaving to a non-package dir
-  })
+  it.skipIf(!zshAvail)(
+    "zsh: loads on cd, dedups in a subdir, unsets on leave",
+    () => {
+      // chpwd fires in `zsh -c`, so cd alone drives the hook.
+      const out = runShell(
+        "zsh",
+        [
+          `cd "${empty}"`,
+          `eval "$(envpkt shell-hook zsh)"`,
+          `cd "${pkg}";         printf 'A=[%s]\\n' "\${GREETING-unset}"`,
+          `cd "${pkg}/src/lib"; printf 'B=[%s]\\n' "\${GREETING-unset}"`,
+          `cd "${empty}";       printf 'C=[%s]\\n' "\${GREETING-unset}"`,
+        ].join("\n"),
+      )
+      expect(out).toContain("A=[hi]") // loaded from the package
+      expect(out).toContain("B=[hi]") // subdir resolves the same package (upward-walk + dedup)
+      expect(out).toContain("C=[unset]") // unset on leaving to a non-package dir
+      // Spawns several tsx cold-starts; well over vitest's 5s default on slower CI runners.
+    },
+    60_000,
+  )
 
-  it.skipIf(!bashAvail)("bash: loads on cd and restores the prior value on leave", () => {
-    // PROMPT_COMMAND doesn't fire in non-interactive `bash -c`, so drive _envpkt_prompt directly.
-    const out = runShell(
-      "bash",
-      [
-        `export GREETING=OUTER`,
-        `cd "${empty}"`,
-        `eval "$(envpkt shell-hook bash)"`,
-        `cd "${pkg}";   _envpkt_prompt; printf 'A=[%s]\\n' "$GREETING"`,
-        `cd "${empty}"; _envpkt_prompt; printf 'C=[%s]\\n' "$GREETING"`,
-      ].join("\n"),
-    )
-    expect(out).toContain("A=[hi]") // package value loaded
-    expect(out).toContain("C=[OUTER]") // prior value restored, not blind-unset
-  })
+  it.skipIf(!bashAvail)(
+    "bash: loads on cd and restores the prior value on leave",
+    () => {
+      // PROMPT_COMMAND doesn't fire in non-interactive `bash -c`, so drive _envpkt_prompt directly.
+      const out = runShell(
+        "bash",
+        [
+          `export GREETING=OUTER`,
+          `cd "${empty}"`,
+          `eval "$(envpkt shell-hook bash)"`,
+          `cd "${pkg}";   _envpkt_prompt; printf 'A=[%s]\\n' "$GREETING"`,
+          `cd "${empty}"; _envpkt_prompt; printf 'C=[%s]\\n' "$GREETING"`,
+        ].join("\n"),
+      )
+      expect(out).toContain("A=[hi]") // package value loaded
+      expect(out).toContain("C=[OUTER]") // prior value restored, not blind-unset
+    },
+    60_000,
+  )
 })
