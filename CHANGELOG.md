@@ -20,8 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **`envpkt env export` emits secrets again on the explicit path; `scope` now gates only the
-  ambient hook (`--track`).** 0.13.0 gated *all* `env export`, which broke `eval "$(envpkt env
-  export)"` setups that load a package's secrets at login. Plain `env export` now behaves like
+  ambient hook (`--track`).** 0.13.0 gated _all_ `env export`, which broke `eval "$(envpkt env
+export)"` setups that load a package's secrets at login. Plain `env export` now behaves like
   0.12.0 (emits everything); only `env export --track` — the path the shell hook uses — respects
   `scope`. So explicit invocations never silently withhold, while ambient `cd`-loading stays
   scoped. (Reverts the 0.13.0 breaking change on the explicit path.)
