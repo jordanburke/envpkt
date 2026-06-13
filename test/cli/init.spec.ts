@@ -27,6 +27,24 @@ describe("envpkt init", () => {
     expect(content).toContain("stale_warning_days = 90")
   })
 
+  it("--global scaffolds scope = shell", () => {
+    runInit(tmpDir, { global: true })
+    loadConfig(join(tmpDir, "envpkt.toml")).fold(
+      (err) => expect.unreachable(`should be valid: ${err._tag}`),
+      (c) => expect(c.scope).toBe("shell"),
+    )
+  })
+
+  it("--scope exec scaffolds scope = exec; default omits scope", () => {
+    runInit(tmpDir, { scope: "exec" })
+    expect(readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")).toContain('scope = "exec"')
+
+    const plain = mkdtempSync(join(tmpdir(), "envpkt-init-noscope-"))
+    runInit(plain, {})
+    expect(readFileSync(join(plain, "envpkt.toml"), "utf-8")).not.toMatch(/^scope =/m)
+    rmSync(plain, { recursive: true, force: true })
+  })
+
   it("sets created date to today on generated secrets", () => {
     runInit(tmpDir, {})
 

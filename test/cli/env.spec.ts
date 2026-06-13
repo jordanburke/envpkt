@@ -307,7 +307,7 @@ describe("envpkt env export", () => {
     expect(tracked.stdout).toContain(`_ENVPKT_INJECTED='LOG_LEVEL'`)
   })
 
-  it.skipIf(!ageInstalled)("withholds sealed secrets at the default scope (exec)", () => {
+  it.skipIf(!ageInstalled)("plain export emits secrets at default scope; --track withholds them (decouple)", () => {
     const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
     const recipient = keygenOutput
       .split("\n")
@@ -321,13 +321,20 @@ describe("envpkt env export", () => {
       stdio: ["pipe", "pipe", "pipe"],
     })
 
-    // No top-level scope → defaults to "exec" → secret withheld from ambient export.
+    // No top-level scope → defaults to "exec".
     const toml = `version = 1\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
 
-    const result = run(["env", "export"], { cwd: tmpDir })
-    expect(result.status).toBe(0)
-    expect(result.stdout).not.toContain("MY_SECRET")
+    // Explicit `env export` emits the secret regardless of scope (restored 0.12.0 behavior).
+    const plain = run(["env", "export"], { cwd: tmpDir })
+    expect(plain.status).toBe(0)
+    expect(plain.stdout).toContain("export MY_SECRET='sk-test-secret-value'")
+
+    // The ambient `--track` (hook) path respects scope: exec withholds the secret.
+    const tracked = run(["env", "export", "--track"], { cwd: tmpDir })
+    expect(tracked.status).toBe(0)
+    expect(tracked.stdout).not.toContain("sk-test-secret-value")
+    expect(tracked.stdout).not.toContain("MY_SECRET")
   })
 })
 

@@ -11,8 +11,12 @@ one-line credential-health warning.
 ## Usage
 
 ```bash
-envpkt shell-hook <shell>     # shell: zsh | bash
+envpkt shell-hook <shell>              # shell: zsh | bash
+envpkt shell-hook <shell> --no-audit   # omit the on-cd health-check line
 ```
+
+`--no-audit` drops step 4 (the `audit` spawn) from the emitted hook — useful on slower machines
+where you don't want the per-package-entry health check.
 
 ## Setup
 

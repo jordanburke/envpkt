@@ -19,7 +19,14 @@ type InitOptions = {
   readonly capabilities?: string
   readonly expires?: string
   readonly force?: boolean
+  readonly scope?: string
+  readonly global?: boolean
 }
+
+/** Resolve the top-level `scope` to scaffold: explicit --scope wins; --global implies "shell". */
+// eslint-disable-next-line functype/prefer-option -- thin scaffold helper; undefined = omit the line
+const resolveInitScope = (options: InitOptions): string | undefined =>
+  options.scope ?? (options.global ? "shell" : undefined)
 
 const todayIso = (): string => new Date().toISOString().split("T")[0]!
 
@@ -57,6 +64,10 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
   lines.push(`#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json`)
   lines.push(``)
   lines.push(`version = 1`)
+  const scope = resolveInitScope(options)
+  if (scope) {
+    lines.push(`scope = "${scope}"   # shell = secrets load ambiently on cd/eval; exec = only via envpkt exec`)
+  }
   lines.push(``)
 
   if (options.catalog) {
@@ -135,6 +146,11 @@ const formatConfigError = (err: ConfigError): string => {
 
 export const runInit = (dir: string, options: InitOptions): void => {
   const outPath = join(dir, CONFIG_FILENAME)
+
+  if (options.scope !== undefined && options.scope !== "shell" && options.scope !== "exec") {
+    console.error(`${RED}Error:${RESET} --scope must be "shell" or "exec" (got "${options.scope}")`)
+    process.exit(1)
+  }
 
   if (existsSync(outPath) && !options.force) {
     console.error(`${RED}Error:${RESET} ${CONFIG_FILENAME} already exists. Use --force to overwrite.`)
