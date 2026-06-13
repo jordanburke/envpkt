@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-06-13
+
 ### Added
 
 - **`envpkt init --global`** scaffolds an ambient package with `scope = "shell"` baked in; a plain
