@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`envpkt init --global`** scaffolds an ambient package with `scope = "shell"` baked in; a plain
+  `--scope <shell|exec>` flag scaffolds either explicitly. (The global package is the one meant to
+  load ambiently — so its generator now defaults it correctly instead of the project default.)
+- **`envpkt shell-hook --no-audit`** omits the on-`cd` credential-health line from the emitted hook
+  (for slower machines where the per-entry `audit` spawn isn't wanted).
+
+### Changed
+
+- **`envpkt env export` emits secrets again on the explicit path; `scope` now gates only the
+  ambient hook (`--track`).** 0.13.0 gated *all* `env export`, which broke `eval "$(envpkt env
+  export)"` setups that load a package's secrets at login. Plain `env export` now behaves like
+  0.12.0 (emits everything); only `env export --track` — the path the shell hook uses — respects
+  `scope`. So explicit invocations never silently withhold, while ambient `cd`-loading stays
+  scoped. (Reverts the 0.13.0 breaking change on the explicit path.)
+
+### Fixed
+
+- **The shell hook now surfaces a missing-key error on `cd`** instead of swallowing it. The hook
+  no longer `2>/dev/null`s the inject, and `env export --track` is quiet on success (so there's no
+  routine-warning noise) but prints a `SealKeyUnavailable` error — now rendered with the searched
+  key paths and remediation in `formatError`, not just the bare tag.
+- **bash hook handles an array-valued `PROMPT_COMMAND`** (bash ≥5.1): it appends to the array
+  rather than string-concatenating (which previously discarded all but the first element).
+
 ## [0.13.0] - 2026-06-12
 
 ### Added

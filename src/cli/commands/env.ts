@@ -303,24 +303,21 @@ const runEnvExport = (options: ExportOptions): void => {
       process.exit(2)
     },
     (boot) => {
-      emitWarnings(boot)
+      // `--track` is the ambient shell-hook path: stay quiet (no routine warnings) so the eval'd
+      // output is clean, and gate secrets by the package's `scope`. Plain `env export` is an
+      // explicit invocation — emit everything and show warnings, exactly like 0.12.0. Either way
+      // a hard error (e.g. SealKeyUnavailable) is printed by the Left branch above and surfaces.
+      if (!options.track) emitWarnings(boot)
 
-      // Secrets are emitted into the ambient shell only when the package opts in with
-      // top-level `scope = "shell"`. Default `exec` withholds them (use `envpkt exec`).
-      // Env defaults (non-secret) are always emitted. `scope` never affects `exec`/`github`/`dotenv`.
+      // Scope only gates the ambient (`--track`) path. Default `exec` withholds secrets there;
+      // `shell` emits them. `scope` never affects plain `env export`, `exec`, `github`, or `dotenv`.
       const scope = loadConfig(boot.configPath).fold(
         () => "exec",
         (config) => config.scope ?? "exec",
       )
+      const gateSecrets = options.track === true && scope !== "shell"
       const entries = collectEmitEntries(boot)
-      const emit = scope === "shell" ? entries : entries.filter((e) => !e.secret)
-
-      const withheld = entries.length - emit.length
-      if (withheld > 0) {
-        console.error(
-          `${DIM}${withheld} secret(s) withheld (scope="${scope}") — use \`envpkt exec\` or set top-level scope="shell".${RESET}`,
-        )
-      }
+      const emit = gateSecrets ? entries.filter((e) => !e.secret) : entries
 
       // Emit under the namespaced wire name so `eval "$(envpkt env export)"` sets the
       // variable the consumer actually reads. With --track, wrap each assignment in an

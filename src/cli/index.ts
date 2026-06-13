@@ -51,6 +51,8 @@ program
   .option("--name <name>", "Identity name (requires --identity)")
   .option("--capabilities <caps>", "Comma-separated capabilities (requires --identity)")
   .option("--expires <date>", "Credential expiration YYYY-MM-DD (requires --identity)")
+  .option("--scope <scope>", 'Top-level scope: "shell" (secrets load ambiently) or "exec" (only via envpkt exec)')
+  .option("--global", 'Scaffold a global/ambient package (implies scope = "shell")')
   .option("--force", "Overwrite existing envpkt.toml")
   .action((options) => {
     runInit(process.cwd(), options)
@@ -193,10 +195,11 @@ program
 
 program
   .command("shell-hook")
-  .description("Output shell function for ambient credential warnings on cd — combine with env export for full setup")
+  .description("Output a shell hook that loads a project's credentials on cd and restores them on leave")
   .argument("<shell>", "Shell type: zsh | bash")
-  .action((shell: string) => {
-    runShellHook(shell)
+  .option("--no-audit", "Omit the credential-health audit line from the emitted hook")
+  .action((shell: string, options) => {
+    runShellHook(shell, options)
   })
 
 program.parse()
