@@ -1,6 +1,7 @@
 import type { CheckResult, ScanResult } from "../core/env.js"
 import type { ConfidenceLevel } from "../core/patterns.js"
 import type { AuditResult, FleetHealth, HealthStatus, SecretHealth } from "../core/types.js"
+import { ageInstallHint } from "../fnox/identity.js"
 
 const RESET = "\x1b[0m"
 const BOLD = "\x1b[1m"
@@ -175,7 +176,7 @@ export const formatError = (error: { _tag: string; message?: string; path?: stri
     case "ReadError":
       return `${RED}Error:${RESET} Could not read file: ${error.message}`
     case "AgeNotFound":
-      return `${RED}Error:${RESET} age CLI not found: ${error.message}`
+      return `${RED}Error:${RESET} age is required for this operation but was not found on PATH.\n${DIM}${ageInstallHint()}${RESET}`
     case "DecryptFailed":
       return `${RED}Error:${RESET} Decrypt failed: ${error.message}`
     case "IdentityNotFound":

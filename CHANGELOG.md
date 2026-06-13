@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`envpkt doctor`** — one-shot environment check: is the `age` CLI installed, is a config
+  resolvable for this directory, and do its sealed secrets decrypt with an available key? Reuses
+  the boot resolution path, so a missing key reports the same searched-paths guidance as a failed
+  boot. Exits non-zero if a check fails.
+
+### Changed
+
+- **Clearer guidance when the `age` CLI is missing.** `AgeNotFound` errors (from `keygen`, `seal`,
+  decryption) now print a platform-aware install command (`brew install age` / `apt install age` /
+  `scoop install age`) plus the install link, instead of a bare "not found" message.
+
 ## [0.13.1] - 2026-06-13
 
 ### Added

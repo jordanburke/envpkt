@@ -364,6 +364,19 @@ envpkt audit -c path/to/envpkt.toml # Specify config path
 
 Exit codes: `0` = healthy, `1` = degraded, `2` = critical.
 
+### `envpkt doctor`
+
+One-shot environment check: is the `age` CLI installed, is a config resolvable here, and do its sealed secrets decrypt with an available key?
+
+```bash
+envpkt doctor
+# ✓ age      v1.2.0
+# ✓ config   /path/to/envpkt.toml
+# ✓ secrets  5 resolved, 0 skipped
+```
+
+If `age` is missing it prints the platform-specific install command; if a sealed packet has no key, it lists the paths it searched. Exits non-zero when a check fails.
+
 ### `envpkt resolve`
 
 Resolve catalog references and output a flat, self-contained config.
