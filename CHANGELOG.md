@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-06-13
+
 ### Added
 
 - **`envpkt doctor`** — one-shot environment check: is the `age` CLI installed, is a config
