@@ -5,43 +5,38 @@
 
 **Credentials your agents actually understand.**
 
-Structured metadata for every secret — capabilities, constraints, expiration, and fleet health — so agents operate within their boundaries instead of flying blind.
+envpkt gives every credential an `envpkt.toml` entry describing _what service it authenticates to_, _what it's allowed to do_, _when it expires_, and _how to rotate it_ — while the secret values stay in your secrets manager, encrypted at rest, or injected at runtime, never committed in plaintext.
 
-Every credential in your system gets an `envpkt.toml` entry describing _what service it authenticates to_, _what it's allowed to do_, _when it expires_, and _how to rotate it_. Your agents query this metadata via MCP to understand their operating constraints. Your operators audit credential health across entire agent fleets. The secrets themselves stay where they belong — in your secrets manager, encrypted at rest, or injected at runtime — never in the agent's conversation context.
+**Day one, with zero agents,** it's an encrypted-at-rest `.env` replacement with scoped loading: scan the credentials already in your shell, seal them into a file that's safe to commit, and load them automatically on `cd`, into a single command, or as a plain `.env` for any tool that wants one.
 
-## MCP Integration
+**As you add agents,** the same metadata gives them structured awareness of their own credentials over [MCP](#for-agents-and-fleets) — capabilities, expiry, drift, fleet health — without any secret value ever entering the model's context window.
 
-envpkt ships an [MCP](https://modelcontextprotocol.io/) server that gives AI agents structured awareness of their credentials. Add it to Claude, Cursor, VS Code, or any MCP-compatible client:
+## Quick Start
 
-```json
-{
-  "mcpServers": {
-    "envpkt": {
-      "command": "envpkt",
-      "args": ["mcp"]
-    }
-  }
-}
+The whole loop for a single project — discover, seal, load — with zero agents involved:
+
+```bash
+npm install -g envpkt
+
+# 1. Discover the credentials already in your shell, and scaffold envpkt.toml from them
+envpkt env scan
+envpkt env scan --write
+
+# 2. Generate an age key and seal the secret values into envpkt.toml (the file is safe to commit)
+envpkt keygen
+envpkt seal
+
+# 3. Load them — pick whatever fits the moment:
+envpkt exec -- your-tool            # run one command with the secrets injected, scoped to it
+eval "$(envpkt shell-hook zsh)"     # add to ~/.zshrc: auto-load on cd into a project, restore on leave
+envpkt env dotenv -o .env           # materialize a .env for Docker / Wrangler / Vite / …
+
+# Anytime: check health and drift
+envpkt audit
+envpkt env check
 ```
 
-### Tools
-
-| Tool               | Description                                             |
-| ------------------ | ------------------------------------------------------- |
-| `getPacketHealth`  | Get overall health status with per-secret audit results |
-| `listCapabilities` | List agent and per-secret capabilities                  |
-| `getSecretMeta`    | Get metadata for a specific secret by key               |
-| `checkExpiration`  | Check expiration status and days remaining              |
-| `getEnvMeta`       | Get metadata for environment defaults and drift status  |
-
-### Resources
-
-| URI                     | Description                       |
-| ----------------------- | --------------------------------- |
-| `envpkt://health`       | Current credential health summary |
-| `envpkt://capabilities` | Agent and secret capabilities     |
-
-The MCP server exposes metadata only — it does not have access to secret values. See [Security Model](#security-model) for details.
+Encrypted secrets committed to git, loaded where you need them, with health you can audit — and not an agent in sight. Scaling the same metadata to agents and fleets is [act two](#for-agents-and-fleets).
 
 ## Security Model
 
@@ -52,30 +47,6 @@ envpkt operates a three-tier trust model. Each tier has different guarantees, an
 **Tier 2: Runtime injection (process-facing)** — `boot()` resolves secrets (from sealed packets, fnox, or environment variables) and injects them into `process.env` at startup, outside the LLM context. This is the same trust model as every Node.js application that reads from `.env`, except now secrets are encrypted at rest, scoped per-agent, and auditable. This is defense-in-depth against prompt injection — the most common attack vector — but it is not a hard boundary against agents with code execution capabilities.
 
 **Tier 3: Shell-level agents** — Agents with shell access (Claude Code, Devin, etc.) can read environment variables directly. Prevention isn't possible at this tier. envpkt provides encrypted storage, scoped access, and audit trails — because when prevention isn't possible, visibility is what matters.
-
-## Quick Start
-
-Start where your credentials already are — environment variables — and graduate to encrypted, per-agent-scoped metadata.
-
-```bash
-# Install
-npm install -g envpkt
-
-# Auto-discover credentials from your shell environment
-envpkt env scan
-
-# Scaffold envpkt.toml from discovered credentials
-envpkt env scan --write
-
-# Audit credential health
-envpkt audit
-
-# Check for drift between envpkt.toml and live environment
-envpkt env check
-
-# Scan a directory tree of agents
-envpkt fleet
-```
 
 ## The envpkt.toml File
 
@@ -235,6 +206,44 @@ A composite action resolves the credentials in `envpkt.toml` into the CI job —
 **Inputs:** `config`, `version` (npm version to run, default `latest`), `strict`, `profile`.
 
 > Decrypting sealed packets requires the [`age`](https://github.com/FiloSottile/age) CLI on the runner (install it first, as above) — not needed if you only inject plaintext `[env.*]` defaults or resolve via fnox. Pin to a released tag (e.g. `@v0.12.0`); no moving major tag (`@v1`) is published yet. Node is assumed present; add `actions/setup-node` first to pin a version.
+
+## For agents and fleets
+
+Everything above stands on its own with no agents involved. Once you _do_ have them, the same `envpkt.toml` metadata powers three more capabilities: agents reading their own constraints over MCP, fleet-wide health monitoring, and shared catalogs across many agents.
+
+### MCP server
+
+envpkt ships an [MCP](https://modelcontextprotocol.io/) server that gives AI agents structured awareness of their credentials. Add it to Claude, Cursor, VS Code, or any MCP-compatible client:
+
+```json
+{
+  "mcpServers": {
+    "envpkt": {
+      "command": "envpkt",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+**Tools**
+
+| Tool               | Description                                             |
+| ------------------ | ------------------------------------------------------- |
+| `getPacketHealth`  | Get overall health status with per-secret audit results |
+| `listCapabilities` | List agent and per-secret capabilities                  |
+| `getSecretMeta`    | Get metadata for a specific secret by key               |
+| `checkExpiration`  | Check expiration status and days remaining              |
+| `getEnvMeta`       | Get metadata for environment defaults and drift status  |
+
+**Resources**
+
+| URI                     | Description                       |
+| ----------------------- | --------------------------------- |
+| `envpkt://health`       | Current credential health summary |
+| `envpkt://capabilities` | Agent and secret capabilities     |
+
+The MCP server exposes metadata only — it reads `envpkt.toml` and strips any `encrypted_value` ciphertext from responses, so prompt injection cannot leak what isn't there. See [Security Model](#security-model) for the full trust model.
 
 ## Fleet Management
 
@@ -470,7 +479,8 @@ Secret values are emitted **only when the package sets top-level `scope = "shell
 Generate a `cd` hook (zsh/bash) that loads a project's credentials when you enter its directory tree and restores your environment when you leave:
 
 ```bash
-eval "$(envpkt shell-hook zsh)"   # add to ~/.zshrc (or: shell-hook bash)
+eval "$(envpkt shell-hook zsh)"             # add to ~/.zshrc (or: shell-hook bash)
+eval "$(envpkt shell-hook zsh --no-audit)"  # …without the per-cd health-check line
 ```
 
 On each directory change it resolves the **nearest `envpkt.toml`, walking up from the current directory** (like `git`/`direnv` — so it works from any subdirectory, not just the project root), injects that package via `env export --track`, and restores the previous package on leave (prior values, not a blind unset). Env defaults always load; secret values load only for `scope = "shell"` packages. Backed by `envpkt config-path` — a resolve-only command that prints the active config path (no decryption).
@@ -484,18 +494,6 @@ Inject resolved secrets into a GitHub Actions job. Emits `::add-mask::` for each
 ```bash
 # Run as a step; later steps in the job see the resolved vars
 npx envpkt env github --strict
-```
-
-### `envpkt shell-hook`
-
-Output a shell function that runs `envpkt audit --format minimal` whenever you `cd` into a directory. envpkt's config discovery chain automatically finds config files beyond CWD (see [Config Resolution](#config-resolution)), so the hook works even in directories without a local `envpkt.toml`.
-
-```bash
-# Add to your .zshrc
-eval "$(envpkt shell-hook zsh)"
-
-# Add to your .bashrc
-eval "$(envpkt shell-hook bash)"
 ```
 
 ### `envpkt mcp`
