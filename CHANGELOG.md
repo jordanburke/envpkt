@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-06-14
+
 ### Added
 
 - **`envpkt diff <a> <b>`** compares two configs by their `[secret.*]`/`[env.*]` entries —
