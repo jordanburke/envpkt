@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`envpkt diff <a> <b>`** compares two configs by their `[secret.*]`/`[env.*]` entries —
+  keys only in each side plus field-level metadata changes for shared keys. Ignores
+  `encrypted_value` ciphertext (same secret re-encrypts differently) but reports sealed-status
+  changes. `--format json` for scripting; `--exit-code` exits non-zero on any difference (CI drift
+  gate). New library API: `diffConfigs`. ([#22](https://github.com/jordanburke/envpkt/issues/22))
+
 ## [0.13.2] - 2026-06-13
 
 ### Added

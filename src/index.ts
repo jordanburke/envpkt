@@ -114,6 +114,10 @@ export { resolveValues } from "./core/resolve-values.js"
 export type { DotenvEntry, FormatDotenvOptions } from "./core/dotenv.js"
 export { formatDotenv, quoteDotenvValue } from "./core/dotenv.js"
 
+// Config diff
+export type { ChangedEntry, ConfigDiff, FieldChange, SectionDiff } from "./core/diff.js"
+export { diffConfigs } from "./core/diff.js"
+
 // TOML editing
 export { appendSection, removeSection, renameSection, updateSectionFields } from "./core/toml-edit.js"
 
