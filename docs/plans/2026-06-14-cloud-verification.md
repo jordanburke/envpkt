@@ -21,7 +21,7 @@ verification is **continuous and fleet-wide**:
 - **Centralized audit log** of every check.
 
 It also handles, server-side and correctly, the things that made ad-hoc local probing risky:
-a verification call is itself a credential *use* (it shows in provider audit logs, consumes
+a verification call is itself a credential _use_ (it shows in provider audit logs, consumes
 rate limits, can trip anomaly detection). Centralized scheduling with backoff is the right home
 for that — not every contributor's terminal firing authenticated calls at prod providers.
 

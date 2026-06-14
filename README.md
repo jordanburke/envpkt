@@ -405,6 +405,25 @@ envpkt inspect --secrets --plaintext  # Show secret values in plaintext
 
 The `--secrets` flag reads values from environment variables matching each secret key. By default values are masked (`pos•••••yapp`). Add `--plaintext` to display full values.
 
+### `envpkt diff`
+
+Compare two configs — useful for spotting drift between environments (e.g. `dev.envpkt.toml` vs `prod.envpkt.toml`). Reports keys only in each side and field-level metadata changes for shared keys. Sealed ciphertext is ignored (the same secret re-encrypts differently); a sealed↔unsealed change is reported.
+
+```bash
+envpkt diff dev.envpkt.toml prod.envpkt.toml
+# - dev.envpkt.toml
+# + prod.envpkt.toml
+#
+# [secret]
+#   - OLD_KEY
+#   + NEW_KEY
+#   ~ API_KEY
+#       expires: 2026-01-01 → 2027-01-01
+
+envpkt diff a.toml b.toml --format json   # structured diff
+envpkt diff a.toml b.toml --exit-code     # exit non-zero on any difference (CI drift gate)
+```
+
 ### `envpkt exec`
 
 Run a pre-flight audit, inject secrets from fnox into the environment, then execute a command.

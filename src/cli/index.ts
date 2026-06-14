@@ -6,6 +6,7 @@ import { Command } from "commander"
 
 import { runAudit } from "./commands/audit.js"
 import { runConfigPath } from "./commands/config-path.js"
+import { runDiff } from "./commands/diff.js"
 import { runDoctor } from "./commands/doctor.js"
 import { registerEnvCommands } from "./commands/env.js"
 import { runExec } from "./commands/exec.js"
@@ -182,6 +183,17 @@ program
   .description("Upgrade envpkt to the latest version (npm install -g envpkt@latest)")
   .action(() => {
     runUpgrade()
+  })
+
+program
+  .command("diff")
+  .description("Compare two envpkt.toml configs by their secret/env entries (keys + metadata)")
+  .argument("<a>", "First config path")
+  .argument("<b>", "Second config path")
+  .option("--format <format>", "Output format: text | json", "text")
+  .option("--exit-code", "Exit non-zero when the configs differ (for CI drift gates)")
+  .action((a: string, b: string, options) => {
+    runDiff(a, b, options)
   })
 
 program
