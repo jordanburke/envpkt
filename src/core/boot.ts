@@ -195,7 +195,6 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
   const warnOnly = opts.warnOnly ?? false
   const log = (opts.logger ?? directSilentLogger).withContext({ component: "envpkt.boot" })
 
-  /* eslint-disable functype/prefer-do-notation -- multi-phase boot pipeline with side-effectful logging at each step is clearer as explicit flatMap+fold; Do would obscure the log/warn calls that are part of each phase's behavior */
   return resolveAndLoad(opts).flatMap(({ config, configPath, configDir, configSource }) =>
     validateAliases(config).fold<Either<BootError, BootResult>>(
       (err) => {
@@ -326,7 +325,6 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
                 })
               },
               ({ path: idPath, dispose }) => {
-                // eslint-disable-next-line functype/prefer-either -- try/finally is resource cleanup (temp key file), not error handling
                 try {
                   unsealSecrets(nonAliasSecretEntries, idPath).fold(
                     (err) => {
@@ -451,7 +449,6 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
     ),
   )
 }
-/* eslint-enable functype/prefer-do-notation */
 
 /* eslint-disable functype/prefer-either -- boot() is the intentional throwing wrapper; bootSafe() returns Either */
 /** Programmatic boot — throws EnvpktBootError on failure (intentional throwing wrapper over bootSafe) */

@@ -24,7 +24,6 @@ export const resolveSecrets = (
   agentSecrets: ReadonlyArray<string>,
   catalogPath: string,
 ): Either<CatalogError, Record<string, SecretMeta>> => {
-  // eslint-disable-next-line functype/prefer-do-notation -- Either-accumulating reduce with per-key validation; Do-notation has no clean analogue for reduce-with-short-circuit patterns
   return agentSecrets.reduce<Either<CatalogError, Record<string, SecretMeta>>>(
     (acc, key) =>
       acc.flatMap((resolved) => {

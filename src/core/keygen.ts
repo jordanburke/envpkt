@@ -40,7 +40,6 @@ export const generateKeypair = (options?: { readonly outputPath?: string }): Eit
     }),
   )
 
-  // eslint-disable-next-line functype/prefer-do-notation -- functype does not provide Either.Do notation
   return keygenResult.fold<Either<KeygenError, KeygenResult>>(
     (err) => Left({ _tag: "KeygenFailed", message: `age-keygen failed: ${err}` } as const),
     (output) => {
@@ -96,7 +95,6 @@ export const updateConfigIdentity = (configPath: string, options: UpdateIdentity
     ...(options.keyFile ? [{ re: /^key_file\s*=/, line: `key_file = "${options.keyFile}"` }] : []),
   ]
 
-  // eslint-disable-next-line functype/prefer-do-notation -- functype does not provide Either.Do notation
   return readResult.fold<Either<KeygenError, true>>(
     (err) => Left({ _tag: "ConfigUpdateError", message: `Failed to read config: ${err}` } as const),
     (raw) => {

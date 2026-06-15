@@ -1,8 +1,8 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 
-import type { Either } from "functype"
-import { Left, Option, Right, Try } from "functype"
+import type { Either, Option } from "functype"
+import { Left, Right, Try } from "functype"
 
 import type { IdentityError } from "../core/types.js"
 
@@ -18,10 +18,9 @@ export const ageAvailable = (): boolean =>
 
 /** The age CLI version string (e.g. "v1.2.0"), or None if age isn't on PATH. */
 export const ageVersion = (): Option<string> =>
-  Try(() => execFileSync("age", ["--version"], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" }).trim()).fold(
-    () => Option.none<string>(),
-    (v) => Option(v),
-  )
+  Try(() =>
+    execFileSync("age", ["--version"], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" }).trim(),
+  ).toOption()
 
 /** Platform-aware instructions for installing the age CLI. */
 export const ageInstallHint = (): string => {
@@ -39,7 +38,7 @@ export const ageInstallHint = (): string => {
  * - Plain identity files (from `age-keygen`) contain `AGE-SECRET-KEY-*` lines directly
  * - Encrypted identity files need `age --decrypt` to unwrap
  */
-/* eslint-disable functype/prefer-do-notation -- two-branch fallback (plain key vs decrypt) with early-return semantics; fold makes the branching explicit */
+
 export const unwrapAgentKey = (identityPath: string): Either<IdentityError, string> => {
   if (!existsSync(identityPath)) {
     return Left({ _tag: "IdentityNotFound", path: identityPath } as const)
@@ -71,4 +70,3 @@ export const unwrapAgentKey = (identityPath: string): Either<IdentityError, stri
     },
   )
 }
-/* eslint-enable functype/prefer-do-notation */

@@ -10,7 +10,6 @@ export const fnoxExport = (profile?: string, agentKey?: string): Either<FnoxErro
   const args = profile ? ["export", "--profile", profile] : ["export"]
   const env = agentKey ? { ...process.env, FNOX_AGE_KEY: agentKey } : undefined
 
-  // eslint-disable-next-line functype/prefer-do-notation -- Do notation is not available in functype; Try→Either fold is the idiomatic pattern
   return Try(() => execFileSync("fnox", args, { stdio: "pipe", encoding: "utf-8", env })).fold<
     Either<FnoxError, Record<string, string>>
   >(
@@ -35,7 +34,6 @@ export const fnoxGet = (key: string, profile?: string, agentKey?: string): Eithe
   const args = profile ? ["get", key, "--profile", profile] : ["get", key]
   const env = agentKey ? { ...process.env, FNOX_AGE_KEY: agentKey } : undefined
 
-  // eslint-disable-next-line functype/prefer-do-notation -- Do notation is not available in functype; Try→Either fold is the idiomatic pattern
   return Try(() => execFileSync("fnox", args, { stdio: "pipe", encoding: "utf-8", env })).fold<
     Either<FnoxError, string>
   >(

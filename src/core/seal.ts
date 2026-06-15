@@ -11,7 +11,7 @@ export const ageEncrypt = (plaintext: string, recipient: string): Either<SealErr
   if (!ageAvailable()) {
     return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
   }
-  // eslint-disable-next-line functype/prefer-do-notation -- simple Try-to-Either fold
+
   return Try(() =>
     execFileSync("age", ["--encrypt", "--recipient", recipient, "--armor"], {
       input: plaintext,
@@ -30,7 +30,6 @@ export const ageDecrypt = (ciphertext: string, identityPath: string): Either<Sea
     return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
   }
 
-  // eslint-disable-next-line functype/prefer-do-notation
   return Try(() =>
     execFileSync("age", ["--decrypt", "--identity", identityPath], {
       input: ciphertext,

@@ -31,7 +31,6 @@ const validateOneSecret = (
     return Left({ _tag: "AliasValueConflict", key, kind: "secret", field: "encrypted_value" })
   }
 
-  // eslint-disable-next-line functype/prefer-do-notation -- Do's generator-typing friction outweighs the readability win for this 4-step validation chain; Either.flatMap chain with toEither conversions is the cleanest alternative
   const result: Either<AliasError, AliasEntry> = parseRef(ref)
     .toEither<AliasError>({ _tag: "AliasInvalidSyntax", key, kind: "secret", value: ref })
     .flatMap((parsed): Either<AliasError, AliasEntry> => {
@@ -39,7 +38,7 @@ const validateOneSecret = (
         return Left({ _tag: "AliasCrossType", key, kind: "secret", targetKind: parsed.kind })
       }
       if (parsed.key === key) return Left({ _tag: "AliasSelfReference", key: `secret.${key}` })
-      // eslint-disable-next-line functype/prefer-do-notation -- nested Option.toEither + Either.flatMap inherits the outer rationale
+
       return Option(secretEntries[parsed.key])
         .toEither<AliasError>({ _tag: "AliasTargetMissing", key: `secret.${key}`, target: ref })
         .flatMap((target): Either<AliasError, AliasEntry> => {
@@ -64,7 +63,6 @@ const validateOneEnv = (
     return Left({ _tag: "AliasValueConflict", key, kind: "env", field: "value" })
   }
 
-  // eslint-disable-next-line functype/prefer-do-notation -- Do's generator-typing friction outweighs the readability win for this 4-step validation chain; Either.flatMap chain with toEither conversions is the cleanest alternative
   const result: Either<AliasError, AliasEntry> = parseRef(ref)
     .toEither<AliasError>({ _tag: "AliasInvalidSyntax", key, kind: "env", value: ref })
     .flatMap((parsed): Either<AliasError, AliasEntry> => {
@@ -72,7 +70,7 @@ const validateOneEnv = (
         return Left({ _tag: "AliasCrossType", key, kind: "env", targetKind: parsed.kind })
       }
       if (parsed.key === key) return Left({ _tag: "AliasSelfReference", key: `env.${key}` })
-      // eslint-disable-next-line functype/prefer-do-notation -- nested Option.toEither + Either.flatMap inherits the outer rationale
+
       return Option(envEntries[parsed.key])
         .toEither<AliasError>({ _tag: "AliasTargetMissing", key: `env.${key}`, target: ref })
         .flatMap((target): Either<AliasError, AliasEntry> => {

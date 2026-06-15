@@ -120,11 +120,9 @@ const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>
 }
 
 const readFnoxKeys = (fnoxPath: string): Either<ConfigError, ReadonlyArray<string>> =>
-  // eslint-disable-next-line functype/prefer-do-notation -- nested Try().fold() is clearer here than Do notation
   Try(() => readFileSync(fnoxPath, "utf-8")).fold<Either<ConfigError, ReadonlyArray<string>>>(
     (err) => Left({ _tag: "ReadError" as const, message: String(err) } as ConfigError),
     (content) =>
-      // eslint-disable-next-line functype/prefer-do-notation -- nested Try().fold() is clearer here than Do notation
       Try(() => parse(content)).fold<Either<ConfigError, ReadonlyArray<string>>>(
         (err) => Left({ _tag: "ParseError" as const, message: String(err) } as ConfigError),
         (data) => Right(Object.keys(data) as ReadonlyArray<string>),
