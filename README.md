@@ -424,6 +424,20 @@ envpkt diff a.toml b.toml --format json   # structured diff
 envpkt diff a.toml b.toml --exit-code     # exit non-zero on any difference (CI drift gate)
 ```
 
+### `envpkt copy`
+
+Copy a secret or env entry from one config to another. For a sealed secret, the value is unsealed with the **source's** age key and resealed for the **destination's** `identity.recipient` automatically — so you can move a credential between configs that use different keys without ever handling the plaintext yourself. Env entries (and secrets with no sealed value) copy as metadata only. The kind (secret vs env) is detected from where the key lives in the source.
+
+```bash
+envpkt copy DATABASE_URL --from prod.envpkt.toml --to staging.envpkt.toml
+envpkt copy DATABASE_URL --from prod.envpkt.toml --to staging.envpkt.toml --as DB_URL  # rename on copy
+envpkt copy PORT --to other.envpkt.toml          # --from defaults to the resolved config here
+envpkt copy API_KEY --to b.toml --force          # overwrite if it already exists in the destination
+envpkt copy API_KEY --to b.toml --dry-run        # preview without writing
+```
+
+`--from`/`--to` default to the config resolved for the current directory (and must already exist). On copy, `created` is reset to today and `last_rotated_at` is dropped (it's the source's rotation history). Copying a sealed secret needs the source key to unseal and the destination's `identity.recipient` to reseal.
+
 ### `envpkt exec`
 
 Run a pre-flight audit, inject secrets from fnox into the environment, then execute a command.

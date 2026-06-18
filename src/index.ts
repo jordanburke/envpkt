@@ -118,6 +118,9 @@ export { formatDotenv, quoteDotenvValue } from "./core/dotenv.js"
 export type { ChangedEntry, ConfigDiff, FieldChange, SectionDiff } from "./core/diff.js"
 export { diffConfigs } from "./core/diff.js"
 
+// Config copy (entry serialization for cross-config copy)
+export { copyableSecretMeta, serializeEnvBlock, serializeSecretBlock } from "./core/copy.js"
+
 // TOML editing
 export { appendSection, removeSection, renameSection, updateSectionFields } from "./core/toml-edit.js"
 
