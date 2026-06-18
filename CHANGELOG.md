@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`envpkt copy <key>`** copies a secret or env entry from one config to another. Sealed secrets
+  are unsealed with the source's age key and resealed for the destination's `identity.recipient`
+  automatically; env entries (and secrets with no sealed value) copy as metadata. The kind is
+  auto-detected from the source. `--from`/`--to` default to the resolved config for the current
+  directory; `--as` copies under a new name; `--force` overwrites an existing destination entry;
+  `--dry-run` previews. On copy, `created` is reset to today and `last_rotated_at` is dropped (it's
+  the source's rotation history). New library API: `serializeSecretBlock`, `serializeEnvBlock`,
+  `copyableSecretMeta`.
+
 ## [0.13.3] - 2026-06-14
 
 ### Added

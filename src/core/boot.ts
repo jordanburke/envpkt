@@ -60,7 +60,7 @@ const resolveIdentityFilePath = (
 }
 
 /** An age identity to unseal with, plus a cleanup hook (no-op for real files). */
-type IdentitySource = { readonly path: string; readonly dispose: () => void }
+export type IdentitySource = { readonly path: string; readonly dispose: () => void }
 
 const noop = (): void => {}
 
@@ -80,7 +80,7 @@ const materializeInlineKey = (key: string): IdentitySource => {
  * env var beats a stray local key. Inline keys are written to a 0600 temp file
  * the caller must dispose().
  */
-const resolveSealIdentity = (config: EnvpktConfig, configDir: string): Option<IdentitySource> => {
+export const resolveSealIdentity = (config: EnvpktConfig, configDir: string): Option<IdentitySource> => {
   if (config.identity?.key_file) {
     // Existence-check the configured key file. If it's missing, fall through to the rest of the
     // precedence chain (ENVPKT_AGE_KEY_FILE → inline → default) rather than returning a dead path
@@ -107,7 +107,7 @@ const resolveSealIdentity = (config: EnvpktConfig, configDir: string): Option<Id
 }
 
 /** Describe the seal-identity precedence chain with per-entry status, for a clear no-key error. */
-const describeSealKeySearch = (config: EnvpktConfig, configDir: string): ReadonlyArray<string> => {
+export const describeSealKeySearch = (config: EnvpktConfig, configDir: string): ReadonlyArray<string> => {
   const keyFile = config.identity?.key_file
   const keyFileLine = keyFile
     ? `identity.key_file → ${resolve(configDir, expandPath(keyFile))} (${existsSync(resolve(configDir, expandPath(keyFile))) ? "found" : "missing"})`

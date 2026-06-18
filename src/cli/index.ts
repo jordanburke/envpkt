@@ -6,6 +6,7 @@ import { Command } from "commander"
 
 import { runAudit } from "./commands/audit.js"
 import { runConfigPath } from "./commands/config-path.js"
+import { runCopy } from "./commands/copy.js"
 import { runDiff } from "./commands/diff.js"
 import { runDoctor } from "./commands/doctor.js"
 import { registerEnvCommands } from "./commands/env.js"
@@ -183,6 +184,19 @@ program
   .description("Upgrade envpkt to the latest version (npm install -g envpkt@latest)")
   .action(() => {
     runUpgrade()
+  })
+
+program
+  .command("copy")
+  .description("Copy a secret or env entry from one config to another (auto unseal → reseal for secrets)")
+  .argument("<key>", "The secret or env key to copy")
+  .option("--from <path>", "Source config path (default: resolved config for this directory)")
+  .option("--to <path>", "Destination config path (default: resolved config for this directory)")
+  .option("--as <newKey>", "Copy under a different key name in the destination")
+  .option("--force", "Overwrite the entry if it already exists in the destination")
+  .option("--dry-run", "Preview the change without writing")
+  .action((key: string, options) => {
+    runCopy(key, options)
   })
 
 program
