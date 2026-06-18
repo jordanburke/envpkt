@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-06-18
+
 ### Added
 
 - **`envpkt copy <key>`** copies a secret or env entry from one config to another. Sealed secrets
