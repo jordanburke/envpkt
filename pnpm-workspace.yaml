@@ -7,6 +7,8 @@ minimumReleaseAgeExclude:
   - "functype" # first-party functype libs, all versions always allowed
   - "functype-log"
   - "functype-os"
+  - eslint-config-functype@2.104.4
+  - eslint-plugin-functype@2.104.4
 
 publicHoistPattern:
   - "*eslint*"

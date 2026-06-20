@@ -42,15 +42,15 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@sinclair/typebox": "^0.34.49",
     "commander": "^15.0.0",
-    "functype": "^1.4.3",
-    "functype-log": "^1.4.3",
-    "functype-os": "^1.4.3",
+    "functype": "^1.4.4",
+    "functype-log": "^1.4.4",
+    "functype-os": "^1.4.4",
     "smol-toml": "^1.6.1"
   },
   "devDependencies": {
     "@types/node": "^24.13.2",
-    "ts-builds": "^3.2.0",
-    "tsdown": "^0.22.2",
+    "ts-builds": "^3.2.1",
+    "tsdown": "^0.22.3",
     "tsx": "^4.22.4"
   },
   "type": "module",
@@ -71,5 +71,5 @@
     "schemas"
   ],
   "prettier": "ts-builds/prettier",
-  "packageManager": "pnpm@11.7.0+sha512.19cc852c120c7125760f2443ee6be0ca5b40f9f50598de1a09a1f177503e010e57c23c77646e01e761de59bf874fb22a3398c33ab9691fc13eb946b6f0f4d620"
+  "packageManager": "pnpm@11.8.0+sha512.c1f5e7c4cb241c8f174b743851d82f42b802324afc8b0f116b96adb15aa06664948dde36960a3ba1079ba5b4b29dd0140135b94b5b5f5263592249d68e555f26"
 }
