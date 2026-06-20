@@ -207,6 +207,35 @@ A composite action resolves the credentials in `envpkt.toml` into the CI job —
 
 > Decrypting sealed packets requires the [`age`](https://github.com/FiloSottile/age) CLI on the runner (install it first, as above) — not needed if you only inject plaintext `[env.*]` defaults or resolve via fnox. Pin to a released tag (e.g. `@v0.12.0`); no moving major tag (`@v1`) is published yet. Node is assumed present; add `actions/setup-node` first to pin a version.
 
+### Anti-rot CI gate
+
+A hand-maintained `envpkt.toml` is documentation, and documentation rots. The fix is a failing build: each `--strict` check exits non-zero so a stale or drifted config blocks the merge. Each gate is **metadata-only** (no secret values) and targets a different failure mode — compose the ones that fit:
+
+```bash
+# 1. Secret health — runs anywhere, no live env or age key needed.
+#    Fails on expired / stale (> lifecycle.stale_warning_days) / missing / missing-metadata.
+envpkt audit --strict            # exit 1 = degraded, 2 = critical
+
+# 2. Cross-environment parity — keep dev/staging/prod tracking the same keys.
+envpkt diff dev.envpkt.toml prod.envpkt.toml --exit-code
+
+# 3. Drift vs the live environment — run where the env is actually populated
+#    (a deployed host or a pre-deploy step), NOT a bare CI runner: with no env
+#    set, every var reads as "missing" and the gate false-fails.
+envpkt env check --strict        # exit 1 on any drift (missing / untracked)
+```
+
+**Where each belongs.** `audit --strict` and `diff --exit-code` are environment-independent — drop them in any PR/CI job as a merge gate. `env check --strict` compares the config against the *live* environment, so it belongs in a pre-deploy step or a host healthcheck, after the env is populated (e.g. `eval "$(envpkt env export)"`), not in a stock CI runner.
+
+```yaml
+# PR gate: block merges when the config rots (no secrets, no age key required)
+- uses: jordanburke/envpkt@v0.13.4
+  with: { config: ./envpkt.toml, strict: "true" }
+- run: envpkt diff dev.envpkt.toml prod.envpkt.toml --exit-code
+```
+
+> Freshness in the sense of "verified live within N days" (a credential that still _authenticates_, not just one that hasn't _expired_ on paper) is a [verification](#) capability reserved for the hosted offering — `--strict` enforces everything checkable offline today.
+
 ## For agents and fleets
 
 Everything above stands on its own with no agents involved. Once you _do_ have them, the same `envpkt.toml` metadata powers three more capabilities: agents reading their own constraints over MCP, fleet-wide health monitoring, and shared catalogs across many agents.
