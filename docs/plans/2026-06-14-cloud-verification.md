@@ -46,6 +46,33 @@ for that — not every contributor's terminal firing authenticated calls at prod
   verification in the cloud, that freshness dimension lives there too; #43's `--strict` exit on
   expired/drifted remains a standalone CLI capability.
 
+## Adjacent: registry-vs-deployment sync (`envpkt diff <backend>:<target>`)
+
+Distinct from verification (claimed-vs-**live**), this is claimed-vs-**deployed**: does a
+deployment target's secret store actually contain the keys the registry declares? First
+reference implementation lives in **agent-todo** (`scripts/check-secret-sync.sh`, 2026-06-20):
+`envpkt resolve --format json` (declared, minus CI-only `team`/`sink = "ci"`) diffed against
+`wrangler secret list` (Cloudflare reality) — names only, never values.
+
+**Boundary — thin tool / fat orchestration.** envpkt stays the cloud-agnostic registry
+exposing structured data (`resolve --format json`); each cloud's native CLI
+(`wrangler` / `aws` / `vault`) owns deployment-side reality; a small orchestration script
+diffs the two. envpkt is *consumed*, not bypassed — exactly what a registry should enable.
+
+**Trigger to formalize — YAGNI until 2+ backends.** When a second/third script appears
+(AWS Secrets Manager, Vault, k8s, dotenv…), move the diff logic into envpkt as a generic
+command with a pluggable backend interface:
+
+```
+envpkt diff cloudflare:agent-gate-api
+envpkt diff aws-sm:my-app
+envpkt diff vault:agent-gate
+```
+
+The shell script becomes the reference that informs the API shape; core stays
+cloud-agnostic, backends opt-in. Until then the abstraction is longer than the script —
+don't build it.
+
 ## Status of related issues
 
 - **#42** — closed as "cloud anchor, not CLI." This doc holds the framing.
