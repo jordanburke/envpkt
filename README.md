@@ -225,7 +225,7 @@ envpkt diff dev.envpkt.toml prod.envpkt.toml --exit-code
 envpkt env check --strict        # exit 1 on any drift (missing / untracked)
 ```
 
-**Where each belongs.** `audit --strict` and `diff --exit-code` are environment-independent — drop them in any PR/CI job as a merge gate. `env check --strict` compares the config against the *live* environment, so it belongs in a pre-deploy step or a host healthcheck, after the env is populated (e.g. `eval "$(envpkt env export)"`), not in a stock CI runner.
+**Where each belongs.** `audit --strict` and `diff --exit-code` are environment-independent — drop them in any PR/CI job as a merge gate. `env check --strict` compares the config against the _live_ environment, so it belongs in a pre-deploy step or a host healthcheck, after the env is populated (e.g. `eval "$(envpkt env export)"`), not in a stock CI runner.
 
 ```yaml
 # PR gate: block merges when the config rots (no secrets, no age key required)
