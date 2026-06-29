@@ -34,6 +34,61 @@ for that — not every contributor's terminal firing authenticated calls at prod
   returning to: not just "what does the credential _claim_" but "is it actually live, over time,
   across the fleet."
 
+## Probe architecture: how the cloud verifies without holding the value
+
+The central trust question: verification _requires_ an authenticated call with the real secret
+value, but envpkt's differentiator is that it never sees values. The resolution is to **move the
+prober to the key, not the key to the prober** — split orchestration (cloud) from execution
+(customer trust zone).
+
+```
+┌─ envpkt cloud ─────────────┐         ┌─ customer trust zone ──────────┐
+│ • schedule (probe key X now)│  push   │  envpkt runner (headless)       │
+│ • probe registry (endpoints)│ ──────▶ │  • resolves value locally       │
+│ • history / alerting /      │         │    (sealed → fnox → env)        │
+│   fleet rollup              │ ◀────── │  • makes the authed call        │
+└─────────────────────────────┘ report  │  • reports VERDICT only         │
+   holds: metadata, schedules,          └────────────────────────────────┘
+   verdicts — never a value                 holds + uses the value; never
+                                            sends it anywhere
+```
+
+What crosses the boundary:
+
+- **Inbound to runner:** "probe `STRIPE_SECRET_KEY` against `GET /v1/account` now." Non-sensitive —
+  a public endpoint name from the registry.
+- **Outbound to cloud:** `{ key, status: "alive", http: 200, latency_ms, checked_at }`. A verdict,
+  not a value.
+
+The secret resolves, is used, and is discarded entirely inside the customer's zone, in-process.
+This is not a new trust tier — it is envpkt's existing three-tier model running headless: the
+runner _is_ the `boot()`/runtime tier (value in-process, outside any LLM context); cloud is the
+MCP-equivalent tier (no value access, ever). Pattern precedent: Datadog agent, Vault agent,
+Checkly private runners.
+
+### Two on-ramps onto the same model
+
+- **Runner (flagship):** thin headless deploy in the customer's CI / sidecar / Worker. Scheduled,
+  automatic, fleet-wide. This is the product.
+- **Result ingestion (zero-trust entry):** customer probes however they like (even a local
+  `envpkt verify --once`) and `POST`s verdicts to cloud for history/alerting/rollup. Cloud is pure
+  aggregation — needs nothing from inside their zone but the verdicts. Lowest barrier to first value.
+
+### Consciously rejected: cloud custody of the value
+
+The easy alternative — customer hands the value to the cloud (KMS/age-encrypted at rest), cloud
+decrypts in memory at probe time, calls, discards — is what Doppler/Infisical/1Password do. It is
+**rejected for envpkt.** The moment the cloud can decrypt a secret, envpkt stops being "the sidecar
+that never sees your values" and becomes another secret vault competing with incumbents. The
+differentiator is exactly the thing that path gives up.
+
+### Caveat: observed data in probe responses
+
+Some verify endpoints return identity (whoami → account email/org; SendGrid → scopes). That is
+_observed_ data. The runner normalizes to a verdict before reporting up — default minimal (status
+only); customer opts in to echoing observed scopes/identity into history. Same "report observed,
+never render a matches-verdict" discipline noted under scope below.
+
 ## Scope notes carried over from #42
 
 - **Liveness, not capability/scope introspection.** Mapping provider permission models onto a
@@ -57,7 +112,7 @@ reference implementation lives in **agent-todo** (`scripts/check-secret-sync.sh`
 **Boundary — thin tool / fat orchestration.** envpkt stays the cloud-agnostic registry
 exposing structured data (`resolve --format json`); each cloud's native CLI
 (`wrangler` / `aws` / `vault`) owns deployment-side reality; a small orchestration script
-diffs the two. envpkt is *consumed*, not bypassed — exactly what a registry should enable.
+diffs the two. envpkt is _consumed_, not bypassed — exactly what a registry should enable.
 
 **Trigger to formalize — YAGNI until 2+ backends.** When a second/third script appears
 (AWS Secrets Manager, Vault, k8s, dotenv…), move the diff logic into envpkt as a generic
