@@ -89,6 +89,100 @@ _observed_ data. The runner normalizes to a verdict before reporting up — defa
 only); customer opts in to echoing observed scopes/identity into history. Same "report observed,
 never render a matches-verdict" discipline noted under scope below.
 
+## Runner deployment topology
+
+The runner is "envpkt's existing value-resolution path + a probe call + an outbound report,"
+wrapped so a scheduler can fire it. Its shape follows from one design call.
+
+### The design call: pull, not push
+
+The runner **reaches out** to cloud; cloud never connects **in**. On a schedule the runner asks
+cloud for a work list (service + key-ref + endpoint — all non-sensitive), resolves the values
+locally, probes the providers, and `POST`s verdicts back. Outbound-only.
+
+This is the property that keeps the boundary honest: the runner works behind NAT/firewalls with
+zero inbound ports, the customer's egress allowlist is the only network config, and a compromised
+cloud has no route into the trust zone.
+
+### What the runner needs (only three things)
+
+1. **Access to the secret values** — exactly what `boot()`/`exec` already get: a sealed
+   `envpkt.toml`, fnox, or env. It runs _where the secrets already live_, so it adds no new
+   exposure surface.
+2. **A cloud token** — narrow scope: `pull-worklist` + `write-verdicts`. It cannot read or
+   exfiltrate values because cloud never _accepts_ values. A leaked token leaks "key X is alive,"
+   not key X. (Fits the read/write asymmetry: verdict-write is low-trust.)
+3. **Egress** — to the providers being probed, and to envpkt cloud.
+
+### Four deployment shapes, thinnest to fattest
+
+**1. Scheduled CLI — zero new infra (the on-ramp).** envpkt is already installed where the
+secrets are; add one cron/systemd line:
+
+```
+*/15 * * * *  envpkt verify --report --cloud-token-file ~/.envpkt/cloud-token
+```
+
+No daemon, no container. This is the "result ingestion" entry, with the probe registry built in.
+
+**2. GitHub Actions scheduled workflow — no infra, secrets already present.** The secrets are
+already in GH Actions secrets; values stay inside GitHub's runner, only verdicts leave:
+
+```yaml
+on:
+  schedule: [{ cron: "*/30 * * * *" }]
+jobs:
+  verify:
+    steps:
+      - run: pnpm dlx envpkt verify --report
+        env:
+          ENVPKT_CLOUD_TOKEN: ${{ secrets.ENVPKT_CLOUD_TOKEN }}
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          # …the keys to probe
+```
+
+A near-exact sibling of agent-todo's existing `check-secret-sync.sh` step — same trust model,
+different question (live vs. present).
+
+**3. Cloudflare Worker on a Cron Trigger — customer's own account (likely flagship).** Secrets
+bound via `wrangler secret put` live in _the customer's_ CF account; the value never touches
+envpkt cloud or even leaves the customer's edge:
+
+```jsonc
+// wrangler.jsonc
+{ "triggers": { "crons": ["*/15 * * * *"] } }
+```
+
+On each tick the Worker pulls the work list, probes, posts verdicts.
+
+**4. Long-lived daemon / sidecar — fleets.** `envpkt runner` as a polling loop, one runner
+watching many configs via the existing `fleet.ts` tree scan, for Kubernetes / always-on coverage
+without a cron-granularity floor:
+
+```
+docker run -d \
+  -v ./envpkt.toml:/app/envpkt.toml \
+  -e ENVPKT_CLOUD_TOKEN=... \
+  --env-file ./secrets.env \
+  ghcr.io/jordanburke/envpkt-runner
+```
+
+### New vs. reused
+
+Almost all reuse: the runner = `resolve-values.ts` (sealed → fnox → env) + an `audit`-style
+iteration over `[secret]` entries + an HTTP reporter. The one genuinely new piece is the **probe
+registry** (service → `{method, url, expected_status, auth_shape}`, keyed on the same `service`
+field `patterns.ts` already populates). `verify --once` is the local taste; `verify --report` and
+`runner` add the cloud leg.
+
+### Runner OSS vs. paid — sub-decision
+
+The probe code is just HTTP calls (cheap to open); the _value_ is the control plane (schedule,
+registry upkeep, history, alerting, fleet rollup). Natural line: **freely-distributed runner,
+paid control plane** — the Grafana-Agent / Vector model, where the agent is free and
+harmless-but-useless without a backend, and the backend is the product. Keeps "verify is the
+cloud anchor" intact while letting the runner ship anywhere.
+
 ## Scope notes carried over from #42
 
 - **Liveness, not capability/scope introspection.** Mapping provider permission models onto a
