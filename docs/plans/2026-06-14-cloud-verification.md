@@ -224,6 +224,8 @@ don't build it.
 
 ## Status of related issues
 
-- **#42** — closed as "cloud anchor, not CLI." This doc holds the framing.
+- **#42** — reopened as the build **epic** for verification, with subtasks #55–#62 (probe
+  registry, `verify --once`, verdict model, `verify --report`, runner daemon, cloud control
+  plane, alerting/rollup, deployment artifacts). This doc holds the framing.
 - **#43** — the `--strict` exit-on-expired/drifted half is still CLI-viable; the
   freshness-since-last-verified half moves to cloud with verification.
