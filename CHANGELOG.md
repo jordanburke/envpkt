@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.5] - 2026-06-30
+
+### Changed
+
+- The GitHub Action's moving major tag (`v0`) is now re-pointed to each release automatically by
+  the publish workflow, so `uses: jordanburke/envpkt@v0` always resolves to the newest `0.x`.
+  Docs and examples reference `@v0` (use `@v0.13.5` for an exact pin); `@v1` arrives at 1.0.
+
+### Documentation
+
+- New guide: **Runtime injection — self-launched vs serverless** — when envpkt injects directly
+  into a process you launch (`exec`/`boot`, no cloud secret store) versus platform-managed
+  serverless (Workers/Lambda), where the platform store is unavoidable and envpkt feeds and audits
+  it instead.
+
 ## [0.13.4] - 2026-06-18
 
 ### Added
