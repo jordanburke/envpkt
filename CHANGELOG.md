@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Upgraded core dependencies: `functype` / `functype-log` / `functype-os` 1.4 → 1.5, and
+  `smol-toml` (the TOML parser) 1.6 → 1.7. No envpkt API changes.
 - The GitHub Action's moving major tag (`v0`) is now re-pointed to each release automatically by
   the publish workflow, so `uses: jordanburke/envpkt@v0` always resolves to the newest `0.x`.
   Docs and examples reference `@v0` (use `@v0.13.5` for an exact pin); `@v1` arrives at 1.0.
@@ -21,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   into a process you launch (`exec`/`boot`, no cloud secret store) versus platform-managed
   serverless (Workers/Lambda), where the platform store is unavoidable and envpkt feeds and audits
   it instead.
+- **Anti-rot CI gate** section in the README (#43) tying `audit --strict`, `diff --exit-code`, and
+  `env check --strict` into a single merge-gate recipe.
 
 ## [0.13.4] - 2026-06-18
 
