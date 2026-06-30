@@ -53,6 +53,7 @@ export default defineConfig({
             { slug: "guides/fleet-management" },
             { slug: "guides/environment-scanning" },
             { slug: "guides/ci-cd" },
+            { slug: "guides/runtime-injection" },
           ],
         },
         {

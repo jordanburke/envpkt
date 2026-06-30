@@ -1,0 +1,91 @@
+---
+title: Runtime injection — self-launched vs serverless
+description: When envpkt can inject secrets directly into a running service and replace a cloud secret store, and when the platform's store is unavoidable.
+---
+
+The most common question once you're sealing secrets in `envpkt.toml`: **do I still need a
+cloud secret store (Cloudflare Worker secrets, AWS Secrets Manager, …) for my running service, or
+can envpkt just inject the values into the running environment?**
+
+The answer turns on one thing: **do you control how the process starts?**
+
+## The deciding question
+
+- **You launch the process** (server, container, VM, k8s pod, systemd unit) → envpkt injects
+  directly. No cloud secret store needed.
+- **A platform launches the process for you** (Cloudflare Workers, AWS Lambda, Vercel functions)
+  → the platform's own secret mechanism is the only way values reach the runtime. envpkt feeds
+  and audits that store, but doesn't replace it.
+
+## Self-launched: envpkt injects, no store needed
+
+When you own the start command, launch the app _through_ envpkt and the decrypted values land in
+the process environment — they never touch a cloud secret store:
+
+```bash
+# bare host / VM
+envpkt exec -- node server.js
+
+# systemd
+# ExecStart=/usr/local/bin/envpkt exec -- /usr/bin/myapp
+
+# container
+# ENTRYPOINT ["envpkt", "exec", "--"]
+# CMD ["node", "server.js"]
+```
+
+Or self-inject from inside the app at startup:
+
+```ts
+import { boot } from "envpkt"
+
+boot() // decrypts sealed packets + populates process.env before your code runs
+```
+
+The sealed `envpkt.toml` ships _with_ the app (committed, or baked into the image). The decrypted
+values live only in that process's memory — never in a platform store.
+
+### You don't eliminate secrets — you collapse N → 1
+
+The age key still has to reach the runtime. So you haven't removed _a_ secret; you've replaced
+"N values in a platform store" with "**one age key** delivered to the runtime + sealed values
+traveling in the image." Deliver the key via:
+
+- an environment variable the orchestrator sets (`ENVPKT_AGE_KEY`),
+- a mounted file (k8s Secret / volume → `identity.key_file`),
+- or, for a VM you bootstrap, a passphrase-wrapped key blob.
+
+One key, one channel — the same N→1 collapse envpkt gives you in CI, now at runtime.
+
+## Serverless: the platform store is unavoidable
+
+On Cloudflare Workers, AWS Lambda, and similar, envpkt **cannot** inject into the running service,
+for two stacked reasons:
+
+1. **You don't own the launch.** The platform spins your code up in a sandboxed isolate per
+   request. There is no startup command to wrap with `envpkt exec`, and no `boot()`-before-handler
+   hook you control. The only path into the isolate is the platform's own env/binding mechanism,
+   which is fed from its secret store (`wrangler secret put`, Lambda env / Secrets Manager).
+2. **Unseal can't run there.** Sealing uses the external `age` CLI as a runtime dependency. A
+   Worker has no subprocess and no filesystem, so `age` cannot execute inside it. Even if you
+   bundled the sealed packets, you couldn't decrypt them in-isolate — and you'd still need the age
+   key as a Worker secret, i.e. back in the platform store.
+
+So for serverless, envpkt's role is **source of truth + parity**, not injection: it holds the
+governed, sealed values and (with a thin orchestration step) populates the platform store from
+them, then audits that the store matches what the registry declares (see
+[CI/CD Integration](/guides/ci-cd/) and `envpkt diff`).
+
+## Security note
+
+"Sealed packets in the image + age key in the env" is not automatically _safer_ than the platform
+store. An attacker who gets into the running container can read both the sealed file and the key —
+so they get everything, the same as reading platform-injected env. Roughly equivalent blast
+radius. The real difference is **ownership**: with `envpkt exec`/`boot` you own the secret set,
+its lifecycle, and its metadata in one versioned file; with the platform store, the platform owns
+rotation and access control.
+
+## Rule of thumb
+
+> **Own the launch → `envpkt exec` / `boot`, no store needed.**
+> **Platform owns the launch → store required; envpkt feeds and audits it.**

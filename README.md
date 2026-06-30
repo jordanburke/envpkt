@@ -181,6 +181,15 @@ const result = boot() // decrypts sealed values, injects into process.env
 
 Mixed mode is supported — sealed values take priority, with fnox as fallback for keys without `encrypted_value`.
 
+### Where it injects: self-launched vs serverless
+
+Whether envpkt can replace a cloud secret store depends on one thing: **do you control how the process starts?**
+
+- **You launch it** (server, container, VM, k8s, systemd) → `envpkt exec -- yourapp` or `boot()` injects the decrypted values straight into the process environment. No cloud secret store needed: the sealed `envpkt.toml` ships with the app, and only the age key has to reach the runtime (N secrets collapse to 1 key).
+- **A platform launches it** (Cloudflare Workers, AWS Lambda, Vercel) → you don't own the launch, and the `age` CLI can't run inside the per-request isolate, so the platform's secret store is unavoidable. envpkt becomes the source of truth that populates and audits that store — not the injector.
+
+> Rule of thumb: **own the launch → `exec`/`boot`, no store. Platform owns the launch → store required, envpkt feeds and audits it.** Full details: [Runtime injection guide](https://envpkt.dev/guides/runtime-injection/).
+
 ## GitHub Actions
 
 A composite action resolves the credentials in `envpkt.toml` into the CI job — with secret values masked in the log — so later steps just see them as environment variables:
