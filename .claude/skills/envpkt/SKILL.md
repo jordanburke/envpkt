@@ -16,6 +16,22 @@ envpkt is a credential lifecycle and fleet management tool for AI agents. It pro
 
 envpkt stores metadata about secrets (service, expiration, purpose, capabilities) and can optionally store age-encrypted secret values as sealed packets (safe to commit). At runtime, values are resolved from sealed packets, fnox, or environment variables.
 
+## CLI-first: use commands, don't hand-edit `envpkt.toml`
+
+**When acting as an AI agent, change `envpkt.toml` through the envpkt CLI — do not hand-edit the file unless the CLI genuinely cannot express the change.** The CLI validates against the schema, preserves TOML structure and comments, fills defaults (e.g. `created`), keeps namespaced wire names consistent, and handles age sealing correctly — all easy to get wrong by hand.
+
+| To…                              | Use the CLI                                  | Don't                                   |
+| -------------------------------- | -------------------------------------------- | --------------------------------------- |
+| Add/modify a secret's metadata   | `envpkt secret add\|edit\|rm\|rename\|alias` | edit `[secret.*]` by hand               |
+| Add/modify an env default        | `envpkt env add\|edit\|rm\|rename\|alias`    | edit `[env.*]` by hand                  |
+| Encrypt a secret value           | `envpkt seal` (`--reseal`, `--edit <keys>`)  | paste ciphertext into `encrypted_value` |
+| Scaffold a config / generate key | `envpkt init`, `envpkt keygen`               | write the file from scratch             |
+| Discover & track creds in env    | `envpkt env scan --write`                    | guess variable names                    |
+
+**Workflow:** preview with `--dry-run`, apply, then verify with `envpkt audit` / `envpkt inspect`. Reserve manual edits for bulk reorganization or fields no flag covers — and re-run `envpkt audit` afterward to catch schema drift.
+
+> **Never hand-write `encrypted_value`.** Age ciphertext can only be produced by `envpkt seal`; editing a sealed value by hand breaks decryption. Note also that `envpkt secret edit --tags` _replaces_ the inline tags table rather than merging — check `--dry-run` first.
+
 ## When to Use This Skill
 
 - Setting up credential management in a project (`envpkt init`)
