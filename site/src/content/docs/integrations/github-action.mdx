@@ -17,7 +17,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: jordanburke/envpkt@v0.12.0
+      - uses: jordanburke/envpkt@v0
         with:
           config: ./envpkt.toml
           strict: "true"
@@ -40,6 +40,18 @@ environment for the rest of the job, under their [namespaced wire names](/refere
 | `strict`  | Fail the step if the pre-flight credential audit is not healthy    | `false`  |
 | `profile` | fnox profile to resolve from (when using fnox)                     | —        |
 
+## Versioning
+
+envpkt is pre-1.0, so the moving **major tag is `v0`** — it's re-pointed to each `0.x` release
+by the publish workflow, so `uses: jordanburke/envpkt@v0` always resolves to the newest `0.x`.
+
+- **`@v0`** — moving major; picks up new `0.x` releases automatically. Recommended for most.
+- **`@v0.13.4`** — exact release; immutable, opt into upgrades deliberately.
+- **`@v1`** — not published yet; it ships when envpkt reaches `1.0.0`.
+
+Note this is the **action** version. The envpkt **CLI** version it runs is separate — controlled
+by the `version` input (default `latest`); pin it for reproducible builds.
+
 ## Supplying the decryption key
 
 Sealed (`encrypted_value`) packets are the typical CI source: commit them to the repo
@@ -47,7 +59,7 @@ Sealed (`encrypted_value`) packets are the typical CI source: commit them to the
 repository/organization secret named `ENVPKT_AGE_KEY` on the step's `env`:
 
 ```yaml
-- uses: jordanburke/envpkt@v0.12.0
+- uses: jordanburke/envpkt@v0
   env:
     ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }}
 ```

@@ -200,7 +200,7 @@ A composite action resolves the credentials in `envpkt.toml` into the CI job —
 # Sealed packets are decrypted with the `age` CLI (not preinstalled on runners).
 - run: sudo apt-get update && sudo apt-get install -y age
 
-- uses: jordanburke/envpkt@v0.12.0
+- uses: jordanburke/envpkt@v0
   with:
     config: ./envpkt.toml
     strict: "true" # fail the build if a credential is expired/unhealthy
@@ -214,7 +214,7 @@ A composite action resolves the credentials in `envpkt.toml` into the CI job —
 
 **Inputs:** `config`, `version` (npm version to run, default `latest`), `strict`, `profile`.
 
-> Decrypting sealed packets requires the [`age`](https://github.com/FiloSottile/age) CLI on the runner (install it first, as above) — not needed if you only inject plaintext `[env.*]` defaults or resolve via fnox. Pin to a released tag (e.g. `@v0.12.0`); no moving major tag (`@v1`) is published yet. Node is assumed present; add `actions/setup-node` first to pin a version.
+> Decrypting sealed packets requires the [`age`](https://github.com/FiloSottile/age) CLI on the runner (install it first, as above) — not needed if you only inject plaintext `[env.*]` defaults or resolve via fnox. Reference `@v0` for the moving major tag (re-pointed to each `0.x` release), or pin an exact release like `@v0.13.4` for immutability. `@v1` ships when envpkt reaches 1.0. Node is assumed present; add `actions/setup-node` first to pin a version.
 
 ### Anti-rot CI gate
 

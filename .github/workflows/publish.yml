@@ -48,3 +48,13 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Keep the moving major action tag (e.g. v0) pointed at the latest release,
+      # so `uses: jordanburke/envpkt@v0` always resolves to the newest 0.x.
+      # v0.13.5 -> v0. (A bare major tag never triggers this workflow; see the
+      # full-semver trigger above.) Promote to v1 when envpkt reaches 1.0.0.
+      - name: Move major action tag
+        run: |
+          MAJOR="${GITHUB_REF_NAME%%.*}"
+          git tag -f "$MAJOR" "$GITHUB_SHA"
+          git push -f origin "refs/tags/$MAJOR"
