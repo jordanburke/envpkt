@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.6] - 2026-07-01
+
+### Changed
+
+- Refreshed the GitHub Action's Marketplace tagline: "Resolve sealed envpkt.toml credentials into
+  your CI job — masked in logs, one age key instead of N GitHub secrets."
+
+### Documentation
+
+- The envpkt skill now directs AI agents to change `envpkt.toml` through the CLI (`secret`/`env`
+  CRUD, `seal`, `init`, `keygen`, `env scan`) rather than hand-editing the file.
+
+### Internal
+
+- Prettier no longer reformats `pnpm-lock.yaml` (added to `.prettierignore`), so `pnpm validate`
+  leaves a clean tree. Fixed a broken Markdown table in the skill quick-reference.
+
 ## [0.13.5] - 2026-06-30
 
 ### Changed
