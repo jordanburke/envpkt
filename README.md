@@ -141,6 +141,10 @@ See [`examples/`](./examples/) for more configurations.
 
 Sealed packets embed age-encrypted secret values directly in `envpkt.toml`. This makes your config fully self-contained — no external secrets backend needed at runtime.
 
+> **Requires the [`age`](https://github.com/FiloSottile/age) CLI.** envpkt shells out to `age` to seal and unseal `encrypted_value` — it's a runtime dependency, not bundled, and there is **no built-in / JS fallback**. Every path that decrypts a sealed value (`boot()`, `exec`, `env export`, `env github`, the GitHub Action) needs `age` on `PATH` plus the private key.
+>
+> **Gotcha — partial resolution hides a missing `age`.** Plaintext `[env.*]` defaults and fnox-backed values resolve _without_ `age`, so a config can look like it's working while every sealed secret silently fails to decrypt. If sealed values aren't showing up, confirm `age` is installed — `envpkt doctor` reports its presence.
+
 ### Setup
 
 ```bash
@@ -214,7 +218,7 @@ A composite action resolves the credentials in `envpkt.toml` into the CI job —
 
 **Inputs:** `config`, `version` (npm version to run, default `latest`), `strict`, `profile`.
 
-> Decrypting sealed packets requires the [`age`](https://github.com/FiloSottile/age) CLI on the runner (install it first, as above) — not needed if you only inject plaintext `[env.*]` defaults or resolve via fnox. Reference `@v0` for the moving major tag (re-pointed to each `0.x` release), or pin an exact release like `@v0.13.4` for immutability. `@v1` ships when envpkt reaches 1.0. Node is assumed present; add `actions/setup-node` first to pin a version.
+> **The [`age`](https://github.com/FiloSottile/age) CLI is required on the runner to unseal `encrypted_value` packets** (install it first, as above) — envpkt shells out to `age`, with no bundled/JS fallback. Without it, sealed secrets won't decrypt or be injected, even though plaintext `[env.*]` defaults and fnox-backed values still resolve — which can mask the missing dependency until a sealed value turns up empty downstream. Reference `@v0` for the moving major tag (re-pointed to each `0.x` release), or pin an exact release like `@v0.13.6` for immutability. `@v1` ships when envpkt reaches 1.0. Node is assumed present; add `actions/setup-node` first to pin a version.
 
 ### Anti-rot CI gate
 

@@ -73,13 +73,18 @@ identity.key_file  >  ENVPKT_AGE_KEY_FILE  >  ENVPKT_AGE_KEY (inline)  >  ~/.env
 
 :::caution[Sealed packets need the `age` CLI on the runner]
 Decrypting `encrypted_value` packets shells out to [`age`](https://github.com/FiloSottile/age),
-which is **not** preinstalled on GitHub-hosted runners. Install it before the `envpkt` step:
+which is **not** preinstalled on GitHub-hosted runners and has **no bundled/JS fallback** — it's
+a hard requirement for unsealing. Install it before the `envpkt` step:
 
 ```yaml
 - run: sudo apt-get update && sudo apt-get install -y age
 ```
 
 (Not needed if you only inject plaintext `[env.*]` defaults, or resolve via fnox.)
+
+**Gotcha:** because those plaintext defaults and fnox values resolve _without_ `age`, a run can
+look healthy while every sealed secret silently fails to decrypt. If sealed values aren't showing
+up in later steps, confirm `age` is installed — don't assume the packets are the problem.
 :::
 
 ## Masking

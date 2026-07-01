@@ -41,6 +41,23 @@ npx envpkt env scan
 npx envpkt audit
 ```
 
+## The `age` CLI (required for sealed packets)
+
+envpkt itself needs only Node. But **sealing and unsealing `encrypted_value` packets shells out to
+the [`age`](https://github.com/FiloSottile/age) CLI** — it's a runtime dependency with no
+bundled/JS fallback. Install it if you use sealed packets:
+
+```bash
+# macOS
+brew install age
+# Debian/Ubuntu (and most CI runners)
+sudo apt-get update && sudo apt-get install -y age
+```
+
+You do **not** need `age` if you only use plaintext `[env.*]` defaults or resolve secrets via
+fnox. Because those paths resolve without `age`, a config can appear to work while sealed secrets
+silently fail to decrypt — run `envpkt doctor` to confirm `age` is detected.
+
 ## Library Usage
 
 envpkt is also a TypeScript library. Import functions directly:
