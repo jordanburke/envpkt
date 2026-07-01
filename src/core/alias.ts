@@ -108,12 +108,11 @@ const collectValidated = <M>(
   items.reduce<Either<AliasError, ReadonlyArray<ValidatedPair>>>(
     (acc, [key, meta]) =>
       acc.flatMap((entries) =>
-        validate(key, meta).map(
-          (opt): ReadonlyArray<ValidatedPair> =>
-            opt.fold(
-              () => entries,
-              (entry) => [...entries, [`${prefix}.${key}`, entry] as ValidatedPair],
-            ),
+        validate(key, meta).map((opt): ReadonlyArray<ValidatedPair> =>
+          opt.fold(
+            () => entries,
+            (entry) => [...entries, [`${prefix}.${key}`, entry] as ValidatedPair],
+          ),
         ),
       ),
     Right([]),

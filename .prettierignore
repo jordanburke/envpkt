@@ -1,2 +1,8 @@
 node_modules
 .DS_Store
+
+# Generated / tool-managed files — Prettier must not reformat these.
+# pnpm manages the lockfile; reformatting it churns ~1k lines every validate.
+pnpm-lock.yaml
+dist
+coverage
