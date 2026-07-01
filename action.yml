@@ -1,5 +1,5 @@
 name: "envpkt"
-description: "Resolve envpkt.toml credentials into the job environment for GitHub Actions, with secret values masked in the log."
+description: "Resolve sealed envpkt.toml credentials into your CI job — masked in logs, one age key instead of N GitHub secrets."
 author: "jordanburke"
 branding:
   icon: "package"
