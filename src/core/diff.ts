@@ -1,4 +1,4 @@
-/* eslint-disable functype/prefer-option, functype/prefer-fold -- ConfigDiff is a JSON-serializable DTO (round-trips through `diff --format json`); fields use `string | undefined` where undefined means "field absent on that side". Option has no place in the serialized shape. */
+/* eslint-disable functype/prefer-option -- ConfigDiff is a JSON-serializable DTO (round-trips through `diff --format json`); fields use `string | undefined` where undefined means "field absent on that side". Option has no place in the serialized shape. */
 import type { EnvMeta, EnvpktConfig, SecretMeta } from "./schema.js"
 
 /** A single field that differs between two entries. `undefined` means the field is absent on that side. */
