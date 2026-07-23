@@ -281,6 +281,15 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
       process.exit(2)
     }
 
+    const externalKeys = editKeys.filter((k) => allSecretEntries[k]!.external === true)
+    if (externalKeys.length > 0) {
+      console.error(`${RED}Error:${RESET} Cannot seal external entries: ${externalKeys.join(", ")}`)
+      console.error(
+        `${DIM}external = true means the value is managed outside envpkt — set it in that store instead.${RESET}`,
+      )
+      process.exit(2)
+    }
+
     if (!process.stdin.isTTY) {
       console.error(`${RED}Error:${RESET} --edit requires an interactive terminal`)
       process.exit(2)
@@ -329,17 +338,28 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   }
 
   // Partition secrets into already-sealed and unsealed.
-  // Aliases (entries with from_key) are skipped entirely — they reference
-  // another secret's value and cannot themselves be sealed.
+  // Aliases (from_key) and external entries (value managed outside envpkt) are
+  // skipped entirely — neither can be sealed here.
   const allSecretEntries = config.secret ?? {}
-  const allKeys = Object.keys(allSecretEntries).filter((k) => allSecretEntries[k]!.from_key === undefined)
+  const allKeys = Object.keys(allSecretEntries).filter(
+    (k) => allSecretEntries[k]!.from_key === undefined && allSecretEntries[k]!.external !== true,
+  )
   const skippedAliases = Object.keys(allSecretEntries).filter((k) => allSecretEntries[k]!.from_key !== undefined)
+  const skippedExternal = Object.keys(allSecretEntries).filter(
+    (k) => allSecretEntries[k]!.from_key === undefined && allSecretEntries[k]!.external === true,
+  )
   const alreadySealed = allKeys.filter((k) => allSecretEntries[k]!.encrypted_value)
   const unsealed = allKeys.filter((k) => !allSecretEntries[k]!.encrypted_value)
 
   if (skippedAliases.length > 0) {
     const noun = skippedAliases.length === 1 ? "alias" : "aliases"
     console.error(`${DIM}Skipping ${skippedAliases.length} ${noun}: ${skippedAliases.join(", ")}${RESET}`)
+  }
+
+  if (skippedExternal.length > 0) {
+    console.error(
+      `${DIM}Skipping ${skippedExternal.length} external (value managed outside envpkt): ${skippedExternal.join(", ")}${RESET}`,
+    )
   }
 
   // Skip already-sealed unless --reseal

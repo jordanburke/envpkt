@@ -195,6 +195,10 @@
               "description": "Whether this secret is required for operation",
               "type": "boolean"
             },
+            "external": {
+              "description": "Value is managed outside envpkt (e.g. a Cloudflare/Vault secret). The entry registers the name for inventory and dev/prod parity only: seal never touches it, and audit reports it as 'external' rather than 'missing'.",
+              "type": "boolean"
+            },
             "tags": {
               "description": "Key-value tags for grouping and filtering",
               "type": "object",

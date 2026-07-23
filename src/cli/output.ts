@@ -49,6 +49,8 @@ const secretStatusIcon = (status: string): string => {
       return `${RED}?${RESET}`
     case "missing_metadata":
       return `${YELLOW}!${RESET}`
+    case "external":
+      return `${CYAN}↗${RESET}`
     default:
       return " "
   }
@@ -82,13 +84,16 @@ export const formatAudit = (audit: AuditResult): string => {
     audit.stale > 0 ? `  ${YELLOW}${audit.stale}${RESET} stale` : null,
     audit.missing > 0 ? `  ${RED}${audit.missing}${RESET} missing` : null,
     audit.missing_metadata > 0 ? `  ${YELLOW}${audit.missing_metadata}${RESET} missing metadata` : null,
+    audit.external > 0 ? `  ${CYAN}${audit.external}${RESET} external` : null,
     audit.orphaned > 0 ? `  ${YELLOW}${audit.orphaned}${RESET} orphaned` : null,
   ]
     .filter(Boolean)
     .join("\n")
 
+  // external is intentional (value lives elsewhere), so — like healthy — it is
+  // summarised as a count rather than listed as something needing attention.
   const details = audit.secrets
-    .filter((s) => s.status !== "healthy")
+    .filter((s) => s.status !== "healthy" && s.status !== "external")
     .map(formatSecretRow)
     .toArray()
     .join("\n")

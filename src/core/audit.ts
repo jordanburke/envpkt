@@ -1,4 +1,4 @@
-import { $, Cond, Do, List, Map as FMap, Option, Set as FSet } from "functype"
+import { $, Cond, Do, List, Map as FMap, Option } from "functype"
 
 import { makeEnvNamer } from "./namespace.js"
 import type { EnvpktConfig } from "./schema.js"
@@ -60,7 +60,10 @@ const classifySecret = (
     (d) => d > staleWarningDays,
   )
   const hasSealed = !!meta.encrypted_value
-  const isMissing = fnoxKeys.size > 0 && !fnoxKeys.has(key) && !hasSealed
+  // external: value lives outside envpkt (CF/Vault/etc). It is never "missing" —
+  // absence of a sealed/fnox value is expected — but expiry/staleness still apply.
+  const isExternal = meta.external === true
+  const isMissing = !isExternal && fnoxKeys.size > 0 && !fnoxKeys.has(key) && !hasSealed
 
   const isMissingMetadata = (requireExpiration && expires.isNone()) || (requireService && service.isNone())
 
@@ -93,6 +96,7 @@ const classifySecret = (
     .elseWhen(isMissingMetadata, "missing_metadata")
     .elseWhen(isExpiringSoon, "expiring_soon")
     .elseWhen(isStale, "stale")
+    .elseWhen(isExternal, "external")
     .else("healthy")
 
   return {
@@ -155,7 +159,6 @@ export const computeAudit = (
   // Non-alias entries: classify normally
   const nonAliasEntries = Object.entries(secretEntries).filter(([, meta]) => meta.from_key === undefined)
   const aliasEntries = Object.entries(secretEntries).filter(([, meta]) => meta.from_key !== undefined)
-  const nonAliasMetaKeys = FSet(nonAliasEntries.map(([k]) => k))
 
   const nonAliasHealth = nonAliasEntries.map(([key, meta]) =>
     classifySecret(key, meta, keys, staleWarningDays, requireExpiration, requireService, now),
@@ -205,9 +208,11 @@ export const computeAudit = (
 
   const secrets = List([...nonAliasHealth, ...aliasHealth])
 
-  // Count orphaned: non-alias secret entries that don't have a corresponding fnox key
-  // Only count when fnox keys are available
-  const orphaned = keys.size > 0 ? nonAliasMetaKeys.toArray().filter((k) => !keys.has(k)).length : 0
+  // Count orphaned: non-alias secret entries that don't have a corresponding fnox key.
+  // Only count when fnox keys are available. External entries are excluded — their
+  // value lives outside envpkt/fnox by design, so absence from fnox is expected.
+  const orphaned =
+    keys.size > 0 ? nonAliasEntries.filter(([k, meta]) => !keys.has(k) && meta.external !== true).length : 0
 
   const total = secrets.size
   const expired = secrets.count((s) => s.status === "expired")
@@ -215,6 +220,7 @@ export const computeAudit = (
   const missing_metadata = secrets.count((s) => s.status === "missing_metadata")
   const expiring_soon = secrets.count((s) => s.status === "expiring_soon")
   const stale = secrets.count((s) => s.status === "stale")
+  const external = secrets.count((s) => s.status === "external")
   const healthy = secrets.count((s) => s.status === "healthy")
   const aliases = aliasHealth.length
 
@@ -233,6 +239,7 @@ export const computeAudit = (
     stale,
     missing,
     missing_metadata,
+    external,
     orphaned,
     aliases,
     identity: config.identity,

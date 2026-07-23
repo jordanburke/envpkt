@@ -117,6 +117,58 @@ from_key = "secret.REAL_KEY"
     expect(stdout).toContain("alias")
     expect(stdout).toContain("from_key")
   })
+
+  it("skips external entries instead of trying to seal them", () => {
+    writeFileSync(
+      configPath,
+      `version = 1
+
+[identity]
+name = "test"
+recipient = "${recipient}"
+
+[secret.REAL_KEY]
+service = "real"
+
+[secret.CF_MANAGED]
+service = "supabase"
+external = true
+`,
+    )
+
+    const { status, stdout } = run(["seal", "-c", configPath], { REAL_KEY: "real-value" })
+    expect(status).toBe(0)
+    // The external entry must NOT have been sealed.
+    const content = readFileSync(configPath, "utf-8")
+    const extSection = content.slice(content.indexOf("[secret.CF_MANAGED]"))
+    expect(extSection).not.toContain("encrypted_value")
+    // The real key MUST still be sealed.
+    const realSection = content.slice(content.indexOf("[secret.REAL_KEY]"), content.indexOf("[secret.CF_MANAGED]"))
+    expect(realSection).toContain("encrypted_value")
+    expect(loadConfig(configPath).isRight()).toBe(true)
+    expect(stdout).toContain("Skipping")
+    expect(stdout).toContain("external")
+  })
+
+  it("--edit refuses to seal an external entry with a clear message", () => {
+    writeFileSync(
+      configPath,
+      `version = 1
+
+[identity]
+name = "test"
+recipient = "${recipient}"
+
+[secret.CF_MANAGED]
+service = "supabase"
+external = true
+`,
+    )
+
+    const { status, stdout } = run(["seal", "--edit", "CF_MANAGED", "-c", configPath])
+    expect(status).toBe(2)
+    expect(stdout).toContain("external")
+  })
 })
 
 describe("collectEditedValues (--edit confirm-on-overwrite)", () => {

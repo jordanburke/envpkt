@@ -23,7 +23,8 @@ export type AgentIdentity = Identity
 
 export type HealthStatus = "healthy" | "degraded" | "critical"
 
-export type SecretStatus = "healthy" | "expiring_soon" | "expired" | "stale" | "missing" | "missing_metadata"
+export type SecretStatus =
+  "healthy" | "expiring_soon" | "expired" | "stale" | "missing" | "missing_metadata" | "external"
 
 // --- Audit types ---
 
@@ -52,6 +53,8 @@ export type AuditResult = {
   readonly stale: number
   readonly missing: number
   readonly missing_metadata: number
+  /** Count of entries whose value is managed outside envpkt (external = true). Reported, not a health problem. */
+  readonly external: number
   readonly orphaned: number
   /** Count of entries that are aliases (from_key). Included in `secrets` but reported separately for visibility. */
   readonly aliases: number

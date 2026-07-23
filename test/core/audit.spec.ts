@@ -188,6 +188,43 @@ describe("computeAudit", () => {
     )
   })
 
+  it("reports external secrets as 'external', never 'missing', even under fnox", () => {
+    const config = makeConfig({
+      KNOWN_KEY: { service: "api" },
+      CF_MANAGED: { service: "supabase", external: true },
+    })
+
+    // fnox is in use and CF_MANAGED is absent from it — without `external` this
+    // would be classified "missing" (critical). external must keep it healthy.
+    const fnoxKeys = new Set(["KNOWN_KEY"])
+    const result = computeAudit(config, fnoxKeys, today)
+
+    expect(result.status).toBe("healthy")
+    expect(result.missing).toBe(0)
+    expect(result.external).toBe(1)
+    expect(result.orphaned).toBe(0)
+
+    const ext = result.secrets.find((s) => s.key === "CF_MANAGED")
+    ext.fold(
+      () => expect.unreachable("Expected to find CF_MANAGED"),
+      (s) => {
+        expect(s.status).toBe("external")
+        expect(s.issues.toArray()).not.toContain("Key not found in fnox")
+      },
+    )
+  })
+
+  it("still flags an expired external secret", () => {
+    const config = makeConfig({
+      EXT_EXPIRED: { service: "vault", external: true, created: "2024-01-01", expires: "2025-01-01" },
+    })
+
+    const result = computeAudit(config, undefined, today)
+    expect(result.status).toBe("critical")
+    expect(result.expired).toBe(1)
+    expect(result.external).toBe(0) // expiry takes precedence over the external label
+  })
+
   it("handles mixed statuses correctly", () => {
     const config = makeConfig({
       HEALTHY: { service: "ok", created: "2025-04-01", expires: "2026-01-01" },

@@ -106,6 +106,12 @@ export const SecretMetaSchema = Type.Object(
     ),
     // Tier 4: enforcement/extensibility
     required: Type.Optional(Type.Boolean({ description: "Whether this secret is required for operation" })),
+    external: Type.Optional(
+      Type.Boolean({
+        description:
+          "Value is managed outside envpkt (e.g. a Cloudflare/Vault secret). The entry registers the name for inventory and dev/prod parity only: seal never touches it, and audit reports it as 'external' rather than 'missing'.",
+      }),
+    ),
     tags: Type.Optional(
       Type.Record(Type.String(), Type.String(), { description: "Key-value tags for grouping and filtering" }),
     ),
