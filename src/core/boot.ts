@@ -99,9 +99,16 @@ export const resolveSealIdentity = (config: EnvpktConfig, configDir: string): Op
   if (inlineKey) {
     return Option<IdentitySource>(materializeInlineKey(inlineKey))
   }
-  const defaultPath = join(homedir(), ".envpkt", "age-key.txt")
-  if (existsSync(defaultPath)) {
-    return Option<IdentitySource>({ path: defaultPath, dispose: noop })
+  // The implicit homedir default is a "nothing was configured" convenience. When the config
+  // explicitly names identity.key_file, that key identifies a specific recipient — falling back
+  // to an unrelated ~/.envpkt/age-key.txt can only ever produce a "no identity matched any of the
+  // recipients" decrypt error and mask the real problem (the configured key is absent). Skip it so
+  // a configured-but-missing key surfaces cleanly as SealKeyUnavailable.
+  if (!config.identity?.key_file) {
+    const defaultPath = join(homedir(), ".envpkt", "age-key.txt")
+    if (existsSync(defaultPath)) {
+      return Option<IdentitySource>({ path: defaultPath, dispose: noop })
+    }
   }
   return Option<IdentitySource>(undefined)
 }
@@ -118,7 +125,11 @@ export const describeSealKeySearch = (config: EnvpktConfig, configDir: string): 
     : `ENVPKT_AGE_KEY_FILE (unset)`
   const inlineLine = resolveInlineKey().isEmpty ? `ENVPKT_AGE_KEY (unset)` : `ENVPKT_AGE_KEY (set, inline)`
   const defaultPath = join(homedir(), ".envpkt", "age-key.txt")
-  const defaultLine = `${defaultPath} (${existsSync(defaultPath) ? "found" : "missing"})`
+  // When identity.key_file is set, the homedir default is intentionally skipped (it would be the
+  // wrong recipient) — reflect that here rather than reporting it as an available fallback.
+  const defaultLine = keyFile
+    ? `${defaultPath} (skipped — identity.key_file is set)`
+    : `${defaultPath} (${existsSync(defaultPath) ? "found" : "missing"})`
   return [keyFileLine, envFileLine, inlineLine, defaultLine]
 }
 
@@ -266,6 +277,9 @@ export const bootSafe = (options?: BootOptions): Either<BootError, BootResult> =
             _tag: "SealKeyUnavailable" as const,
             sealedKeys: nonAliasMetaKeys.filter((k) => !!nonAliasSecretEntries[k]?.encrypted_value),
             searched: describeSealKeySearch(config, configDir),
+            configuredKeyFile: config.identity?.key_file
+              ? resolve(configDir, expandPath(config.identity.key_file))
+              : undefined,
           })
         }
 
@@ -507,12 +521,17 @@ const formatBootError = (error: BootError): string => {
     case "SealKeyUnavailable": {
       const keys = error.sealedKeys.length
       const searched = error.searched.map((line) => `  • ${line}`).join("\n")
+      // If the config named a key_file, restoring it (not the homedir default) is the fix —
+      // the default is deliberately skipped when key_file is set.
+      const restoreLine = error.configuredKeyFile
+        ? `  • Restore the configured key to ${error.configuredKeyFile} (or set ENVPKT_AGE_KEY_FILE / ENVPKT_AGE_KEY)`
+        : `  • Restore your key to ~/.envpkt/age-key.txt (or set ENVPKT_AGE_KEY_FILE / ENVPKT_AGE_KEY)`
       return [
         `${keys} sealed secret(s) can't be decrypted — no age key found.`,
         `Searched (in order):`,
         searched,
         `Fix one:`,
-        `  • Restore your key to ~/.envpkt/age-key.txt (or set ENVPKT_AGE_KEY_FILE / ENVPKT_AGE_KEY)`,
+        restoreLine,
         `  • Re-provision from source: envpkt seal --edit <KEY>`,
         `Refusing to inject empty values for sealed secrets.`,
       ].join("\n")

@@ -239,6 +239,9 @@ export type BootError =
       readonly _tag: "SealKeyUnavailable"
       readonly sealedKeys: ReadonlyArray<string>
       readonly searched: ReadonlyArray<string>
+      // The configured identity.key_file path (expanded), when one was set — so the fix hint
+      // can point at the right location instead of the generic homedir default.
+      readonly configuredKeyFile?: string
     }
   | IdentityError
 

@@ -187,13 +187,22 @@ export const formatError = (error: { _tag: string; message?: string; path?: stri
     case "IdentityNotFound":
       return `${RED}Error:${RESET} Identity file not found: ${error.path}`
     case "SealKeyUnavailable": {
-      const e = error as unknown as { sealedKeys: ReadonlyArray<string>; searched: ReadonlyArray<string> }
+      const e = error as unknown as {
+        sealedKeys: ReadonlyArray<string>
+        searched: ReadonlyArray<string>
+        configuredKeyFile?: string
+      }
+      // When identity.key_file was configured, point the fix at that path — the homedir
+      // default is deliberately skipped, so advising a restore there would be wrong.
+      const restoreLine = e.configuredKeyFile
+        ? `  • Restore the configured key to ${e.configuredKeyFile} (or set ENVPKT_AGE_KEY_FILE / ENVPKT_AGE_KEY)`
+        : `  • Restore your key to ~/.envpkt/age-key.txt (or set ENVPKT_AGE_KEY_FILE / ENVPKT_AGE_KEY)`
       return [
         `${RED}Error:${RESET} ${e.sealedKeys.length} sealed secret(s) can't be decrypted — no age key found.`,
         `${DIM}Searched (in order):${RESET}`,
         e.searched.map((l) => `  • ${l}`).join("\n"),
         `${DIM}Fix one:${RESET}`,
-        `  • Restore your key to ~/.envpkt/age-key.txt (or set ENVPKT_AGE_KEY_FILE / ENVPKT_AGE_KEY)`,
+        restoreLine,
         `  • Re-provision from source: envpkt seal --edit <KEY>`,
       ].join("\n")
     }

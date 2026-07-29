@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { mkdtempSync, readdirSync, writeFileSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, readdirSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
@@ -591,6 +591,27 @@ describe("bootSafe fail-fast on missing seal key (B1)", () => {
         }
       },
       () => expect.unreachable("Expected Left(SealKeyUnavailable)"),
+    )
+  })
+
+  it("with an explicit but missing key_file, does NOT fall back to ~/.envpkt/age-key.txt", () => {
+    // A default key exists in HOME, but it belongs to a different recipient. An explicit
+    // key_file that is absent must NOT resolve to that default (which only yields a
+    // "no identity matched any of the recipients" decrypt failure and masks the real
+    // problem) — it must surface cleanly as SealKeyUnavailable.
+    mkdirSync(join(isolatedHome, ".envpkt"), { recursive: true })
+    writeFileSync(join(isolatedHome, ".envpkt", "age-key.txt"), "AGE-SECRET-KEY-1UNRELATEDKEY\n", { mode: 0o600 })
+
+    const result = bootSafe({ configPath: sealedConfig([`key_file = "missing-key.txt"`]), inject: false })
+    result.fold(
+      (err) => {
+        expect(err._tag).toBe("SealKeyUnavailable")
+        if (err._tag === "SealKeyUnavailable") {
+          // The searched list must show the default was skipped, not silently used.
+          expect(err.searched.join("\n")).toMatch(/skipped — identity\.key_file is set/)
+        }
+      },
+      () => expect.unreachable("Expected Left(SealKeyUnavailable), not a wrong-key decrypt"),
     )
   })
 

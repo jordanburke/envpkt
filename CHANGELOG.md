@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-07-29
+
+### Fixed
+
+- A configured-but-missing `identity.key_file` no longer silently falls back to the homedir
+  default `~/.envpkt/age-key.txt`. That default is almost always a different recipient's key, so
+  the fallback could only ever produce a cryptic `age: no identity matched any of the recipients`
+  decrypt failure while masking the real problem (the configured key is absent). An explicit
+  `key_file` that can't be found now surfaces a clear `SealKeyUnavailable` error that names the
+  missing path and shows the default was deliberately skipped. Explicit env sources
+  (`ENVPKT_AGE_KEY_FILE`, `ENVPKT_AGE_KEY`) still take over as before — the CI path is unchanged.
+
 ## [0.13.6] - 2026-07-01
 
 ### Changed
