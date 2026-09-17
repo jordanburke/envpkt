@@ -42,16 +42,16 @@
     "@modelcontextprotocol/sdk": "^1.30.0",
     "@sinclair/typebox": "^0.34.52",
     "commander": "^15.0.0",
-    "functype": "^1.8.0",
-    "functype-log": "^1.8.0",
-    "functype-os": "^1.8.0",
-    "smol-toml": "^1.7.1"
+    "functype": "^1.9.0",
+    "functype-log": "^1.9.0",
+    "functype-os": "^1.9.0",
+    "smol-toml": "^1.8.0"
   },
   "devDependencies": {
-    "@types/node": "^24.13.3",
-    "ts-builds": "^3.2.3",
+    "@types/node": "^24.13.5",
+    "ts-builds": "^3.4.1",
     "tsdown": "^0.22.14",
-    "tsx": "^4.23.1"
+    "tsx": "^4.23.13"
   },
   "type": "module",
   "main": "./dist/index.js",
