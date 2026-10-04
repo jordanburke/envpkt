@@ -7,6 +7,7 @@ export {
   EnvpktConfigSchema,
   IdentitySchema,
   LifecycleConfigSchema,
+  McpHeaderSchema,
   SecretMetaSchema,
   ToolsConfigSchema,
 } from "./core/schema.js"
@@ -40,6 +41,9 @@ export type {
   KeygenError,
   KeygenResult,
   LifecycleConfig,
+  McpConfigError,
+  McpHeader,
+  McpHeadersError,
   ResolvedPath,
   ResolveOptions,
   ResolveResult,
@@ -68,6 +72,9 @@ export { loadCatalog, resolveConfig, resolveSecrets } from "./core/catalog.js"
 
 // Alias validation
 export { formatAliasError, isEnvAlias, isSecretAlias, validateAliases } from "./core/alias.js"
+
+// MCP header bindings (Claude Code headersHelper)
+export { buildMcpHeaders, formatMcpHeadersError, validateMcpHeaders } from "./core/mcp-headers.js"
 
 // Packet formatting
 export type { FormatPacketOptions, SecretDisplay } from "./core/format.js"

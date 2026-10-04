@@ -4,9 +4,7 @@
   "title": "envpkt configuration",
   "description": "Credential lifecycle and fleet management configuration for AI agents",
   "type": "object",
-  "required": [
-    "version"
-  ],
+  "required": ["version"],
   "properties": {
     "version": {
       "description": "Schema version number",
@@ -33,9 +31,7 @@
     "namespace": {
       "description": "Optional namespace/package prefix for injected environment variable names",
       "type": "object",
-      "required": [
-        "prefix"
-      ],
+      "required": ["prefix"],
       "properties": {
         "prefix": {
           "description": "Namespace prefix applied to all injected env/secret names (e.g. 'CIV' -> CIV__API_KEY)",
@@ -51,9 +47,7 @@
     "identity": {
       "description": "Identity and capabilities of the principal using this envpkt",
       "type": "object",
-      "required": [
-        "name"
-      ],
+      "required": ["name"],
       "properties": {
         "name": {
           "description": "Display name",
@@ -211,6 +205,33 @@
             "namespace": {
               "description": "Override the file-level namespace for this entry's injected name. Empty string opts out of any prefix.",
               "type": "string"
+            },
+            "mcp": {
+              "description": "MCP servers this secret authenticates to. Read by `envpkt headers` (Claude Code headersHelper).",
+              "type": "array",
+              "items": {
+                "description": "Send this secret as an HTTP header to an MCP server",
+                "type": "object",
+                "required": ["server"],
+                "properties": {
+                  "server": {
+                    "minLength": 1,
+                    "description": "MCP server name, as keyed in .mcp.json",
+                    "type": "string"
+                  },
+                  "header": {
+                    "default": "Authorization",
+                    "minLength": 1,
+                    "description": "HTTP header name to send the secret in",
+                    "type": "string"
+                  },
+                  "scheme": {
+                    "default": "Bearer",
+                    "description": "Prefix placed before the value (e.g. 'Bearer'). Empty string sends the raw value.",
+                    "type": "string"
+                  }
+                }
+              }
             }
           }
         }

@@ -76,6 +76,25 @@ The MCP server does not have access to secret values — this is an architectura
 
 This means prompt injection attacks against the MCP layer cannot leak secret values — there are no secret values to leak. See the [Security Model](https://github.com/jordanburke/envpkt#security-model) in the README for the full three-tier trust model.
 
+## Authenticating other MCP servers
+
+The envpkt MCP server never sees secret values. To send a secret to a **different** HTTP MCP server, use [`envpkt headers`](/cli/headers/) as that server's Claude Code `headersHelper`:
+
+```toml
+[secret.GITHUB_MCP_API_KEY]
+mcp = [{ server = "civala-github" }]
+```
+
+```json
+{
+  "mcpServers": {
+    "civala-github": { "type": "http", "url": "https://github.civala.ai/mcp", "headersHelper": "envpkt headers" }
+  }
+}
+```
+
+The helper runs outside the model's context. Claude Code reads the headers from its stdout and sends them with each request. Stdio servers don't use `headersHelper`; wrap them with [`envpkt exec`](/cli/exec/).
+
 ## Library API
 
 ```typescript

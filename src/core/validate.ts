@@ -2,13 +2,14 @@ import type { Either } from "functype"
 
 import { formatAliasError, validateAliases } from "./alias.js"
 import { parseToml, validateConfig } from "./config.js"
-import type { AliasError, ConfigError, EnvpktConfig } from "./types.js"
+import { formatMcpHeadersError, validateMcpHeaders } from "./mcp-headers.js"
+import type { AliasError, ConfigError, EnvpktConfig, McpConfigError } from "./types.js"
 
 /** Union of structural validation failures — what `validateRawConfig` can return on the Left. */
-export type ValidationError = ConfigError | AliasError
+export type ValidationError = ConfigError | AliasError | McpConfigError
 
 /**
- * Validate a raw TOML string as a complete envpkt config: parse → schema → aliases.
+ * Validate a raw TOML string as a complete envpkt config: parse → schema → aliases → mcp.
  *
  * Used by write-path CLI commands to verify the post-edit file would still be
  * structurally valid before persisting. Catalog resolution is intentionally
@@ -20,6 +21,7 @@ export const validateRawConfig = (raw: string): Either<ValidationError, EnvpktCo
   parseToml(raw)
     .flatMap(validateConfig)
     .flatMap((config) => validateAliases(config).map(() => config))
+    .flatMap((config) => validateMcpHeaders(config).map(() => config))
 
 /** Human-readable one-liner for any ValidationError tag. */
 export const formatValidationError = (err: ValidationError): string => {
@@ -39,5 +41,9 @@ export const formatValidationError = (err: ValidationError): string => {
     case "AliasCrossType":
     case "AliasValueConflict":
       return formatAliasError(err)
+    case "McpHeaderInvalid":
+    case "McpSchemeInvalid":
+    case "McpHeaderDuplicate":
+      return formatMcpHeadersError(err)
   }
 }

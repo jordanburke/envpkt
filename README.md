@@ -584,6 +584,21 @@ Inject resolved secrets into a GitHub Actions job. Emits `::add-mask::` for each
 npx envpkt env github --strict
 ```
 
+### `envpkt headers`
+
+Print the HTTP headers for one MCP server as JSON, for Claude Code's `headersHelper`. Bind a secret to a server with `mcp = [{ server = "civala-github" }]` (optional `header`, default `"Authorization"`; `scheme`, default `"Bearer"`, `""` for the raw value).
+
+```bash
+envpkt headers civala-github   # {"Authorization":"Bearer ..."}
+envpkt headers                 # server from $CLAUDE_CODE_MCP_SERVER_NAME
+```
+
+```json
+{ "type": "http", "url": "https://github.civala.ai/mcp", "headersHelper": "envpkt headers" }
+```
+
+stdout holds only the JSON; warnings and errors go to stderr. It decrypts sealed values through `identity.key_file`, so it works when Claude was launched with a stripped environment and `${VAR}` refs in `.mcp.json` would expand empty. Exits non-zero, naming the server, when nothing matches or a value does not resolve. Without `-c`, it finds `envpkt.toml` like every other command, falling back to the global package when the project has none.
+
 ### `envpkt mcp`
 
 Start the envpkt MCP server (stdio transport) for AI agent integration.

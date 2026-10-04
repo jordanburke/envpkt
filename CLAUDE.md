@@ -53,7 +53,7 @@ The validate chain is customized in `ts-builds.config.json` to include `build:sc
 
 ### CLI Layer (`src/cli/`)
 
-Commander-based CLI. Each command in `src/cli/commands/` maps 1:1 to a subcommand (`audit`, `env`, `exec`, `fleet`, `init`, `inspect`, `keygen`, `mcp`, `resolve`, `seal`, `shell-hook`). Output formatting is in `src/cli/output.ts`.
+Commander-based CLI. Each command in `src/cli/commands/` maps 1:1 to a subcommand (`audit`, `env`, `exec`, `fleet`, `headers`, `init`, `inspect`, `keygen`, `mcp`, `resolve`, `seal`, `shell-hook`). Output formatting is in `src/cli/output.ts`.
 
 ### MCP Layer (`src/mcp/`)
 
@@ -85,9 +85,16 @@ Tests mirror source: `test/core/`, `test/cli/`, `test/fnox/`, `test/e2e/`, `test
 
 ## Publishing
 
+CI publishes. Pushing a `vX.Y.Z` tag runs `.github/workflows/publish.yml`, which runs `pnpm validate` and `npm publish --provenance` through npm OIDC trusted publishing (no token). Do not run `npm publish` by hand.
+
 ```bash
-npm version patch|minor|major
-npm publish --access public
+npm version patch|minor|major --no-git-tag-version   # bump package.json
+# move CHANGELOG [Unreleased] under the new version, then:
+git commit -am "X.Y.Z" && git push
+# wait for Node.js CI on main to go green, then:
+git tag vX.Y.Z && git push origin vX.Y.Z
 ```
 
-`prepublishOnly` runs `pnpm validate`. The `schemas/` directory and JSON Schema export (`envpkt/schema`) are part of the published package.
+Push `main` first and tag only after CI passes: the tag triggers the publish, and a failed publish job can't be retried safely.
+
+`.nvmrc` pins an exact Node version (`24.20.0`, npm 11.19.0): a bare major lets the runner pick an npm whose OIDC exchange fails with `E401 ... Failed to generate Web Auth URLs`. The workflow also moves the major action tag (e.g. `v0`). `prepublishOnly` runs `pnpm validate`. The `schemas/` directory and JSON Schema export (`envpkt/schema`) are part of the published package.

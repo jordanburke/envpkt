@@ -2,30 +2,31 @@
 
 ## CLI Commands
 
-| Command                            | Description                   | Key Options                                                      |
-| ---------------------------------- | ----------------------------- | ---------------------------------------------------------------- |
-| `envpkt init`                      | Initialize `envpkt.toml`      | `--from-fnox`, `--identity`, `--name`, `--force`                 |
-| `envpkt audit`                     | Audit credential health       | `--strict`, `--format`, `--expiring <days>`, `--status`          |
-| `envpkt inspect`                   | Display config view           | `--resolved`, `--secrets`, `--plaintext`, `--format`             |
-| `envpkt exec <cmd>`                | Audit + run with injected env | `--skip-audit`, `--warn-only`, `--strict`, `--profile`           |
-| `envpkt seal`                      | Encrypt values with age       | `--profile`, `--reseal`, `--edit <keys>`                         |
-| `envpkt resolve`                   | Flatten catalog references    | `-o <path>`, `--format toml\|json`, `--dry-run`                  |
-| `envpkt fleet`                     | Scan directory tree health    | `-d <path>`, `--depth`, `--status`, `--format`                   |
-| `envpkt mcp`                       | Start MCP server (stdio)      | `-c <path>`                                                      |
-| `envpkt env scan`                  | Discover credentials in env   | `--write`, `--dry-run`, `--include-unknown`                      |
-| `envpkt env check`                 | Drift detection vs live env   | `--strict`, `--format`                                           |
-| `envpkt env export`                | Output `export` statements    | `--profile`, `--skip-audit`                                      |
-| `envpkt shell-hook <sh>`           | Shell cd-hook for warnings    | `zsh` or `bash`                                                  |
-| `envpkt secret add <name>`         | Add secret entry              | `--service`, `--purpose`, `--expires`, `--tags`, `--dry-run`     |
-| `envpkt secret edit <name>`        | Update secret metadata        | `--service`, `--purpose`, `--expires`, `--tags`, `--dry-run`     |
-| `envpkt secret rm <name>`          | Remove secret entry           | `-c`, `--dry-run`                                                |
-| `envpkt secret rename <old> <new>` | Rename secret entry           | `-c`, `--dry-run`                                                |
-| `envpkt secret alias <name>`       | Alias to another secret       | `--from secret.<KEY>` (req), `--purpose`, `--force`, `--dry-run` |
-| `envpkt env add <name> <value>`    | Add env default entry         | `--purpose`, `--comment`, `--tags`, `--dry-run`                  |
-| `envpkt env edit <name>`           | Update env entry fields       | `--value`, `--purpose`, `--comment`, `--tags`, `--dry-run`       |
-| `envpkt env rm <name>`             | Remove env entry              | `-c`, `--dry-run`                                                |
-| `envpkt env rename <old> <new>`    | Rename env entry              | `-c`, `--dry-run`                                                |
-| `envpkt env alias <name>`          | Alias to another env entry    | `--from env.<KEY>` (req), `--purpose`, `--force`, `--dry-run`    |
+| Command                            | Description                   | Key Options                                                                 |
+| ---------------------------------- | ----------------------------- | --------------------------------------------------------------------------- |
+| `envpkt init`                      | Initialize `envpkt.toml`      | `--from-fnox`, `--identity`, `--name`, `--force`                            |
+| `envpkt audit`                     | Audit credential health       | `--strict`, `--format`, `--expiring <days>`, `--status`                     |
+| `envpkt inspect`                   | Display config view           | `--resolved`, `--secrets`, `--plaintext`, `--format`                        |
+| `envpkt exec <cmd>`                | Audit + run with injected env | `--skip-audit`, `--warn-only`, `--strict`, `--profile`                      |
+| `envpkt seal`                      | Encrypt values with age       | `--profile`, `--reseal`, `--edit <keys>`                                    |
+| `envpkt resolve`                   | Flatten catalog references    | `-o <path>`, `--format toml\|json`, `--dry-run`                             |
+| `envpkt fleet`                     | Scan directory tree health    | `-d <path>`, `--depth`, `--status`, `--format`                              |
+| `envpkt mcp`                       | Start MCP server (stdio)      | `-c <path>`                                                                 |
+| `envpkt headers [server]`          | MCP server headers as JSON    | `-c <path>`, `--profile`; server defaults to `$CLAUDE_CODE_MCP_SERVER_NAME` |
+| `envpkt env scan`                  | Discover credentials in env   | `--write`, `--dry-run`, `--include-unknown`                                 |
+| `envpkt env check`                 | Drift detection vs live env   | `--strict`, `--format`                                                      |
+| `envpkt env export`                | Output `export` statements    | `--profile`, `--skip-audit`                                                 |
+| `envpkt shell-hook <sh>`           | Shell cd-hook for warnings    | `zsh` or `bash`                                                             |
+| `envpkt secret add <name>`         | Add secret entry              | `--service`, `--purpose`, `--expires`, `--tags`, `--dry-run`                |
+| `envpkt secret edit <name>`        | Update secret metadata        | `--service`, `--purpose`, `--expires`, `--tags`, `--dry-run`                |
+| `envpkt secret rm <name>`          | Remove secret entry           | `-c`, `--dry-run`                                                           |
+| `envpkt secret rename <old> <new>` | Rename secret entry           | `-c`, `--dry-run`                                                           |
+| `envpkt secret alias <name>`       | Alias to another secret       | `--from secret.<KEY>` (req), `--purpose`, `--force`, `--dry-run`            |
+| `envpkt env add <name> <value>`    | Add env default entry         | `--purpose`, `--comment`, `--tags`, `--dry-run`                             |
+| `envpkt env edit <name>`           | Update env entry fields       | `--value`, `--purpose`, `--comment`, `--tags`, `--dry-run`                  |
+| `envpkt env rm <name>`             | Remove env entry              | `-c`, `--dry-run`                                                           |
+| `envpkt env rename <old> <new>`    | Rename env entry              | `-c`, `--dry-run`                                                           |
+| `envpkt env alias <name>`          | Alias to another env entry    | `--from env.<KEY>` (req), `--purpose`, `--force`, `--dry-run`               |
 
 ## Library Functions
 
@@ -84,6 +85,14 @@
 | `isEnvAlias(meta)`        | `boolean`                        |
 | `formatAliasError(err)`   | `string`                         |
 
+### MCP Header Bindings
+
+| Function                                  | Returns                                           |
+| ----------------------------------------- | ------------------------------------------------- |
+| `buildMcpHeaders(config, values, server)` | `Either<McpHeadersError, Record<string, string>>` |
+| `validateMcpHeaders(config)`              | `Either<McpConfigError, void>`                    |
+| `formatMcpHeadersError(err)`              | `string`                                          |
+
 ### Pattern Matching
 
 | Function                     | Returns                    |
@@ -118,23 +127,24 @@
 
 ### `[secret.*]`
 
-| Field             | Tier   | Type                     | Description                          |
-| ----------------- | ------ | ------------------------ | ------------------------------------ |
-| `service`         | 1      | `string`                 | Service this secret authenticates to |
-| `expires`         | 1      | `YYYY-MM-DD`             | Secret expiration date               |
-| `rotation_url`    | 1      | `URL`                    | Where to rotate                      |
-| `purpose`         | 2      | `string`                 | Why this secret exists               |
-| `comment`         | 2      | `string`                 | Free-form annotation or note         |
-| `capabilities`    | 2      | `string[]`               | What operations it grants            |
-| `created`         | 2      | `YYYY-MM-DD`             | Provisioning date                    |
-| `rotates`         | 3      | `string`                 | Rotation schedule (e.g. `"90d"`)     |
-| `rate_limit`      | 3      | `string`                 | Rate limit info                      |
-| `model_hint`      | 3      | `string`                 | Suggested model/tier                 |
-| `source`          | 3      | `string`                 | Value origin (vault, ci, etc.)       |
-| `encrypted_value` | sealed | `string`                 | Age-encrypted ciphertext             |
-| `from_key`        | alias  | `"secret.<KEY>"`         | Alias — reuse another entry's value  |
-| `required`        | 4      | `boolean`                | Whether required for operation       |
-| `tags`            | 4      | `Record<string, string>` | Key-value tags                       |
+| Field             | Tier   | Type                           | Description                           |
+| ----------------- | ------ | ------------------------------ | ------------------------------------- |
+| `service`         | 1      | `string`                       | Service this secret authenticates to  |
+| `expires`         | 1      | `YYYY-MM-DD`                   | Secret expiration date                |
+| `rotation_url`    | 1      | `URL`                          | Where to rotate                       |
+| `purpose`         | 2      | `string`                       | Why this secret exists                |
+| `comment`         | 2      | `string`                       | Free-form annotation or note          |
+| `capabilities`    | 2      | `string[]`                     | What operations it grants             |
+| `created`         | 2      | `YYYY-MM-DD`                   | Provisioning date                     |
+| `rotates`         | 3      | `string`                       | Rotation schedule (e.g. `"90d"`)      |
+| `rate_limit`      | 3      | `string`                       | Rate limit info                       |
+| `model_hint`      | 3      | `string`                       | Suggested model/tier                  |
+| `source`          | 3      | `string`                       | Value origin (vault, ci, etc.)        |
+| `encrypted_value` | sealed | `string`                       | Age-encrypted ciphertext              |
+| `from_key`        | alias  | `"secret.<KEY>"`               | Alias — reuse another entry's value   |
+| `required`        | 4      | `boolean`                      | Whether required for operation        |
+| `tags`            | 4      | `Record<string, string>`       | Key-value tags                        |
+| `mcp`             | integ. | `{server, header?, scheme?}[]` | MCP servers to send it to as a header |
 
 ### `[env.*]`
 
@@ -164,25 +174,31 @@
 
 ## Error Tags
 
-| Tag                  | Source                  | Meaning                     |
-| -------------------- | ----------------------- | --------------------------- |
-| `FileNotFound`       | ConfigError             | envpkt.toml not found       |
-| `ParseError`         | ConfigError             | TOML parse failure          |
-| `ValidationError`    | ConfigError             | Schema validation failed    |
-| `ReadError`          | ConfigError             | File read error             |
-| `FnoxNotFound`       | FnoxError               | fnox CLI not installed      |
-| `FnoxCliError`       | FnoxError               | fnox command failed         |
-| `FnoxParseError`     | FnoxError               | fnox output parse failure   |
-| `AuditFailed`        | BootError               | Audit policy violation      |
-| `CatalogNotFound`    | CatalogError            | Catalog file missing        |
-| `CatalogLoadError`   | CatalogError            | Catalog load/parse error    |
-| `SecretNotInCatalog` | CatalogError            | Key not in catalog          |
-| `MissingSecretsList` | CatalogError            | No secrets list on identity |
-| `AgeNotFound`        | IdentityError           | age CLI not installed       |
-| `DecryptFailed`      | IdentityError/SealError | Decryption failure          |
-| `IdentityNotFound`   | IdentityError           | Identity file missing       |
-| `EncryptFailed`      | SealError               | Encryption failure          |
-| `NoRecipient`        | SealError               | No recipient public key     |
+| Tag                  | Source                  | Meaning                        |
+| -------------------- | ----------------------- | ------------------------------ |
+| `FileNotFound`       | ConfigError             | envpkt.toml not found          |
+| `ParseError`         | ConfigError             | TOML parse failure             |
+| `ValidationError`    | ConfigError             | Schema validation failed       |
+| `ReadError`          | ConfigError             | File read error                |
+| `FnoxNotFound`       | FnoxError               | fnox CLI not installed         |
+| `FnoxCliError`       | FnoxError               | fnox command failed            |
+| `FnoxParseError`     | FnoxError               | fnox output parse failure      |
+| `AuditFailed`        | BootError               | Audit policy violation         |
+| `CatalogNotFound`    | CatalogError            | Catalog file missing           |
+| `CatalogLoadError`   | CatalogError            | Catalog load/parse error       |
+| `SecretNotInCatalog` | CatalogError            | Key not in catalog             |
+| `MissingSecretsList` | CatalogError            | No secrets list on identity    |
+| `AgeNotFound`        | IdentityError           | age CLI not installed          |
+| `DecryptFailed`      | IdentityError/SealError | Decryption failure             |
+| `IdentityNotFound`   | IdentityError           | Identity file missing          |
+| `EncryptFailed`      | SealError               | Encryption failure             |
+| `NoRecipient`        | SealError               | No recipient public key        |
+| `McpHeaderInvalid`   | McpConfigError          | Header name not an HTTP token  |
+| `McpSchemeInvalid`   | McpConfigError          | Scheme not one word            |
+| `McpHeaderDuplicate` | McpConfigError          | (server, header) claimed twice |
+| `McpServerUnknown`   | McpHeadersError         | No secret names the server     |
+| `McpValueUnresolved` | McpHeadersError         | Bound value missing or empty   |
+| `McpValueInvalid`    | McpHeadersError         | Value has a line break/NUL     |
 
 ## Health Statuses
 

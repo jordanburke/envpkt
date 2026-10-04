@@ -365,3 +365,28 @@ envpkt inspect --secrets --plaintext
 # JSON output
 envpkt inspect --format json
 ```
+
+## Authenticate an HTTP MCP Server from envpkt.toml
+
+```toml
+# envpkt.toml — bind the secret to the server name used in .mcp.json
+[secret.GITHUB_MCP_API_KEY]
+mcp = [{ server = "civala-github" }]
+```
+
+```json
+{
+  "mcpServers": {
+    "civala-github": { "type": "http", "url": "https://github.civala.ai/mcp", "headersHelper": "envpkt headers" }
+  }
+}
+```
+
+```bash
+# Check what Claude Code will receive
+envpkt headers civala-github   # {"Authorization":"Bearer ..."}
+envpkt validate                # includes an "MCP headers" check
+```
+
+Works when Claude is launched with a stripped environment: envpkt decrypts with `identity.key_file`
+instead of relying on `${VAR}` expansion in `.mcp.json`.

@@ -11,6 +11,7 @@ export type {
   EnvpktConfig,
   Identity,
   LifecycleConfig,
+  McpHeader,
   Namespace,
   SecretMeta,
   ToolsConfig,
@@ -190,6 +191,25 @@ export type AliasError =
       readonly kind: "secret" | "env"
       readonly field: string
     }
+
+// --- MCP header types ---
+
+/** Structural problems in `mcp` bindings — caught by validation, independent of secret values. */
+export type McpConfigError =
+  | { readonly _tag: "McpHeaderInvalid"; readonly key: string; readonly server: string; readonly header: string }
+  | { readonly _tag: "McpSchemeInvalid"; readonly key: string; readonly server: string; readonly scheme: string }
+  | {
+      readonly _tag: "McpHeaderDuplicate"
+      readonly server: string
+      readonly header: string
+      readonly keys: ReadonlyArray<string>
+    }
+
+export type McpHeadersError =
+  | McpConfigError
+  | { readonly _tag: "McpServerUnknown"; readonly server: string }
+  | { readonly _tag: "McpValueUnresolved"; readonly server: string; readonly keys: ReadonlyArray<string> }
+  | { readonly _tag: "McpValueInvalid"; readonly server: string; readonly keys: ReadonlyArray<string> }
 
 // --- Boot types ---
 

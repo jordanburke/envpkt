@@ -191,6 +191,41 @@ Keys are type-prefixed (`"secret.<KEY>"` or `"env.<KEY>"`) so the two namespaces
 - `AuditResult.secrets` includes alias rows with `alias_of: Option<string>` and status inherited from the target; `AuditResult.aliases` counts them separately.
 - Cross-type and chained aliases fail at load time with `AliasError` variants — see [Error Types → AliasError](/reference/error-types/#aliaserror).
 
+## MCP Header Bindings
+
+Build the HTTP headers that [`envpkt headers`](/cli/headers/) prints for Claude Code's `headersHelper`.
+
+### `buildMcpHeaders(config, values, server)`
+
+Collect every secret whose [`mcp`](/reference/toml-schema/#mcp-header-bindings) list names `server` and merge them into one header object. `values` is keyed by logical secret name, as in `BootResult.secrets`, so aliases and namespaces are already resolved. Returns `Either<McpHeadersError, Record<string, string>>`. Only this server's bindings are checked.
+
+```typescript
+import { bootSafe, buildMcpHeaders, formatMcpHeadersError, loadConfig } from "envpkt"
+
+const config = loadConfig("./envpkt.toml").orThrow()
+
+bootSafe({ inject: false }).fold(
+  (err) => console.error(err._tag),
+  (boot) =>
+    buildMcpHeaders(config, boot.secrets, "civala-github").fold(
+      (err) => console.error(formatMcpHeadersError(err)),
+      (headers) => console.log(headers), // { Authorization: "Bearer ..." }
+    ),
+)
+```
+
+### `validateMcpHeaders(config)`
+
+Check every `mcp` binding: header names and schemes must be HTTP tokens, and no `(server, header)` pair may be claimed twice. Returns `Either<McpConfigError, void>`. `envpkt validate` and the CLI write gate call it.
+
+### `formatMcpHeadersError(error)`
+
+One-line message for any `McpHeadersError`. It names the server and secret keys and never includes a secret value.
+
+### `McpHeaderSchema`
+
+TypeBox schema for one `mcp` entry: `{ server, header?, scheme? }`.
+
 ## Catalog Resolution
 
 ### `resolveConfig(config, baseDir)`

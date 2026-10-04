@@ -28,6 +28,10 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           cache: "pnpm"
 
+      # Sealed-value tests decrypt with the `age` CLI, which is not preinstalled.
+      - name: Install age
+        run: sudo apt-get update && sudo apt-get install -y age
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

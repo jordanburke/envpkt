@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-10-04
+
+### Added
+
+- `envpkt headers [server]` prints the HTTP headers for one MCP server as a JSON object, for
+  Claude Code's `headersHelper` in `.mcp.json`. The server defaults to
+  `$CLAUDE_CODE_MCP_SERVER_NAME`. stdout carries only the JSON; warnings and errors go to stderr.
+  Values resolve exactly as in `env export` (sealed → fnox, aliases, namespaces), so HTTP MCP
+  servers authenticate even when Claude was launched with a stripped environment and `${VAR}`
+  refs in `.mcp.json` expand empty. Exits non-zero, naming the server, when no secret names it or
+  a bound value is missing, empty, fails to decrypt, or contains a line break. Only the requested
+  server's bindings are checked, so a broken binding elsewhere never blocks it.
+- `[secret.*].mcp` binds a secret to MCP servers: a list of `{ server, header?, scheme? }`.
+  `header` defaults to `"Authorization"`, `scheme` to `"Bearer"`; `scheme = ""` sends the raw
+  value. Secrets naming the same server merge into one header object. Older envpkt (verified on
+  0.13.4) accepts a config carrying `mcp` and ignores it, so configs can adopt it before every
+  machine upgrades.
+- `envpkt validate` (on the catalog-merged config) and the write gate reject a header name that is
+  not an HTTP token, a multi-word scheme, and two bindings claiming the same `(server, header)`
+  pair (header names compare case-insensitively).
+- Library: `buildMcpHeaders`, `validateMcpHeaders`, `formatMcpHeadersError`, `McpHeaderSchema`,
+  and the `McpConfigError` / `McpHeadersError` types.
+
+### Changed
+
+- Dependencies: `functype`, `functype-log` and `functype-os` ^1.9.0 → ^1.13.0, `smol-toml`
+  ^1.8.0 → ^1.9.0, `@modelcontextprotocol/sdk` ^1.30.0 → ^1.32.0. Dev: `ts-builds` ^3.4.3,
+  `tsx` ^4.23.15, `@types/node` ^24.19.1.
+- `.nvmrc` pins Node `24.20.0` (npm 11.19.0) instead of a bare `24`, so the OIDC publish job
+  cannot drift onto an npm whose trusted-publishing exchange fails.
+- CI and publish workflows install `age`, so sealed-value tests run in CI instead of skipping.
+
 ## [0.14.1] - 2026-07-29
 
 ### Fixed

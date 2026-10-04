@@ -1,4 +1,4 @@
-import { List, Option, Set as FSet } from "functype"
+import { List, Option, Set } from "functype"
 
 import { makeEnvNamer } from "./namespace.js"
 import type { ConfidenceLevel, MatchResult } from "./patterns.js"
@@ -70,7 +70,7 @@ const parseAliasRef = (raw: string, expectedKind: "secret" | "env"): Option<stri
 export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, string | undefined>>): CheckResult => {
   const secretEntries = config.secret ?? {}
   const metaKeys = Object.keys(secretEntries)
-  const metaKeysSet = FSet(metaKeys)
+  const metaKeysSet = Set(metaKeys)
 
   // Namespace boundary: the live environment holds wire names (e.g. CIV__API_KEY),
   // so presence checks and the tracked-key set must use wire names too. References
@@ -133,7 +133,7 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
   // Keys considered "tracked" = secrets ∪ env defaults (after dedup above).
   // Use wire names so credential-shaped env vars injected under a namespace
   // (e.g. CIV__API_KEY) match their tracking entry instead of looking untracked.
-  const trackedKeys = FSet([...metaKeys.map(secretWire), ...envDefaultEntries.map((e) => envWire(e.envVar))])
+  const trackedKeys = Set([...metaKeys.map(secretWire), ...envDefaultEntries.map((e) => envWire(e.envVar))])
 
   // Direction 2: env vars → find credential-shaped vars not in TOML
   const envMatches = scanEnv(env)

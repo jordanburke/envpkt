@@ -79,24 +79,51 @@ Identity and capabilities.
 
 Per-secret metadata. Each key corresponds to an environment variable name.
 
-| Field             | Type            | Required | Tier        | Description                                                                         |
-| ----------------- | --------------- | -------- | ----------- | ----------------------------------------------------------------------------------- |
-| `service`         | `string`        | No       | Scan-first  | Service this secret authenticates to                                                |
-| `expires`         | `string` (date) | No       | Scan-first  | Expiration date (`YYYY-MM-DD`)                                                      |
-| `rotation_url`    | `string` (URI)  | No       | Scan-first  | URL for rotation procedure                                                          |
-| `purpose`         | `string`        | No       | Context     | Why this secret exists                                                              |
-| `comment`         | `string`        | No       | Context     | Free-form annotation or note                                                        |
-| `capabilities`    | `string[]`      | No       | Context     | Operations this secret grants                                                       |
-| `created`         | `string` (date) | No       | Context     | Provisioning date (`YYYY-MM-DD`)                                                    |
-| `rotates`         | `string`        | No       | Operational | Rotation schedule (e.g., `90d`, `quarterly`)                                        |
-| `rate_limit`      | `string`        | No       | Operational | Rate limit info (e.g., `1000/min`)                                                  |
-| `model_hint`      | `string`        | No       | Operational | Suggested model or tier                                                             |
-| `source`          | `string`        | No       | Operational | Secret origin (e.g., `vault`, `ci`, `manual`)                                       |
-| `encrypted_value` | `string`        | No       | Value       | Age-encrypted ciphertext — mutually exclusive with `from_key`                       |
-| `from_key`        | `string`        | No       | Alias       | Reference another secret entry (format: `"secret.<KEY>"`) — see [Aliases](#aliases) |
-| `required`        | `boolean`       | No       | Enforcement | Whether secret is required for operation                                            |
-| `tags`            | `object`        | No       | Enforcement | Key-value tags for grouping/filtering                                               |
-| `namespace`       | `string`        | No       | Enforcement | Override the file-level `[namespace]` prefix for this entry. `""` opts out entirely |
+| Field             | Type            | Required | Tier        | Description                                                                                |
+| ----------------- | --------------- | -------- | ----------- | ------------------------------------------------------------------------------------------ |
+| `service`         | `string`        | No       | Scan-first  | Service this secret authenticates to                                                       |
+| `expires`         | `string` (date) | No       | Scan-first  | Expiration date (`YYYY-MM-DD`)                                                             |
+| `rotation_url`    | `string` (URI)  | No       | Scan-first  | URL for rotation procedure                                                                 |
+| `purpose`         | `string`        | No       | Context     | Why this secret exists                                                                     |
+| `comment`         | `string`        | No       | Context     | Free-form annotation or note                                                               |
+| `capabilities`    | `string[]`      | No       | Context     | Operations this secret grants                                                              |
+| `created`         | `string` (date) | No       | Context     | Provisioning date (`YYYY-MM-DD`)                                                           |
+| `rotates`         | `string`        | No       | Operational | Rotation schedule (e.g., `90d`, `quarterly`)                                               |
+| `rate_limit`      | `string`        | No       | Operational | Rate limit info (e.g., `1000/min`)                                                         |
+| `model_hint`      | `string`        | No       | Operational | Suggested model or tier                                                                    |
+| `source`          | `string`        | No       | Operational | Secret origin (e.g., `vault`, `ci`, `manual`)                                              |
+| `encrypted_value` | `string`        | No       | Value       | Age-encrypted ciphertext — mutually exclusive with `from_key`                              |
+| `from_key`        | `string`        | No       | Alias       | Reference another secret entry (format: `"secret.<KEY>"`) — see [Aliases](#aliases)        |
+| `required`        | `boolean`       | No       | Enforcement | Whether secret is required for operation                                                   |
+| `tags`            | `object`        | No       | Enforcement | Key-value tags for grouping/filtering                                                      |
+| `namespace`       | `string`        | No       | Enforcement | Override the file-level `[namespace]` prefix for this entry. `""` opts out entirely        |
+| `mcp`             | `object[]`      | No       | Integration | MCP servers this secret authenticates to — see [MCP header bindings](#mcp-header-bindings) |
+
+### MCP header bindings
+
+`mcp` lists the MCP servers a secret is sent to as an HTTP header.
+[`envpkt headers`](/cli/headers/) reads it to answer Claude Code's `headersHelper`.
+
+| Field    | Type     | Required | Default           | Description                                                   |
+| -------- | -------- | -------- | ----------------- | ------------------------------------------------------------- |
+| `server` | `string` | Yes      | —                 | Server name, as keyed in `.mcp.json`                          |
+| `header` | `string` | No       | `"Authorization"` | Header to send the value in. Must be a valid HTTP header name |
+| `scheme` | `string` | No       | `"Bearer"`        | One word placed before the value. `""` sends the raw value    |
+
+```toml
+[secret.GITHUB_MCP_API_KEY]
+mcp = [{ server = "civala-github" }]                                  # Authorization: Bearer <value>
+
+[secret.CF_API_KEY]
+mcp = [{ server = "cloudflare", header = "x-api-key", scheme = "" }]  # x-api-key: <value>
+```
+
+Several secrets may name the same server; their headers merge into one object. Two secrets may
+not claim the same `(server, header)` pair. Header names compare case-insensitively, and
+`envpkt validate` reports a clash, checking the catalog-merged config.
+
+With a [catalog](/guides/catalog-system/), an agent that overrides a secret and sets `mcp`
+replaces the catalog's whole `mcp` list for that secret. It does not add to it.
 
 ## `[env.<KEY>]` Sections
 

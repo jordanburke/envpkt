@@ -6,6 +6,7 @@ import { Try } from "functype"
 import { validateAliases } from "../../core/alias.js"
 import { resolveConfig } from "../../core/catalog.js"
 import { parseToml, resolveConfigPath, validateConfig } from "../../core/config.js"
+import { validateMcpHeaders } from "../../core/mcp-headers.js"
 import type { EnvpktConfig } from "../../core/types.js"
 import { formatValidationError } from "../../core/validate.js"
 import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET } from "../output.js"
@@ -38,6 +39,7 @@ const CHECK_NAMES = {
   schema: "Schema",
   catalog: "Catalog",
   aliases: "Aliases",
+  mcp: "MCP headers",
   sealed: "Sealed blocks",
 } as const
 
@@ -63,6 +65,16 @@ const checkSealedBlocks = (config: EnvpktConfig): CheckResult => {
   return { name: CHECK_NAMES.sealed, status: "failed", error: broken.join("; ") }
 }
 
+/** `mcp` bindings: valid header names and schemes, no (server, header) pair claimed twice. */
+const checkMcpHeaders = (config: EnvpktConfig): CheckResult => {
+  const count = Object.values(config.secret ?? {}).reduce((n, meta) => n + (meta.mcp?.length ?? 0), 0)
+  if (count === 0) return { name: CHECK_NAMES.mcp, status: "na", detail: "no mcp bindings" }
+  return validateMcpHeaders(config).fold<CheckResult>(
+    (err) => ({ name: CHECK_NAMES.mcp, status: "failed", error: formatValidationError(err) }),
+    () => ({ name: CHECK_NAMES.mcp, status: "ok", detail: `${count} binding(s)` }),
+  )
+}
+
 const skipped = (name: string): CheckResult => ({ name, status: "skipped" })
 
 const buildReport = (path: string, raw: string): ValidationReport => {
@@ -76,6 +88,7 @@ const buildReport = (path: string, raw: string): ValidationReport => {
         skipped(CHECK_NAMES.schema),
         skipped(CHECK_NAMES.catalog),
         skipped(CHECK_NAMES.aliases),
+        skipped(CHECK_NAMES.mcp),
         skipped(CHECK_NAMES.sealed),
       ],
     }),
@@ -90,6 +103,7 @@ const buildReport = (path: string, raw: string): ValidationReport => {
             { name: CHECK_NAMES.schema, status: "failed", error: formatValidationError(err) },
             skipped(CHECK_NAMES.catalog),
             skipped(CHECK_NAMES.aliases),
+            skipped(CHECK_NAMES.mcp),
             skipped(CHECK_NAMES.sealed),
           ],
         }),
@@ -111,9 +125,17 @@ const buildReport = (path: string, raw: string): ValidationReport => {
             }),
           )
 
+          // Check bindings on the catalog-merged view — what `envpkt headers` actually sees.
+          const merged = config.catalog
+            ? resolveConfig(config, dirname(path)).fold(
+                () => config,
+                (r) => r.config,
+              )
+            : config
+          const mcpCheck = checkMcpHeaders(merged)
           const sealedCheck = checkSealedBlocks(config)
 
-          const checks = [tomlOk, schemaOk, catalogCheck, aliasCheck, sealedCheck]
+          const checks = [tomlOk, schemaOk, catalogCheck, aliasCheck, mcpCheck, sealedCheck]
           const ok = checks.every((c) => c.status === "ok" || c.status === "na")
           return { ok, configPath: path, checks }
         },

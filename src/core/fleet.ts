@@ -54,7 +54,6 @@ function* findEnvpktFiles(dir: string, maxDepth: number, currentDepth = 0): Gene
     (e) => e,
   )
 
-  // eslint-disable-next-line functype/no-imperative-loops
   for (const entry of entries) {
     if (entry.isDirectory() && !SKIP_DIRS.has(entry.name) && !entry.name.startsWith(".")) {
       yield* findEnvpktFiles(join(dir, entry.name), maxDepth, currentDepth + 1)

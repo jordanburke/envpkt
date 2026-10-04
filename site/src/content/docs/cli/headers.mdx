@@ -1,0 +1,118 @@
+---
+title: envpkt headers
+description: Print HTTP headers for an MCP server as JSON, for Claude Code's headersHelper
+---
+
+Print the HTTP headers for one MCP server as a JSON object. Claude Code runs this as a
+[`headersHelper`](https://code.claude.com/docs/en/mcp) and sends the result with every request
+to that server.
+
+## Usage
+
+```bash
+envpkt headers [server] [options]
+```
+
+`server` defaults to `$CLAUDE_CODE_MCP_SERVER_NAME`, which Claude Code sets to the server's name
+before it runs the helper. The command fails if neither is given.
+
+## Options
+
+| Option                | Description           | Default       |
+| --------------------- | --------------------- | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml` | Auto-detected |
+| `--profile <profile>` | fnox profile to use   | —             |
+
+## Why
+
+Claude Code expands `${VAR}` references in `.mcp.json` from its own environment. When Claude is
+started by a launcher that strips the environment, those references expand empty and HTTP MCP
+servers answer `401`. A helper command does not depend on the launch environment: envpkt
+decrypts the sealed value from `envpkt.toml` itself, using `identity.key_file`.
+
+## Setup
+
+Bind a secret to a server with the [`mcp` field](/reference/toml-schema/#mcp-header-bindings):
+
+```toml
+[secret.GITHUB_MCP_API_KEY]
+service = "github"
+mcp = [{ server = "civala-github" }]
+encrypted_value = """..."""
+```
+
+Point the server's `headersHelper` at envpkt in `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "civala-github": {
+      "type": "http",
+      "url": "https://github.civala.ai/mcp",
+      "headersHelper": "envpkt headers"
+    }
+  }
+}
+```
+
+Claude Code then sends `Authorization: Bearer <value>` to `civala-github`.
+
+## Output
+
+```bash
+$ envpkt headers civala-github
+{"Authorization":"Bearer ghp_..."}
+```
+
+- **stdout** holds the JSON object and nothing else. Claude parses it as-is.
+- **stderr** holds everything else: config source, audit and fnox warnings, errors.
+- Every secret that names the server is merged into one object, one header per secret.
+- Aliases (`from_key`) and namespaces resolve exactly as they do for
+  [`envpkt env export`](/cli/env-export/). The `mcp` binding uses the logical TOML key, not the
+  namespaced wire name.
+- `scope` does not apply. Like `envpkt exec`, this is an explicit request for values.
+
+## Exit codes
+
+| Code | Meaning                                                                                                    |
+| ---- | ---------------------------------------------------------------------------------------------------------- |
+| `0`  | Headers printed                                                                                            |
+| `1`  | No secret names the server, a bound value is missing, empty or can't be decrypted, or a binding is invalid |
+| `2`  | No server named, the config failed to load or resolve, or no age key was found at all                      |
+
+A sealed value that fails to decrypt (for example, the wrong key) exits `1`. The age error is printed as a
+warning, then the command reports which key did not resolve. Every error names the server on stderr, so
+Claude's MCP log shows which server failed.
+
+## Checks
+
+- Only the requested server's bindings are checked. A broken binding on another server never blocks this one.
+- Header names must be valid HTTP header names, and a non-empty `scheme` must be one word.
+- A value containing a line break or NUL is refused rather than sent. The error names the key, never the value.
+
+## Config lookup
+
+`envpkt headers` finds `envpkt.toml` the same way every command does: `-c`, then `ENVPKT_CONFIG`, then the
+working directory and its parents, then the global package (`~/.envpkt/envpkt.toml` and cloud-storage
+copies). If the project has no `envpkt.toml`, the global package answers. Pass `-c` in `.mcp.json` to pin
+the file: `"headersHelper": "envpkt headers -c ./envpkt.toml"`.
+
+## How Claude Code runs it
+
+- The helper has a 10-second timeout. It runs at each connect and reconnect, and again after a
+  `401` or `403`.
+- For a project `.mcp.json`, it runs with the project directory as its working directory, so
+  envpkt finds the project's `envpkt.toml`.
+- Claude strips variables whose names contain `TOKEN`, `SECRET`, `PASSWORD`, `KEY` or `AUTH`
+  before running a project helper. Sealed values with `identity.key_file` need none of them.
+  `ENVPKT_AGE_KEY` and `ENVPKT_AGE_KEY_FILE` match that filter, so a key passed through either
+  will not reach the helper.
+
+:::caution
+Stdio (local) MCP servers do not use `headersHelper`. Wrap them with
+[`envpkt exec`](/cli/exec/) instead: `envpkt exec -- npx -y some-mcp-server`.
+:::
+
+:::note
+This is not [`envpkt mcp`](/cli/mcp/). That command starts envpkt's own MCP server.
+:::

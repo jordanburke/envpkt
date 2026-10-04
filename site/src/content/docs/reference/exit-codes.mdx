@@ -27,6 +27,12 @@ Inherits audit exit codes. With `--strict`, aborts execution on any non-healthy 
 
 With `--strict`, returns non-zero on any drift between TOML and environment.
 
+### `envpkt headers`
+
+Not health-based. `0` when headers print. `1` when no secret names the server, a bound value is
+missing, empty or fails to decrypt, or a binding is invalid. `2` when no server is named, the config
+fails to load or resolve, or no age key is found at all.
+
 ### `envpkt fleet`
 
 Returns the worst health status across all agents in the fleet.

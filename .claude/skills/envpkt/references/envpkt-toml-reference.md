@@ -68,6 +68,12 @@ required = true
 # Sealed value — age-encrypted, safe to commit
 encrypted_value = "-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24..."
 
+[secret.GITHUB_MCP_API_KEY]
+service = "github"
+# Send to HTTP MCP servers via Claude Code's headersHelper (`envpkt headers`).
+# header defaults to "Authorization", scheme to "Bearer"; scheme = "" sends the raw value.
+mcp = [{ server = "civala-github" }, { server = "gh-raw", header = "x-api-key", scheme = "" }]
+
 # --- Environment Defaults (non-secret, safe to commit) ---
 
 [env.NODE_ENV]

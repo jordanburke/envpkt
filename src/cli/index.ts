@@ -12,6 +12,7 @@ import { runDoctor } from "./commands/doctor.js"
 import { registerEnvCommands } from "./commands/env.js"
 import { runExec } from "./commands/exec.js"
 import { runFleet } from "./commands/fleet.js"
+import { runHeaders } from "./commands/headers.js"
 import { runInit } from "./commands/init.js"
 import { runInspect } from "./commands/inspect.js"
 import { runKeygen } from "./commands/keygen.js"
@@ -102,7 +103,7 @@ program
 program
   .command("validate")
   .description(
-    "Verify envpkt.toml integrity — runs TOML syntax, schema, catalog, alias, and sealed-block structural checks",
+    "Verify envpkt.toml integrity — runs TOML syntax, schema, catalog, alias, MCP header, and sealed-block structural checks",
   )
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--json", "Output structured JSON instead of human-readable text")
@@ -135,6 +136,16 @@ program
   .option("--strict", "Abort on any non-healthy secret")
   .action((args: string[], options) => {
     runExec(args, options)
+  })
+
+program
+  .command("headers")
+  .description("Print HTTP headers for an MCP server as JSON — for Claude Code's headersHelper in .mcp.json")
+  .argument("[server]", "MCP server name (default: $CLAUDE_CODE_MCP_SERVER_NAME)")
+  .option("-c, --config <path>", "Path to envpkt.toml")
+  .option("--profile <profile>", "fnox profile to use")
+  .action((server: string | undefined, options) => {
+    runHeaders(server, options)
   })
 
 program

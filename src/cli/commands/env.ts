@@ -237,7 +237,7 @@ const shellEscape = (value: string): string => value.replace(/'/g, "'\\''")
 type EmitEntry = { readonly name: string; readonly value: string; readonly secret: boolean }
 
 /** Shared resolution for the emit commands (`export`, `github`): resolve without injecting. */
-const resolveForEmit = (options: {
+export const resolveForEmit = (options: {
   readonly config?: string
   readonly profile?: string
 }): Either<BootError, BootResult> =>
@@ -288,7 +288,7 @@ const collectEmitEntries = (boot: BootResult): EmitEntry[] => {
   return [...defaults, ...overridden, ...secrets]
 }
 
-const emitWarnings = (boot: BootResult): void => {
+export const emitWarnings = (boot: BootResult): void => {
   const sourceMsg = formatConfigSource(boot.configPath, boot.configSource)
   if (sourceMsg) console.error(sourceMsg)
   boot.warnings.forEach((warning) => {

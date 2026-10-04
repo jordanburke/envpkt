@@ -137,6 +137,37 @@ type AliasError =
 | `AliasCrossType`     | A secret entry aliases an env entry or vice versa (same-type aliasing only)         |
 | `AliasValueConflict` | The entry declares both `from_key` and a value field (`encrypted_value` or `value`) |
 
+## `McpHeadersError`
+
+Returned by `buildMcpHeaders` and printed by [`envpkt headers`](/cli/headers/). `McpConfigError` is the subset that `validateMcpHeaders` returns.
+
+```typescript
+type McpConfigError =
+  | { readonly _tag: "McpHeaderInvalid"; readonly key: string; readonly server: string; readonly header: string }
+  | { readonly _tag: "McpSchemeInvalid"; readonly key: string; readonly server: string; readonly scheme: string }
+  | {
+      readonly _tag: "McpHeaderDuplicate"
+      readonly server: string
+      readonly header: string
+      readonly keys: ReadonlyArray<string>
+    }
+
+type McpHeadersError =
+  | McpConfigError
+  | { readonly _tag: "McpServerUnknown"; readonly server: string }
+  | { readonly _tag: "McpValueUnresolved"; readonly server: string; readonly keys: ReadonlyArray<string> }
+  | { readonly _tag: "McpValueInvalid"; readonly server: string; readonly keys: ReadonlyArray<string> }
+```
+
+| Tag                  | When                                                                          |
+| -------------------- | ----------------------------------------------------------------------------- |
+| `McpHeaderInvalid`   | A `header` is not a valid HTTP header name (empty, spaces, `:` and so on)     |
+| `McpSchemeInvalid`   | A non-empty `scheme` is not a single HTTP token (e.g. `"Bearer token"`)       |
+| `McpHeaderDuplicate` | Two bindings claim the same `(server, header)` pair (header case-insensitive) |
+| `McpServerUnknown`   | No secret's `mcp` list names the requested server                             |
+| `McpValueUnresolved` | A bound secret has no value, or an empty one, after resolution                |
+| `McpValueInvalid`    | A bound value contains a line break or NUL, so it can't be sent as a header   |
+
 ## `BootError`
 
 Union of all error types that can occur during boot:

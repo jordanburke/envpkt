@@ -1,6 +1,6 @@
 {
   "name": "envpkt",
-  "version": "0.14.1",
+  "version": "0.15.0",
   "description": "Credential lifecycle and fleet management for AI agents",
   "keywords": [
     "credentials",
@@ -39,19 +39,19 @@
     "prepublishOnly": "pnpm validate"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
     "@sinclair/typebox": "^0.34.52",
     "commander": "^15.0.0",
-    "functype": "^1.9.0",
-    "functype-log": "^1.9.0",
-    "functype-os": "^1.9.0",
-    "smol-toml": "^1.8.0"
+    "functype": "^1.13.0",
+    "functype-log": "^1.13.0",
+    "functype-os": "^1.13.0",
+    "smol-toml": "^1.9.0"
   },
   "devDependencies": {
-    "@types/node": "^24.13.5",
-    "ts-builds": "^3.4.1",
+    "@types/node": "^24.19.1",
+    "ts-builds": "^3.4.3",
     "tsdown": "^0.22.14",
-    "tsx": "^4.23.13"
+    "tsx": "^4.23.15"
   },
   "type": "module",
   "main": "./dist/index.js",

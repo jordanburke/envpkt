@@ -1,4 +1,4 @@
-import { $, Cond, Do, List, Map as FMap, Option } from "functype"
+import { $, Cond, Do, List, Map, Option, Set } from "functype"
 
 import { makeEnvNamer } from "./namespace.js"
 import type { EnvpktConfig } from "./schema.js"
@@ -22,10 +22,13 @@ const parseDate = (dateStr: string): Option<Date> => {
   return Number.isNaN(d.getTime()) ? Option<Date>(undefined) : Option(d)
 }
 
+/** The only operations audit needs on the fnox key set — satisfied by both functype's Set and the built-in. */
+type KeyLookup = { readonly size: number; readonly has: (key: string) => boolean }
+
 const classifySecret = (
   key: string,
   meta: NonNullable<EnvpktConfig["secret"]>[string],
-  fnoxKeys: ReadonlySet<string>,
+  fnoxKeys: KeyLookup,
   staleWarningDays: number,
   requireExpiration: boolean,
   requireService: boolean,
@@ -153,7 +156,7 @@ export const computeAudit = (
   const requireExpiration = lifecycle.require_expiration ?? false
   const requireService = lifecycle.require_service ?? false
 
-  const keys = fnoxKeys ?? new Set<string>()
+  const keys: KeyLookup = fnoxKeys ?? Set.empty<string>()
   const secretEntries = config.secret ?? {}
 
   // Non-alias entries: classify normally
@@ -163,7 +166,7 @@ export const computeAudit = (
   const nonAliasHealth = nonAliasEntries.map(([key, meta]) =>
     classifySecret(key, meta, keys, staleWarningDays, requireExpiration, requireService, now),
   )
-  const healthByKey = FMap<string, SecretHealth>(nonAliasHealth.map((h) => [h.key, h] as const))
+  const healthByKey = Map<string, SecretHealth>(nonAliasHealth.map((h) => [h.key, h] as const))
 
   // Alias entries: inherit status from target.
   // Prefer the pre-validated aliasTable when provided (e.g. from bootSafe),

@@ -62,6 +62,25 @@ export const NamespaceSchema = Type.Object(
 )
 export type Namespace = Static<typeof NamespaceSchema>
 
+// --- MCP Header Binding ---
+
+export const McpHeaderSchema = Type.Object(
+  {
+    server: Type.String({ minLength: 1, description: "MCP server name, as keyed in .mcp.json" }),
+    header: Type.Optional(
+      Type.String({ default: "Authorization", minLength: 1, description: "HTTP header name to send the secret in" }),
+    ),
+    scheme: Type.Optional(
+      Type.String({
+        default: "Bearer",
+        description: "Prefix placed before the value (e.g. 'Bearer'). Empty string sends the raw value.",
+      }),
+    ),
+  },
+  { description: "Send this secret as an HTTP header to an MCP server" },
+)
+export type McpHeader = Static<typeof McpHeaderSchema>
+
 // --- Secret Metadata ---
 
 export const SecretMetaSchema = Type.Object(
@@ -119,6 +138,11 @@ export const SecretMetaSchema = Type.Object(
       Type.String({
         description:
           "Override the file-level namespace for this entry's injected name. Empty string opts out of any prefix.",
+      }),
+    ),
+    mcp: Type.Optional(
+      Type.Array(McpHeaderSchema, {
+        description: "MCP servers this secret authenticates to. Read by `envpkt headers` (Claude Code headersHelper).",
       }),
     ),
   },

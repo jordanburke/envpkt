@@ -184,14 +184,40 @@ on_audit_fail = "pagerduty-alert.sh"
 
 ### Secret Metadata Tiers
 
-| Tier            | Fields                                          | Purpose                            |
-| --------------- | ----------------------------------------------- | ---------------------------------- |
-| 1 — Scan-first  | `service`, `expires`, `rotation_url`            | Auto-discovered by `env scan`      |
-| 2 — Context     | `purpose`, `comment`, `capabilities`, `created` | Human-annotated context            |
-| 3 — Operational | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime operational data           |
-| 4 — Enforcement | `required`, `tags`                              | Policy enforcement and filtering   |
-| Sealed          | `encrypted_value`                               | Age-encrypted value safe to commit |
-| Alias           | `from_key`                                      | Reuse another entry's value        |
+| Tier            | Fields                                          | Purpose                               |
+| --------------- | ----------------------------------------------- | ------------------------------------- |
+| 1 — Scan-first  | `service`, `expires`, `rotation_url`            | Auto-discovered by `env scan`         |
+| 2 — Context     | `purpose`, `comment`, `capabilities`, `created` | Human-annotated context               |
+| 3 — Operational | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime operational data              |
+| 4 — Enforcement | `required`, `tags`                              | Policy enforcement and filtering      |
+| Sealed          | `encrypted_value`                               | Age-encrypted value safe to commit    |
+| Alias           | `from_key`                                      | Reuse another entry's value           |
+| Integration     | `mcp`                                           | Send as an HTTP header to MCP servers |
+
+### MCP header bindings (`mcp`)
+
+`mcp` sends a secret as an HTTP header to an HTTP MCP server, through Claude Code's
+`headersHelper`. No CLI command sets it yet, so add it by hand, then run `envpkt validate`.
+
+```toml
+[secret.GITHUB_MCP_API_KEY]
+mcp = [{ server = "civala-github" }]                                  # Authorization: Bearer <value>
+
+[secret.CF_API_KEY]
+mcp = [{ server = "cloudflare", header = "x-api-key", scheme = "" }]  # x-api-key: <value>
+```
+
+```json
+"civala-github": { "type": "http", "url": "https://github.civala.ai/mcp", "headersHelper": "envpkt headers" }
+```
+
+- `header` defaults to `"Authorization"` and must be a valid HTTP header name.
+- `scheme` defaults to `"Bearer"`; `""` sends the raw value.
+- Secrets naming the same server merge into one object. Two may not claim the same `(server, header)`.
+- The binding uses the logical key; aliases and namespaces resolve as in `env export`.
+- Stdio servers don't use `headersHelper`; wrap them with `envpkt exec -- <server command>`.
+- Rollout: a config may carry `mcp` before every machine upgrades (0.13.4+ ignores it), but
+  `.mcp.json` may only point at `envpkt headers` once the machine runs 0.15.0+.
 
 ### Aliases (`from_key`)
 
@@ -354,11 +380,14 @@ packets, no key file needed. Precedence: `identity.key_file` → `ENVPKT_AGE_KEY
 | --------------------------- | ---------------------------------------------------------------- |
 | `envpkt fleet`              | Scan directory tree for `envpkt.toml` files and aggregate health |
 | `envpkt mcp`                | Start the envpkt MCP server (stdio transport)                    |
+| `envpkt headers [server]`   | Print an MCP server's HTTP headers as JSON (`headersHelper`)     |
 | `envpkt shell-hook <shell>` | Output shell function for ambient credential warnings on `cd`    |
 
 **fleet options**: `-d <path>`, `--depth <n>`, `--format table|json`, `--status <status>`
 
 **mcp options**: `-c <path>`
+
+**headers**: `[server]` defaults to `$CLAUDE_CODE_MCP_SERVER_NAME`; options `-c <path>`, `--profile <p>`. stdout is only the JSON object; everything else goes to stderr. Exit `1` when nothing matches or a value doesn't resolve, `2` when no server is named or the config fails to load.
 
 **shell-hook**: argument is `zsh` or `bash`
 
@@ -491,6 +520,16 @@ import { resolveConfig, loadCatalog, resolveSecrets } from "envpkt"
 
 // Resolve catalog references
 const result: Either<CatalogError, ResolveResult> = resolveConfig(config, configDir)
+```
+
+### MCP Header Bindings
+
+```typescript
+import { buildMcpHeaders, formatMcpHeadersError, validateMcpHeaders } from "envpkt"
+
+// values keyed by logical name, e.g. BootResult.secrets
+const headers: Either<McpHeadersError, Record<string, string>> = buildMcpHeaders(config, boot.secrets, "civala-github")
+const check: Either<McpConfigError, void> = validateMcpHeaders(config)
 ```
 
 ### Value Resolution
@@ -804,6 +843,10 @@ All tools accept an optional `configPath` argument.
   }
 }
 ```
+
+### Authenticating other HTTP MCP servers
+
+Use `envpkt headers` as the server's `headersHelper` — see [MCP header bindings](#mcp-header-bindings-mcp).
 
 ## Debugging Tips
 

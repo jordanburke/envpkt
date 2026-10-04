@@ -41,6 +41,7 @@ export default defineConfig({
             { slug: "cli/env-dotenv" },
             { slug: "cli/env-github" },
             { slug: "cli/shell-hook" },
+            { slug: "cli/headers" },
             { slug: "cli/mcp" },
           ],
         },
