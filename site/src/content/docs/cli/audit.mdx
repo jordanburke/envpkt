@@ -80,14 +80,15 @@ With `--strict`, any non-healthy secret causes a non-zero exit.
 
 ## Secret Statuses
 
-| Status             | Meaning                                                   |
-| ------------------ | --------------------------------------------------------- |
-| `healthy`          | Secret is valid and within policy                         |
-| `expiring_soon`    | Secret expires within `stale_warning_days`                |
-| `expired`          | Secret has passed its expiration date                     |
-| `stale`            | Secret is older than `stale_warning_days` without updates |
-| `missing`          | Secret key exists in config but has no metadata           |
-| `missing_metadata` | Required fields (service, expiration) are absent          |
+| Status             | Meaning                                                                                              |
+| ------------------ | ---------------------------------------------------------------------------------------------------- |
+| `healthy`          | Secret is valid and within policy                                                                    |
+| `expiring_soon`    | Secret expires within `stale_warning_days`                                                           |
+| `expired`          | Secret has passed its expiration date                                                                |
+| `stale`            | Secret is older than `stale_warning_days` without updates                                            |
+| `missing`          | Secret key exists in config but has no metadata                                                      |
+| `missing_metadata` | Required fields (service, expiration) are absent                                                     |
+| `external`         | `external = true`: value managed outside envpkt. Shown only when no other non-healthy status applies |
 
 ## Aliases
 

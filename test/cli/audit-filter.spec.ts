@@ -56,7 +56,7 @@ describe("audit --unsealed", () => {
   })
 
   it("combines with --status external to show only external = true entries", () => {
-    const { stdout } = run(["audit", "-c", configPath, "--format", "json", "--status", "external"])
+    const { stdout } = run(["audit", "-c", configPath, "--format", "json", "--unsealed", "--status", "external"])
     expect(keysOf(stdout)).toEqual(["CF_TOKEN"])
   })
 })
