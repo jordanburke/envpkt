@@ -13,17 +13,23 @@ envpkt audit [options]
 
 ## Options
 
-| Option                | Description                                                                 | Default       |
-| --------------------- | --------------------------------------------------------------------------- | ------------- |
-| `-c, --config <path>` | Path to `envpkt.toml`                                                       | Auto-detected |
-| `--format <format>`   | Output format: `table`, `json`, `minimal`                                   | `table`       |
-| `--expiring <days>`   | Show secrets expiring within N days                                         | —             |
-| `--status <status>`   | Filter by status: `healthy`, `expiring_soon`, `expired`, `stale`, `missing` | —             |
-| `--strict`            | Exit non-zero on any non-healthy secret                                     | `false`       |
-| `--all`               | Show both secrets and `[env.*]` defaults drift                              | `false`       |
-| `--env-only`          | Show only `[env.*]` defaults (drift detection)                              | `false`       |
-| `--sealed`            | Show only secrets with `encrypted_value` (sealed packets)                   | `false`       |
-| `--external`          | Show only secrets without `encrypted_value` (externally managed)            | `false`       |
+| Option                | Description                                                                                                 | Default       |
+| --------------------- | ----------------------------------------------------------------------------------------------------------- | ------------- |
+| `-c, --config <path>` | Path to `envpkt.toml`                                                                                       | Auto-detected |
+| `--format <format>`   | Output format: `table`, `json`, `minimal`                                                                   | `table`       |
+| `--expiring <days>`   | Show secrets expiring within N days                                                                         | —             |
+| `--status <status>`   | Filter by status: `healthy`, `expiring_soon`, `expired`, `stale`, `missing`, `missing_metadata`, `external` | —             |
+| `--strict`            | Exit non-zero on any non-healthy secret                                                                     | `false`       |
+| `--all`               | Show both secrets and `[env.*]` defaults drift                                                              | `false`       |
+| `--env-only`          | Show only `[env.*]` defaults (drift detection)                                                              | `false`       |
+| `--sealed`            | Show only secrets with `encrypted_value` (sealed packets)                                                   | `false`       |
+| `--unsealed`          | Show only secrets without `encrypted_value` (resolved at runtime, or `external = true`)                     | `false`       |
+| `--sort`              | Sort secrets alphabetically within each status bucket (no file mutation)                                    | `false`       |
+
+`--unsealed` and `--status external` answer different questions. `--unsealed` lists every secret
+with no sealed value, whether envpkt resolves it at runtime (env, fnox) or it is declared
+`external = true`. `--status external` lists only the `external = true` entries: values managed
+entirely outside envpkt, such as a Cloudflare Worker secret or Vault.
 
 ## Examples
 
@@ -55,8 +61,11 @@ envpkt audit --env-only
 # Show only sealed (encrypted) secrets
 envpkt audit --sealed
 
-# Show only externally-managed secrets
-envpkt audit --external
+# Show only unsealed secrets (no encrypted_value)
+envpkt audit --unsealed
+
+# Show only secrets declared external = true (managed outside envpkt)
+envpkt audit --status external
 ```
 
 ## Exit Codes

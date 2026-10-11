@@ -78,12 +78,15 @@ program
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--format <format>", "Output format: table | json | minimal", "table")
   .option("--expiring <days>", "Show secrets expiring within N days", parseInt)
-  .option("--status <status>", "Filter by status: healthy | expiring_soon | expired | stale | missing")
+  .option(
+    "--status <status>",
+    "Filter by status: healthy | expiring_soon | expired | stale | missing | missing_metadata | external",
+  )
   .option("--strict", "Exit non-zero on any non-healthy secret")
   .option("--all", "Show both secrets and env defaults")
   .option("--env-only", "Show only env defaults (drift detection)")
   .option("--sealed", "Show only secrets with encrypted_value")
-  .option("--external", "Show only secrets without encrypted_value")
+  .option("--unsealed", "Show only secrets without encrypted_value (resolved at runtime or external)")
   .option("--sort", "Sort secrets alphabetically within each status bucket (no file mutation)")
   .action((options) => {
     runAudit(options)

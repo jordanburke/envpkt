@@ -31,7 +31,7 @@ type AuditOptions = {
   readonly all?: boolean
   readonly envOnly?: boolean
   readonly sealed?: boolean
-  readonly external?: boolean
+  readonly unsealed?: boolean
   readonly sort?: boolean
 }
 
@@ -128,7 +128,7 @@ const runAuditOnConfig = (config: EnvpktConfig, options: AuditOptions): void => 
       })()
     : audit
 
-  const afterExternal = options.external
+  const afterUnsealed = options.unsealed
     ? (() => {
         const secretEntries = config.secret ?? {}
         return {
@@ -140,10 +140,10 @@ const runAuditOnConfig = (config: EnvpktConfig, options: AuditOptions): void => 
 
   const afterStatus = options.status
     ? {
-        ...afterExternal,
-        secrets: afterExternal.secrets.filter((s) => s.status === (options.status as SecretStatus)),
+        ...afterUnsealed,
+        secrets: afterUnsealed.secrets.filter((s) => s.status === (options.status as SecretStatus)),
       }
-    : afterExternal
+    : afterUnsealed
 
   const filtered = Option(options.expiring).fold(
     () => afterStatus,

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `envpkt audit --unsealed` lists secrets with no `encrypted_value`: values envpkt resolves at
+  runtime (env, fnox) plus `external = true` entries. Use `--status external` to list only the
+  `external = true` entries. `--status` help now lists `missing_metadata` and `external`.
+
+### Removed
+
+- **Breaking:** `envpkt audit --external` is gone; use `--unsealed` for the same filter. "External"
+  now means only the `external = true` field.
+
 ## [0.15.0] - 2026-10-04
 
 ### Added

@@ -184,15 +184,17 @@ on_audit_fail = "pagerduty-alert.sh"
 
 ### Secret Metadata Tiers
 
-| Tier            | Fields                                          | Purpose                               |
-| --------------- | ----------------------------------------------- | ------------------------------------- |
-| 1 — Scan-first  | `service`, `expires`, `rotation_url`            | Auto-discovered by `env scan`         |
-| 2 — Context     | `purpose`, `comment`, `capabilities`, `created` | Human-annotated context               |
-| 3 — Operational | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime operational data              |
-| 4 — Enforcement | `required`, `tags`                              | Policy enforcement and filtering      |
-| Sealed          | `encrypted_value`                               | Age-encrypted value safe to commit    |
-| Alias           | `from_key`                                      | Reuse another entry's value           |
-| Integration     | `mcp`                                           | Send as an HTTP header to MCP servers |
+| Tier            | Fields                                          | Purpose                                                           |
+| --------------- | ----------------------------------------------- | ----------------------------------------------------------------- |
+| 1 — Scan-first  | `service`, `expires`, `rotation_url`            | Auto-discovered by `env scan`                                     |
+| 2 — Context     | `purpose`, `comment`, `capabilities`, `created` | Human-annotated context                                           |
+| 3 — Operational | `rotates`, `rate_limit`, `model_hint`, `source` | Runtime operational data                                          |
+| 4 — Enforcement | `required`, `tags`                              | Policy enforcement and filtering                                  |
+| Sealed          | `encrypted_value`                               | Age-encrypted value safe to commit                                |
+| External        | `external`                                      | Value managed outside envpkt; never sealed, audited as `external` |
+| Alias           | `from_key`                                      | Reuse another entry's value                                       |
+| Integration     | `mcp`                                           | Send as an HTTP header to MCP servers                             |
+| Namespace       | `namespace`                                     | Override the file-level prefix; `""` injects the bare name        |
 
 ### MCP header bindings (`mcp`)
 
@@ -298,7 +300,7 @@ See `references/quick-reference.md` for a compact cheat sheet.
 | `envpkt inspect`   | Display structured view of config                 |
 | `envpkt env check` | Bidirectional drift detection vs live environment |
 
-**audit options**: `-c <path>`, `--format table|json|minimal`, `--expiring <days>`, `--status <status>`, `--strict`, `--all`, `--env-only`, `--sealed`, `--external`
+**audit options**: `-c <path>`, `--format table|json|minimal`, `--expiring <days>`, `--status <status>`, `--strict`, `--all`, `--env-only`, `--sealed`, `--unsealed`, `--sort`. `--unsealed` lists secrets with no `encrypted_value`; `--status external` lists only `external = true` entries
 
 **inspect options**: `-c <path>`, `--format table|json`, `--resolved`, `--secrets`, `--plaintext`
 
