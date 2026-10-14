@@ -478,7 +478,7 @@ envpkt copy API_KEY --to b.toml --force          # overwrite if it already exist
 envpkt copy API_KEY --to b.toml --dry-run        # preview without writing
 ```
 
-`--from`/`--to` default to the config resolved for the current directory (and must already exist). On copy, `created` is reset to today and `last_rotated_at` is dropped (it's the source's rotation history). Copying a sealed secret needs the source key to unseal and the destination's `identity.recipient` to reseal.
+`--from`/`--to` default to the config resolved for the current directory (and must already exist). A copy into a new key gets today's `created`. With `--force` onto an existing entry, the entry is replaced in place and keeps the destination's `created`. Either way, `last_rotated_at` is dropped (it's the source's rotation history). Copying a sealed secret needs the source key to unseal and the destination's `identity.recipient` to reseal.
 
 ### `envpkt exec`
 

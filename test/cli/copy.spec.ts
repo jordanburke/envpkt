@@ -100,6 +100,58 @@ describe("envpkt copy", () => {
     expect(parsed.env.PORT!.value).toBe("3000")
   })
 
+  it("--force replaces an existing entry in place, leaving every other line alone", () => {
+    const a = write("a.toml", `version = 1\n\n[env.PORT]\nvalue = "3000"\n`)
+    const before = `version = 1
+
+[env.ABOVE]
+value = "a"
+
+[env.PORT]
+value = "9999"
+
+[env.BELOW]
+value = "b"
+`
+    const b = write("b.toml", before)
+    const { status } = cli(["copy", "PORT", "--from", a, "--to", b, "--force"])
+    expect(status).toBe(0)
+    expect(readFileSync(b, "utf-8")).toBe(before.replace(`value = "9999"`, `value = "3000"`))
+  })
+
+  it("--force keeps the destination's created on an existing secret", () => {
+    const a = write(
+      "a.toml",
+      `version = 1\n\n[secret.TOKEN]\nservice = "todoist"\npurpose = "oauth"\ncreated = "2026-01-01"\n`,
+    )
+    const before = `version = 1
+
+[secret.ABOVE]
+service = "a"
+
+[secret.TOKEN]
+service = "todoist"
+created = "2026-06-01"
+
+[secret.BELOW]
+service = "b"
+`
+    const b = write("b.toml", before)
+    const { status } = cli(["copy", "TOKEN", "--from", a, "--to", b, "--force"])
+    expect(status).toBe(0)
+    expect(readFileSync(b, "utf-8")).toBe(
+      before.replace(`service = "todoist"\n`, `service = "todoist"\npurpose = "oauth"\n`),
+    )
+  }, 60_000)
+
+  it("stamps today's created on a secret new to the destination", () => {
+    const a = write("a.toml", `version = 1\n\n[secret.TOKEN]\nservice = "todoist"\ncreated = "2026-01-01"\n`)
+    const b = write("b.toml", `version = 1\n`)
+    const { status } = cli(["copy", "TOKEN", "--from", a, "--to", b])
+    expect(status).toBe(0)
+    expect(parseSecret(b, "TOKEN").created).toBe(new Date().toISOString().split("T")[0])
+  }, 60_000)
+
   it("errors when the key is not found in the source", () => {
     const a = write("a.toml", `version = 1\n\n[env.PORT]\nvalue = "3000"\n`)
     const b = write("b.toml", `version = 1\n`)

@@ -69,20 +69,20 @@ describe("copyableSecretMeta", () => {
     encrypted_value: "OLD_CIPHER",
   }
 
-  it("resets created to today and drops last_rotated_at", () => {
-    const out = copyableSecretMeta(source, { today: "2026-06-18", encryptedValue: Option.none<string>() })
+  it("sets created from opts and drops last_rotated_at", () => {
+    const out = copyableSecretMeta(source, { created: "2026-06-18", encryptedValue: Option.none<string>() })
     expect(out.created).toBe("2026-06-18")
     expect(out.last_rotated_at).toBeUndefined()
     expect(out.service).toBe("stripe")
   })
 
   it("sets the resealed ciphertext when given Some", () => {
-    const out = copyableSecretMeta(source, { today: "2026-06-18", encryptedValue: Option("NEW_CIPHER") })
+    const out = copyableSecretMeta(source, { created: "2026-06-18", encryptedValue: Option("NEW_CIPHER") })
     expect(out.encrypted_value).toBe("NEW_CIPHER")
   })
 
   it("strips encrypted_value when given None (metadata-only copy)", () => {
-    const out = copyableSecretMeta(source, { today: "2026-06-18", encryptedValue: Option.none<string>() })
+    const out = copyableSecretMeta(source, { created: "2026-06-18", encryptedValue: Option.none<string>() })
     expect(out.encrypted_value).toBeUndefined()
   })
 })

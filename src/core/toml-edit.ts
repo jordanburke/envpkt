@@ -44,28 +44,63 @@ const findSectionRange = (
   return { start, end: final.end }
 }
 
+/**
+ * End (exclusive) of a section's own lines: through its last field, before the blank and
+ * comment lines that run up to the next header. Those trailing lines separate it from its
+ * neighbour (or are the neighbour's doc comment), so edits to this section leave them alone.
+ */
+const sectionBodyEnd = (lines: ReadonlyArray<string>, range: { start: number; end: number }): number => {
+  const lastContent = lines.slice(range.start, range.end).findLastIndex((l) => {
+    const t = l.trim()
+    return t !== "" && !t.startsWith("#")
+  })
+  return range.start + lastContent + 1
+}
+
+const dropTrailingBlanks = (xs: ReadonlyArray<string>): ReadonlyArray<string> =>
+  xs.slice(0, xs.findLastIndex((l) => l.trim() !== "") + 1)
+
+const dropLeadingBlanks = (xs: ReadonlyArray<string>): ReadonlyArray<string> => {
+  const first = xs.findIndex((l) => l.trim() !== "")
+  return first === -1 ? [] : xs.slice(first)
+}
+
 /** Check whether a section header exists in the raw TOML */
 const sectionExists = (lines: ReadonlyArray<string>, sectionHeader: string): boolean =>
   lines.some((l) => l.trim() === sectionHeader)
 
 /**
- * Remove a TOML section (e.g. `[secret.X]`) and all its fields through the next section or EOF.
- * Strips trailing blank lines left behind.
+ * Remove a TOML section (e.g. `[secret.X]`) and all its fields. A comment above the next
+ * section stays. The sections on either side end up one blank line apart.
  */
 export const removeSection = (raw: string, sectionHeader: string): Either<TomlEditError, string> => {
   const lines = raw.split("\n")
   const range = findSectionRange(lines, sectionHeader)
   if (!range) return Either.left({ _tag: "SectionNotFound", section: sectionHeader })
 
-  const after = lines.slice(range.end)
+  const before = dropTrailingBlanks(lines.slice(0, range.start))
+  const after = dropLeadingBlanks(lines.slice(sectionBodyEnd(lines, range)))
 
-  // Drop trailing blank lines from the kept prefix so the removed section doesn't leave a gap
-  const beforeAll = lines.slice(0, range.start)
-  const lastNonBlank = beforeAll.findLastIndex((l) => l.trim() !== "")
-  const before = lastNonBlank === -1 ? [] : beforeAll.slice(0, lastNonBlank + 1)
+  if (after.length === 0) return Either.right([...before, ...(raw.endsWith("\n") ? [""] : [])].join("\n"))
+  if (before.length === 0) return Either.right(after.join("\n"))
+  return Either.right([...before, "", ...after].join("\n"))
+}
 
-  const result = [...before, ...after].join("\n")
-  return Either.right(result)
+/**
+ * Replace a TOML section with `block`, in place. Lines outside the section, including the
+ * blank and comment lines between it and the next header, are left as they were.
+ */
+export const replaceSection = (raw: string, sectionHeader: string, block: string): Either<TomlEditError, string> => {
+  const lines = raw.split("\n")
+  const range = findSectionRange(lines, sectionHeader)
+  if (!range) return Either.left({ _tag: "SectionNotFound", section: sectionHeader })
+
+  const replaced = [
+    ...lines.slice(0, range.start),
+    ...block.trimEnd().split("\n"),
+    ...lines.slice(sectionBodyEnd(lines, range)),
+  ]
+  return Either.right(replaced.join("\n"))
 }
 
 /**

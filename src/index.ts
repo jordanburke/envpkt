@@ -129,7 +129,7 @@ export { diffConfigs } from "./core/diff.js"
 export { copyableSecretMeta, serializeEnvBlock, serializeSecretBlock } from "./core/copy.js"
 
 // TOML editing
-export { appendSection, removeSection, renameSection, updateSectionFields } from "./core/toml-edit.js"
+export { appendSection, removeSection, renameSection, replaceSection, updateSectionFields } from "./core/toml-edit.js"
 
 // Fleet scanner
 export { scanFleet } from "./core/fleet.js"

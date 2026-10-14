@@ -4,6 +4,7 @@ import {
   appendSection,
   removeSection,
   renameSection,
+  replaceSection,
   sortConfigToml,
   updateSectionFields,
 } from "../../src/core/toml-edit.js"
@@ -96,6 +97,44 @@ service = "keep"
     expect(text).toContain("[secret.KEEP]")
   })
 
+  it("keeps one blank line between the neighbours of a removed middle section", () => {
+    const text = removeSection(baseToml, "[secret.SECOND]").fold(
+      () => "",
+      (v) => v,
+    )
+    expect(text).toBe(`version = 1
+
+[secret.FIRST]
+service = "alpha"
+purpose = "Testing"
+
+[secret.THIRD]
+service = "gamma"
+`)
+  })
+
+  it("keeps the comment above the next section", () => {
+    const withDivider = `version = 1
+
+[secret.A]
+service = "a"
+
+# ---- group B ----
+[secret.B]
+service = "b"
+`
+    const text = removeSection(withDivider, "[secret.A]").fold(
+      () => "",
+      (v) => v,
+    )
+    expect(text).toBe(`version = 1
+
+# ---- group B ----
+[secret.B]
+service = "b"
+`)
+  })
+
   it("returns SectionNotFound for missing section", () => {
     const result = removeSection(baseToml, "[secret.NOPE]")
     expect(result.isLeft()).toBe(true)
@@ -104,6 +143,89 @@ service = "keep"
         expect(err._tag).toBe("SectionNotFound")
         expect(err.section).toBe("[secret.NOPE]")
       },
+      () => expect.unreachable("Should be Left"),
+    )
+  })
+})
+
+describe("replaceSection", () => {
+  const replaced = (raw: string, header: string, block: string): string =>
+    replaceSection(raw, header, block).fold(
+      (err) => expect.unreachable(`Should be Right, got ${err._tag}`),
+      (v) => v,
+    )
+
+  it("replaces a middle section in place, leaving every other line alone", () => {
+    expect(replaced(baseToml, "[secret.SECOND]", `[secret.SECOND]\nservice = "new"\n`)).toBe(`version = 1
+
+[secret.FIRST]
+service = "alpha"
+purpose = "Testing"
+
+[secret.SECOND]
+service = "new"
+
+[secret.THIRD]
+service = "gamma"
+`)
+  })
+
+  it("replaces the first section in place", () => {
+    expect(replaced(baseToml, "[secret.FIRST]", `[secret.FIRST]\nservice = "new"\n`)).toBe(
+      baseToml.replace(`service = "alpha"\npurpose = "Testing"`, `service = "new"`),
+    )
+  })
+
+  it("replaces the last section and ends with one newline", () => {
+    expect(replaced(baseToml, "[secret.THIRD]", `[secret.THIRD]\nservice = "new"\n`)).toBe(
+      baseToml.replace(`service = "gamma"`, `service = "new"`),
+    )
+  })
+
+  it("replaces a section holding a multiline encrypted_value", () => {
+    const withSealed = `version = 1
+
+[secret.SEALED]
+service = "vault"
+encrypted_value = """
+OLD_LINE1
+[not.a.header]
+"""
+
+[secret.KEEP]
+service = "keep"
+`
+    const block = `[secret.SEALED]\nservice = "vault"\nencrypted_value = """\nNEW_LINE1\n"""\n`
+    expect(replaced(withSealed, "[secret.SEALED]", block)).toBe(`version = 1
+
+[secret.SEALED]
+service = "vault"
+encrypted_value = """
+NEW_LINE1
+"""
+
+[secret.KEEP]
+service = "keep"
+`)
+  })
+
+  it("keeps a comment between the replaced section and the next header", () => {
+    const withDivider = `[secret.A]
+service = "a"
+
+# ---- group B ----
+[secret.B]
+service = "b"
+`
+    expect(replaced(withDivider, "[secret.A]", `[secret.A]\nservice = "z"\n`)).toBe(
+      withDivider.replace(`service = "a"`, `service = "z"`),
+    )
+  })
+
+  it("returns SectionNotFound for a missing section", () => {
+    const result = replaceSection(baseToml, "[secret.NOPE]", `[secret.NOPE]\n`)
+    result.fold(
+      (err) => expect(err).toEqual({ _tag: "SectionNotFound", section: "[secret.NOPE]" }),
       () => expect.unreachable("Should be Left"),
     )
   })

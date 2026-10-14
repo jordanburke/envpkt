@@ -14,11 +14,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `envpkt audit --unsealed` lists secrets with no `encrypted_value`: values envpkt resolves at
   runtime (env, fnox) plus `external = true` entries. Use `--status external` to list only the
   `external = true` entries. `--status` help now lists `missing_metadata` and `external`.
+- Library: `replaceSection(raw, header, block)` replaces a TOML section where it sits.
+
+### Changed
+
+- **Breaking (library):** `copyableSecretMeta` takes `created` in place of `today`. The caller
+  now decides the date: today for a new entry, or the destination's own `created` when
+  overwriting.
 
 ### Removed
 
 - **Breaking:** `envpkt audit --external` is gone; use `--unsealed` for the same filter. "External"
   now means only the `external = true` field.
+
+### Fixed
+
+- `envpkt copy --force` onto an existing entry replaces it in place. The entry keeps its position
+  and the destination's `created`, so the diff shows only what the copy changed. A copy into a
+  new key still appends at the end and stamps today. (#65)
+- Removing a section from the middle of a file (`secret rm`, `env rm`, `--force` on `secret alias`
+  and `env alias`) keeps one blank line between its neighbours. It no longer deletes a comment
+  sitting directly above the next section.
 
 ## [0.15.0] - 2026-10-04
 

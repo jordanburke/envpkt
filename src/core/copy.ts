@@ -14,19 +14,20 @@ const tomlInlineTable = (rec: Readonly<Record<string, string>>): string => {
 
 /**
  * The SecretMeta to write into the destination on copy.
- * - `created` is reset to today: the entry is new *here*, regardless of the source's age.
+ * - `created` comes from the caller, never the source: today for an entry new to the
+ *   destination, or the destination's own `created` when the copy overwrites it.
  * - `last_rotated_at` is dropped — it's the source's rotation history, not the copy's.
  * - `encryptedValue` re-derives the ciphertext: `Some(cipher)` sets the resealed value,
  *   `None` strips it entirely (a metadata-only copy of a secret with no sealed value).
  */
 export const copyableSecretMeta = (
   meta: SecretMeta,
-  opts: { readonly today: string; readonly encryptedValue: Option<string> },
+  opts: { readonly created: string; readonly encryptedValue: Option<string> },
 ): SecretMeta => {
   const { last_rotated_at: _lra, encrypted_value: _ev, ...rest } = meta
   return opts.encryptedValue.fold<SecretMeta>(
-    () => ({ ...rest, created: opts.today }),
-    (cipher) => ({ ...rest, created: opts.today, encrypted_value: cipher }),
+    () => ({ ...rest, created: opts.created }),
+    (cipher) => ({ ...rest, created: opts.created, encrypted_value: cipher }),
   )
 }
 

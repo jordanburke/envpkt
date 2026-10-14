@@ -7,7 +7,7 @@ import { describeSealKeySearch, resolveSealIdentity } from "../../core/boot.js"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import { copyableSecretMeta, serializeEnvBlock, serializeSecretBlock } from "../../core/copy.js"
 import { ageEncrypt, unsealSecrets } from "../../core/seal.js"
-import { appendSection, removeSection } from "../../core/toml-edit.js"
+import { appendSection, replaceSection } from "../../core/toml-edit.js"
 import type { EnvpktConfig } from "../../core/types.js"
 import { BOLD, CYAN, DIM, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 import { previewIfValid, writeIfValid } from "../write-gate.js"
@@ -36,6 +36,7 @@ const todayIso = (): string => new Date().toISOString().split("T")[0]!
  * Build the `[secret.<destName>]` block for a copy: unseal the source value with the
  * source identity and reseal it for the destination recipient. Secrets with no sealed
  * value are copied as metadata only (with a warning) — there's nothing to reseal.
+ * Overwriting an existing destination entry keeps its `created`; a new entry gets today.
  */
 const sealedSecretBlock = (
   key: string,
@@ -45,11 +46,11 @@ const sealedSecretBlock = (
   destConfig: EnvpktConfig,
 ): string => {
   const meta = srcConfig.secret![key]!
-  const today = todayIso()
+  const created = destConfig.secret?.[destName]?.created ?? todayIso()
 
   if (meta.encrypted_value === undefined || meta.encrypted_value === "") {
     console.error(`${YELLOW}Warning:${RESET} secret "${key}" has no sealed value — copying metadata only.`)
-    return serializeSecretBlock(destName, copyableSecretMeta(meta, { today, encryptedValue: Option.none<string>() }))
+    return serializeSecretBlock(destName, copyableSecretMeta(meta, { created, encryptedValue: Option.none<string>() }))
   }
 
   const identity = resolveSealIdentity(srcConfig, dirname(srcPath)).fold(
@@ -85,7 +86,7 @@ const sealedSecretBlock = (
     (err) => `${RED}Error:${RESET} reseal failed for "${destName}": ${err.message}`,
     2,
   )
-  return serializeSecretBlock(destName, copyableSecretMeta(meta, { today, encryptedValue: Option(cipher) }))
+  return serializeSecretBlock(destName, copyableSecretMeta(meta, { created, encryptedValue: Option(cipher) }))
 }
 
 const writeBlock = (
@@ -97,10 +98,9 @@ const writeBlock = (
   successMsg: string,
 ): void => {
   const raw = readFileSync(destPath, "utf-8")
-  const baseRaw = overwrite
-    ? orExit(removeSection(raw, header), (err) => `${RED}Error:${RESET} ${err._tag}: ${err.section}`, 2)
-    : raw
-  const updated = appendSection(baseRaw, block)
+  const updated = overwrite
+    ? orExit(replaceSection(raw, header, block), (err) => `${RED}Error:${RESET} ${err._tag}: ${err.section}`, 2)
+    : appendSection(raw, block)
   if (dryRun) {
     previewIfValid(updated, block)
     return
