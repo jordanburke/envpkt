@@ -41,6 +41,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
     "@sinclair/typebox": "^0.34.52",
+    "age-encryption": "^0.3.1",
     "commander": "^15.0.0",
     "functype": "^1.15.0",
     "functype-log": "^1.15.0",

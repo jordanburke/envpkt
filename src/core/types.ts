@@ -270,6 +270,12 @@ export type IdentityError =
   | { readonly _tag: "DecryptFailed"; readonly message: string }
   | { readonly _tag: "IdentityNotFound"; readonly path: string }
 
+/** Why an age identity (key) file can't be used for in-process decryption. Never carries key material. */
+export type IdentityFileError =
+  | { readonly _tag: "NoIdentityKey" }
+  | { readonly _tag: "PassphraseProtectedIdentity" }
+  | { readonly _tag: "UnsupportedIdentity"; readonly kind: "plugin" | "ssh" | "unknown"; readonly line: number }
+
 export type SealError =
   | { readonly _tag: "AgeNotFound"; readonly message: string }
   | { readonly _tag: "EncryptFailed"; readonly key: string; readonly message: string }
