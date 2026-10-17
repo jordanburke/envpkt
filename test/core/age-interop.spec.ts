@@ -39,7 +39,7 @@ const PLAINTEXTS: ReadonlyArray<readonly [string, string]> = [
 let tmpDir: string
 
 beforeEach(() => {
-  tmpDir = mkdtempSync(join(tmpdir(), "envpkt-age-interop-"))
+  tmpDir = mkdtempSync(join(tmpdir(), "envpkt-interop-"))
 })
 
 afterEach(() => {

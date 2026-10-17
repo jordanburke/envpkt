@@ -115,7 +115,7 @@ the maintained lines only: `"engines": { "node": ">=22.12.0" }`. CI runs `pnpm v
 newest 22, 24 and 26 (22 is in maintenance until 2027-04-30). pnpm needs 22.13+, so CI can't run
 the 22.12.0 floor; it was checked by hand (all tests, the CLI, and `require(esm)` pass). Re-check
 it before the 0.18.0 release. `.nvmrc` stays pinned at `24.20.0` for the publish job. Done ahead of
-step 2, so step 1's code is already tested on all three lines.
+step 2, so CI tests step 1's code on all three lines before step 2 builds on it.
 
 CommonJS callers load envpkt through `require(esm)` (unflagged from Node 22.12) and can't use
 top-level `await`; the 0.18.0 CHANGELOG entry must show them `boot().then(…)` (step 5).
