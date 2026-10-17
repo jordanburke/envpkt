@@ -318,7 +318,7 @@ See `references/quick-reference.md` for a compact cheat sheet.
 
 **exec options**: `-c <path>`, `--profile <profile>`, `--skip-audit` / `--no-check`, `--warn-only`, `--strict`
 
-**seal options**: `-c <path>`, `--profile <profile>`, `--reseal` (re-encrypt all including already sealed), `--edit <keys>` (comma-separated keys to re-seal with new interactively-prompted values)
+**seal options**: `-c <path>`, `--profile <profile>`, `--reseal` (re-encrypt all including already sealed), `--edit <keys>` (comma-separated keys to re-seal with new values; prompts in a terminal, and without one reads a single key's value from stdin), `--stdin` (with `--edit <key>`, read the value from stdin even in a terminal)
 
 **resolve options**: `-c <path>`, `-o <path>`, `--format toml|json`, `--dry-run`
 
@@ -685,7 +685,15 @@ envpkt seal                                  # 5. Encrypt values into config
 ```bash
 envpkt secret add NEW_API_KEY --service stripe --purpose "Payment processing"
 envpkt seal --edit NEW_API_KEY               # Prompts for value, encrypts it
+
+# No terminal (agent shell, CI): pipe the value in
+pbpaste | envpkt seal --edit NEW_API_KEY
+
+# A first seal also works with plain seal and an env var
+NEW_API_KEY=... envpkt seal
 ```
+
+Plain `envpkt seal` skips keys that are already sealed, so the env-var form only works for a first seal. Use `--edit` to replace a value.
 
 ### Rotating a Secret Value
 
@@ -693,9 +701,15 @@ envpkt seal --edit NEW_API_KEY               # Prompts for value, encrypts it
 # Re-seal a specific key with a new value (interactive prompt)
 envpkt seal --edit OPENAI_API_KEY
 
+# From an agent or CI shell with no terminal: pipe the new value on stdin
+pbpaste | envpkt seal --edit OPENAI_API_KEY
+printf '%s' "$NEW_VALUE" | envpkt seal --edit OPENAI_API_KEY --stdin
+
 # Re-encrypt ALL secrets (e.g. after rotating the age keypair)
 envpkt seal --reseal
 ```
+
+Stdin carries one value, so it takes exactly one `--edit` key. envpkt strips one trailing newline, fails on empty input, and never prints the value. A piped value replaces a sealed one without the confirm prompt the terminal path shows. `--stdin` forces stdin even in a terminal.
 
 ### Editing Secret Metadata
 

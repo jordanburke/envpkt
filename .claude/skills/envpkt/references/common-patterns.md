@@ -130,6 +130,9 @@ envpkt seal --edit OPENAI_API_KEY
 # Re-seal multiple keys at once
 envpkt seal --edit OPENAI_API_KEY,STRIPE_API_KEY
 
+# No terminal (agent shell, CI): pipe one key's value on stdin
+pbpaste | envpkt seal --edit OPENAI_API_KEY
+
 # Typical rotation flow:
 # 1. Rotate key in provider dashboard
 # 2. Re-seal with new value

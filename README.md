@@ -499,6 +499,8 @@ Encrypt secret values into `envpkt.toml` using [age](https://age-encryption.org/
 envpkt seal                            # Seal all secrets in envpkt.toml
 envpkt seal -c path/to/envpkt.toml     # Specify config path
 envpkt seal --profile staging          # Use a specific fnox profile for value resolution
+envpkt seal --edit OPENAI_API_KEY      # Re-seal one key with a new value (prompts in a terminal)
+pbpaste | envpkt seal --edit OPENAI_API_KEY   # No terminal (agent, CI): read the value from stdin
 ```
 
 Requires `identity.recipient` (age public key) in your config. Values are resolved via cascade:
@@ -506,6 +508,15 @@ Requires `identity.recipient` (age public key) in your config. Values are resolv
 1. **fnox** (if available)
 2. **Environment variables** (e.g. `OPENAI_API_KEY` in your shell)
 3. **Interactive prompt** (asks you to paste each value)
+
+Plain `envpkt seal` skips keys that are already sealed, so it only covers a first seal. `OPENAI_API_KEY=... envpkt seal` works for that.
+
+To rotate one sealed value, use `--edit <key>`. In a terminal it prompts, and asks before replacing a sealed value. Without a terminal (an agent shell, CI, Claude Code's `!` prompt), it reads the value from stdin instead and replaces it without asking. Pass `--stdin` to read stdin on purpose, even in a terminal. Stdin rules:
+
+- It carries one value, so `--edit` takes exactly one key.
+- One trailing newline is stripped (`\n` or `\r\n`).
+- Empty stdin is an error, and the file is left unchanged.
+- envpkt never prints the value.
 
 After sealing, each secret gets an `encrypted_value` field. At boot time, `envpkt exec` or `boot()` automatically decrypts sealed values using the `identity.key_file` path (or the default `~/.envpkt/age-key.txt`).
 

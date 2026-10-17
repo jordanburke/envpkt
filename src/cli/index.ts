@@ -168,7 +168,14 @@ program
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--profile <profile>", "fnox profile to use for value resolution")
   .option("--reseal", "Re-encrypt all secrets, including already sealed (for key rotation)")
-  .option("--edit <keys>", "Re-seal specific keys with new values (comma-separated), always prompts interactively")
+  .option(
+    "--edit <keys>",
+    "Re-seal specific keys with new values (comma-separated). Prompts in a terminal; without one, reads a single key's value from stdin",
+  )
+  .option(
+    "--stdin",
+    "With --edit <key>, read the new value from stdin even in a terminal (one key; one trailing newline is stripped)",
+  )
   .action(async (options) => {
     await runSeal(options)
   })

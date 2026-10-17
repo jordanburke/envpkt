@@ -8,7 +8,7 @@
 | `envpkt audit`                     | Audit credential health       | `--strict`, `--format`, `--expiring <days>`, `--status`                     |
 | `envpkt inspect`                   | Display config view           | `--resolved`, `--secrets`, `--plaintext`, `--format`                        |
 | `envpkt exec <cmd>`                | Audit + run with injected env | `--skip-audit`, `--warn-only`, `--strict`, `--profile`                      |
-| `envpkt seal`                      | Encrypt values with age       | `--profile`, `--reseal`, `--edit <keys>`                                    |
+| `envpkt seal`                      | Encrypt values with age       | `--profile`, `--reseal`, `--edit <keys>`, `--stdin`                         |
 | `envpkt resolve`                   | Flatten catalog references    | `-o <path>`, `--format toml\|json`, `--dry-run`                             |
 | `envpkt fleet`                     | Scan directory tree health    | `-d <path>`, `--depth`, `--status`, `--format`                              |
 | `envpkt mcp`                       | Start MCP server (stdio)      | `-c <path>`                                                                 |

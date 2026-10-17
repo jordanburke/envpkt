@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `envpkt seal --edit <key>` reads the new value from stdin when no terminal is attached, so an
+  agent or CI shell can rotate one sealed value: `pbpaste | envpkt seal --edit KEY`. `--stdin`
+  asks for this on purpose, even in a terminal. Stdin takes exactly one key, strips one trailing
+  newline, fails on empty input, and replaces a sealed value without the confirm prompt. The
+  terminal prompt is unchanged.
+
 ## [0.16.0] - 2026-10-11
 
 ### Added

@@ -1,7 +1,9 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { dirname, resolve } from "node:path"
+import { text } from "node:stream/consumers"
 
-import { List, Option, Set } from "functype"
+import type { Either } from "functype"
+import { Left, List, Option, Right, Set } from "functype"
 
 import { expandPath, loadConfig, resolveConfigPath } from "../../core/config.js"
 import { resolveKeyPath } from "../../core/keygen.js"
@@ -17,6 +19,7 @@ type SealOptions = {
   readonly profile?: string
   readonly reseal?: boolean
   readonly edit?: string
+  readonly stdin?: boolean
 }
 
 type SealParseState = {
@@ -187,12 +190,80 @@ export const collectEditedValues = async (
   return values
 }
 
+/** Where `--edit` reads new values from: the interactive prompt, or one value piped on stdin. */
+export type EditInput = "prompt" | "stdin"
+
+/**
+ * Pick the `--edit` input source. Stdin is used when `--stdin` is passed or no terminal is
+ * attached; it carries one value, so it needs exactly one key. Left holds the error message.
+ */
+export const resolveEditInput = (
+  keyCount: number,
+  opts: { readonly stdin: boolean; readonly isTTY: boolean },
+): Either<string, EditInput> => {
+  if (!opts.stdin && opts.isTTY) return Right("prompt")
+  if (keyCount !== 1) {
+    const why = opts.stdin ? "--stdin" : "Without an interactive terminal, --edit"
+    return Left(
+      `${why} reads one value from stdin, so it takes exactly one key (got ${keyCount}). Seal one key at a time.`,
+    )
+  }
+  return Right("stdin")
+}
+
+/** Strip one trailing newline (`\n` or `\r\n`) from piped input. None when nothing is left. */
+export const parseStdinValue = (raw: string): Option<string> => {
+  const value = raw.replace(/\r?\n$/, "")
+  return value === "" ? Option.none<string>() : Option(value)
+}
+
 /** Write sealed values back into the TOML file, preserving structure. */
 const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encrypted_value?: string }>): void => {
   const raw = readFileSync(configPath, "utf-8")
   const finalContent = applySealedToml(raw, sealedMeta)
   validateOrExit(finalContent)
   writeFileSync(configPath, finalContent)
+}
+
+/**
+ * Read one `--edit` value from stdin. The value is never echoed or logged. Piping a value is
+ * an explicit request to replace it, so a sealed entry is replaced without the confirm prompt.
+ */
+const readEditedValueFromStdin = async (key: string): Promise<Record<string, string>> => {
+  if (process.stdin.isTTY) console.error(`${DIM}Reading the value for ${key} from stdin (end with Ctrl-D)${RESET}`)
+  return parseStdinValue(await text(process.stdin)).fold(
+    () => {
+      console.error(`${RED}Error:${RESET} No value on stdin for ${key}`)
+      console.error(
+        `${DIM}Pipe the value in, e.g. ${CYAN}pbpaste | envpkt seal --edit ${key}${RESET}${DIM}, or run in a terminal to be prompted.${RESET}`,
+      )
+      process.exit(2)
+      return {} // unreachable
+    },
+    (value) => ({ [key]: value }),
+  )
+}
+
+/** Prompt for each `--edit` value on the terminal, confirming before replacing a sealed one. */
+const promptEditedValues = async (
+  editKeys: ReadonlyArray<string>,
+  secretEntries: Readonly<Record<string, SecretMeta>>,
+): Promise<Record<string, string>> => {
+  const rl = await import("node:readline").then((m) =>
+    m.createInterface({ input: process.stdin, output: process.stderr }),
+  )
+  const prompt = (question: string): Promise<string> =>
+    new Promise((resolve) => {
+      rl.question(question, (answer) => resolve(answer))
+    })
+
+  const values = await collectEditedValues(editKeys, secretEntries, prompt, (key, reason) => {
+    console.error(
+      `${YELLOW}Skipped${RESET} ${key} (${reason === "empty" ? "empty value" : "kept existing sealed value"})`,
+    )
+  })
+  rl.close()
+  return values
 }
 
 export const runSeal = async (options: SealOptions): Promise<void> => {
@@ -257,13 +328,18 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     )
   })
 
-  // --edit mode: re-seal specific keys with new interactively-prompted values
+  // --edit mode: re-seal specific keys with new values from the prompt or stdin
   const editKeys = options.edit
     ? options.edit
         .split(",")
         .map((k) => k.trim())
         .filter((k) => k.length > 0)
     : []
+
+  if (options.stdin && editKeys.length === 0) {
+    console.error(`${RED}Error:${RESET} --stdin needs --edit <key> to name the secret the value is for`)
+    process.exit(2)
+  }
 
   if (editKeys.length > 0) {
     const allSecretEntries = config.secret ?? {}
@@ -290,10 +366,17 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
       process.exit(2)
     }
 
-    if (!process.stdin.isTTY) {
-      console.error(`${RED}Error:${RESET} --edit requires an interactive terminal`)
-      process.exit(2)
-    }
+    const input = resolveEditInput(editKeys.length, {
+      stdin: options.stdin === true,
+      isTTY: process.stdin.isTTY === true,
+    }).fold(
+      (msg) => {
+        console.error(`${RED}Error:${RESET} ${msg}`)
+        process.exit(2)
+        return "prompt" as const // unreachable
+      },
+      (i) => i,
+    )
 
     const secretEntries = Object.fromEntries(editKeys.map((k) => [k, allSecretEntries[k]!]))
 
@@ -302,21 +385,11 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     )
     console.log("")
 
-    // Force interactive prompt — skip fnox/env cascade entirely
-    const rl = await import("node:readline").then((m) =>
-      m.createInterface({ input: process.stdin, output: process.stderr }),
-    )
-    const prompt = (question: string): Promise<string> =>
-      new Promise((resolve) => {
-        rl.question(question, (answer) => resolve(answer))
-      })
-
-    const values = await collectEditedValues(editKeys, secretEntries, prompt, (key, reason) => {
-      console.error(
-        `${YELLOW}Skipped${RESET} ${key} (${reason === "empty" ? "empty value" : "kept existing sealed value"})`,
-      )
-    })
-    rl.close()
+    // Skip the fnox/env cascade entirely: the value comes from stdin or the prompt
+    const values =
+      input === "stdin"
+        ? await readEditedValueFromStdin(editKeys[0]!)
+        : await promptEditedValues(editKeys, secretEntries)
 
     if (Object.keys(values).length === 0) {
       console.error(`${RED}Error:${RESET} No values provided`)

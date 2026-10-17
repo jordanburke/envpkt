@@ -6,8 +6,9 @@ import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { collectEditedValues } from "../../src/cli/commands/seal.js"
+import { collectEditedValues, parseStdinValue, resolveEditInput } from "../../src/cli/commands/seal.js"
 import { loadConfig } from "../../src/core/config.js"
+import { unsealSecrets } from "../../src/core/seal.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__testDir, "../..")
@@ -37,7 +38,7 @@ afterEach(() => {
 
 type RunResult = { stdout: string; status: number }
 
-const run = (args: string[], env?: Record<string, string>): RunResult => {
+const run = (args: string[], env?: Record<string, string>, input?: string): RunResult => {
   // spawnSync captures stdout AND stderr regardless of exit status (unlike
   // execFileSync which only returns stderr in the exception path). This makes
   // assertions over informational stderr output reliable on success.
@@ -45,6 +46,7 @@ const run = (args: string[], env?: Record<string, string>): RunResult => {
     cwd: tmpDir,
     encoding: "utf-8",
     env: { ...process.env, ...env },
+    input,
   })
   return {
     stdout: (result.stdout ?? "") + (result.stderr ?? ""),
@@ -221,5 +223,115 @@ describe("collectEditedValues (--edit confirm-on-overwrite)", () => {
     )
     expect(values).toEqual({})
     expect(skips).toEqual(["S:empty"])
+  })
+})
+
+describe("resolveEditInput (--edit input source)", () => {
+  it("prompts when a terminal is attached and --stdin is not passed", () => {
+    expect(resolveEditInput(1, { stdin: false, isTTY: true }).orThrow()).toBe("prompt")
+    expect(resolveEditInput(3, { stdin: false, isTTY: true }).orThrow()).toBe("prompt")
+  })
+
+  it("reads stdin for one key when no terminal is attached", () => {
+    expect(resolveEditInput(1, { stdin: false, isTTY: false }).orThrow()).toBe("stdin")
+  })
+
+  it("reads stdin for one key when --stdin is passed, even in a terminal", () => {
+    expect(resolveEditInput(1, { stdin: true, isTTY: true }).orThrow()).toBe("stdin")
+  })
+
+  it("refuses several keys on stdin", () => {
+    const noTty = resolveEditInput(2, { stdin: false, isTTY: false })
+    expect(noTty.isLeft()).toBe(true)
+    expect(
+      noTty.fold(
+        (m) => m,
+        () => "",
+      ),
+    ).toContain("exactly one key (got 2)")
+    expect(resolveEditInput(2, { stdin: true, isTTY: true }).isLeft()).toBe(true)
+  })
+})
+
+describe("parseStdinValue", () => {
+  it("strips exactly one trailing newline", () => {
+    expect(parseStdinValue("secret\n").orThrow()).toBe("secret")
+    expect(parseStdinValue("secret\r\n").orThrow()).toBe("secret")
+    expect(parseStdinValue("secret\n\n").orThrow()).toBe("secret\n")
+    expect(parseStdinValue("secret").orThrow()).toBe("secret")
+  })
+
+  it("is empty for empty input or a lone newline", () => {
+    expect(parseStdinValue("").isEmpty).toBe(true)
+    expect(parseStdinValue("\n").isEmpty).toBe(true)
+  })
+})
+
+describe.skipIf(!ageInstalled)("envpkt seal --edit from stdin", () => {
+  let recipient: string
+  let identityPath: string
+
+  beforeEach(() => {
+    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+    const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
+    recipient = recipientLine!.replace("# public key: ", "").trim()
+    identityPath = join(tmpDir, "age-key.txt")
+    writeFileSync(identityPath, keygenOutput)
+    writeFileSync(
+      configPath,
+      `version = 1
+
+[identity]
+name = "test"
+recipient = "${recipient}"
+
+[secret.API_KEY]
+service = "api"
+
+[secret.OTHER_KEY]
+service = "other"
+`,
+    )
+  })
+
+  const unsealed = (): Record<string, string> => {
+    const config = loadConfig(configPath).orThrow()
+    return unsealSecrets(config.secret ?? {}, identityPath).orThrow()
+  }
+
+  it("seals one key from piped stdin, stripping the trailing newline, and never prints it", () => {
+    const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "piped-value-123\n")
+    expect(status).toBe(0)
+    expect(stdout).not.toContain("piped-value-123")
+    expect(unsealed()).toEqual({ API_KEY: "piped-value-123" })
+  })
+
+  it("replaces an already-sealed value without a confirm prompt (rotation)", () => {
+    expect(run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "first\n").status).toBe(0)
+    const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY", "--stdin"], {}, "second\n")
+    expect(status).toBe(0)
+    expect(stdout).not.toContain("Replace the sealed value")
+    expect(unsealed()).toEqual({ API_KEY: "second" })
+  })
+
+  it("fails clearly on empty stdin and leaves the file unchanged", () => {
+    const before = readFileSync(configPath, "utf-8")
+    const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "")
+    expect(status).toBe(2)
+    expect(stdout).toContain("No value on stdin for API_KEY")
+    expect(readFileSync(configPath, "utf-8")).toBe(before)
+  })
+
+  it("refuses several --edit keys without a terminal", () => {
+    const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY,OTHER_KEY"], {}, "value\n")
+    expect(status).toBe(2)
+    expect(stdout).toContain("exactly one key (got 2)")
+    expect(stdout).not.toContain("value\n")
+  })
+
+  it("refuses --stdin without --edit", () => {
+    const { status, stdout } = run(["seal", "-c", configPath, "--stdin"], {}, "value\n")
+    expect(status).toBe(2)
+    expect(stdout).toContain("--stdin needs --edit")
   })
 })
