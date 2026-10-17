@@ -8,8 +8,8 @@ Seal and unseal without the external `age` binary. Today `npm install -g envpkt`
 users also install `age` (brew, apt, scoop), every CI workflow installs it, and the GitHub Action
 documents it as a runner requirement. [typage](https://github.com/FiloSottile/typage)
 (`age-encryption` on npm) is the age format in TypeScript, by age's author. It ships plain ESM
-JavaScript, depends only on the noble crypto libraries, runs on Node 20+, and its test suite runs
-the shared `cctv-age` test vectors.
+JavaScript, depends only on the noble crypto libraries, needs Node 20+, and its test suite runs
+the shared `cctv-age` test vectors. envpkt supports only maintained Node lines (decision 5).
 
 Correction for #41: it says "TypeScript/WASM". typage has no WASM; fix the issue text.
 
@@ -44,7 +44,9 @@ Nothing else imports `age-encryption`. It exposes, all returning `Promise<Either
 
 - `encryptArmored(plaintext, recipient)`: armored string, formatted exactly as `ageEncrypt` writes
   it today (check `armor.encode`'s trailing newline against the current `.trim()`).
-- `decryptArmored(armored, identities: ReadonlyArray<string>)`: plaintext, byte for byte.
+- `decryptArmored(armored, identities: ReadonlyArray<string>)`: plaintext, byte for byte when it
+  is valid UTF-8 (a leading BOM included). A malformed key fails by position (`identity 2 is not a
+valid age secret key`): typage's bech32 errors quote the whole key, so they never reach a message.
 - `generateIdentity()`: `{ identity, recipient }`.
 - `parseIdentityFile(content)`: every `AGE-SECRET-KEY-` line, or a typed error for a
   passphrase-protected file, an `AGE-PLUGIN-` line, or no key.
@@ -89,15 +91,30 @@ like.
 
 ### 4. Callers to migrate
 
-- `src/core/boot.ts`: phase 1 unseal, identity resolution, `boot`/`bootSafe`.
+- `src/core/boot.ts`: phase 1 unseal, identity resolution, `boot`/`bootSafe`. Phase 1 lives inside
+  synchronous `fold` chains, so it is a restructure, not an `await` sprinkle: lift each phase to
+  `Promise<Either>` and chain them. `no-floating-promises` and `no-misused-promises` are at error
+  level, so the linter catches a missed `await`.
+- `fnoxExport(profile, agentKey?)` takes one key. With `unwrapAgentKey` returning all keys, pass
+  the first, as today.
+- Removing `AgeNotFound` also touches `src/cli/output.ts` (its error formatter),
+  `boot.ts`'s `AgeNotFound` case, and `ageInstallHint`.
+- Add `IdentityFileError` to `IdentityError` (and so `BootError`), and export it from `index.ts`.
 - `src/cli/commands/`: `exec`, `env export`/`env github`, `headers`, `doctor` (via `bootSafe`);
   `seal` (3 seal/unseal calls and `unwrapAgentKey`); `secret rotate` (`ageEncrypt`); `copy` (unseal
-  and reseal); `inspect` (unseal); `keygen` (`generateKeypair`). Commander supports async actions.
+  and reseal); `inspect` (unseal); `keygen` (`generateKeypair`). Commander supports async actions,
+  but only under `program.parseAsync()`; `src/cli/index.ts` calls `program.parse()` today.
 - `doctor` replaces its `age` version check with the bundled `age-encryption` version (decision 4).
 
-### 5. `engines`
+### 5. Node versions
 
-`package.json` has no `engines` field. typage needs Node 20+. Add `"engines": { "node": ">=20" }`.
+`package.json` had no `engines` field. Node 20 reached end of life on 2026-04-30, so envpkt claims
+the maintained lines only: `"engines": { "node": ">=22" }`. CI runs `pnpm validate` on 22, 24 and 26
+(22 is in maintenance until 2027-04-30). `.nvmrc` stays pinned at `24.20.0` for the publish job.
+Done ahead of step 2, so step 1's code is already tested on all three.
+
+CommonJS callers load envpkt through `require(esm)` (unflagged from Node 22.12) and can't use
+top-level `await`; the CHANGELOG shows them `boot().then(…)`.
 
 ## Format compatibility (the test that decides whether this is safe)
 
@@ -143,7 +160,7 @@ byte-for-byte tests from 0.17.0 (`copy`, `--reseal`, env → `boot()`) carry ove
 2. Core callers: `seal.ts`, `keygen.ts`, `fnox/identity.ts`, `boot.ts`; types; `index.ts` exports.
 3. CLI callers.
 4. Test-setup migration and `action-smoke.yml`.
-5. Docs, CHANGELOG, `engines`, release 0.18.0.
+5. Docs, CHANGELOG, release 0.18.0.
 
 ## Deferred
 
@@ -163,3 +180,5 @@ shape as today's `age` shell-out. It is additive, so it needs no further breakin
    Every recipient in the maintainer's configs is a plain `age1…` X25519 key.
 3. **Names: kept.** `boot`, `bootSafe`, `sealSecrets`, … keep their names and return Promises.
 4. **`doctor`: reports the bundled `age-encryption` version** in place of the `age` CLI check.
+5. **Node: maintained lines only.** `engines` is `>=22`, and CI tests 22, 24 and 26. When a line
+   reaches end of life, drop it from the matrix and raise `engines` in the next minor release.
