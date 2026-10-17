@@ -515,7 +515,7 @@ To rotate one sealed value, use `--edit <key>`. In a terminal it prompts, and as
 
 - It carries one value, so `--edit` takes exactly one key.
 - One trailing newline is stripped (`\n` or `\r\n`).
-- Empty stdin is an error, and the file is left unchanged.
+- Empty or whitespace-only stdin is an error, and the file is left unchanged.
 - envpkt never prints the value.
 
 After sealing, each secret gets an `encrypted_value` field. At boot time, `envpkt exec` or `boot()` automatically decrypts sealed values using the `identity.key_file` path (or the default `~/.envpkt/age-key.txt`).

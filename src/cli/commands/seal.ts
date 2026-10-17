@@ -151,6 +151,12 @@ export const applySealedToml = (raw: string, sealedMeta: Record<string, { encryp
   return final.output.join("\n")
 }
 
+/**
+ * A value with no non-whitespace content. Unsealing trims, so such a value would come back as
+ * `""` — it is treated as empty on both the prompt and stdin paths.
+ */
+const isBlank = (value: string): boolean => value.trim() === ""
+
 /** Affirmative answer to a `[y/N]` confirm prompt. */
 const isAffirmative = (answer: string): boolean => /^y(es)?$/i.test(answer.trim())
 
@@ -158,7 +164,7 @@ const isAffirmative = (answer: string): boolean => /^y(es)?$/i.test(answer.trim(
  * Collect new plaintext values for the `--edit`ed keys via the injected `prompt`. Before
  * overwriting an entry that is **already sealed** (`encrypted_value` present), require an
  * explicit confirmation — replacing it discards the only ciphertext, and the prior value
- * can't be recovered without the original key. Declined or empty entries are skipped (reported
+ * can't be recovered without the original key. Declined or empty (whitespace-only) entries are skipped (reported
  * via `onSkip`). I/O flows only through `prompt`/`onSkip`, so the confirm/skip logic is
  * unit-testable without a TTY.
  */
@@ -181,7 +187,7 @@ export const collectEditedValues = async (
       }
     }
     const value = await prompt(`Enter new value for ${key}: `)
-    if (value === "") {
+    if (isBlank(value)) {
       onSkip?.(key, "empty")
       continue
     }
@@ -211,10 +217,10 @@ export const resolveEditInput = (
   return Right("stdin")
 }
 
-/** Strip one trailing newline (`\n` or `\r\n`) from piped input. None when nothing is left. */
+/** Strip one trailing newline (`\n` or `\r\n`) from piped input. None when nothing but whitespace is left. */
 export const parseStdinValue = (raw: string): Option<string> => {
   const value = raw.replace(/\r?\n$/, "")
-  return value === "" ? Option.none<string>() : Option(value)
+  return isBlank(value) ? Option.none<string>() : Option(value)
 }
 
 /** Write sealed values back into the TOML file, preserving structure. */
@@ -230,7 +236,9 @@ const writeSealedToml = (configPath: string, sealedMeta: Record<string, { encryp
  * an explicit request to replace it, so a sealed entry is replaced without the confirm prompt.
  */
 const readEditedValueFromStdin = async (key: string): Promise<Record<string, string>> => {
-  if (process.stdin.isTTY) console.error(`${DIM}Reading the value for ${key} from stdin (end with Ctrl-D)${RESET}`)
+  // Say so even without a TTY: a harness that holds stdin open would otherwise wait silently.
+  const endHint = process.stdin.isTTY ? " (end with Ctrl-D)" : ""
+  console.error(`${DIM}Reading the value for ${key} from stdin${endHint}${RESET}`)
   return parseStdinValue(await text(process.stdin)).fold(
     () => {
       console.error(`${RED}Error:${RESET} No value on stdin for ${key}`)

@@ -224,6 +224,15 @@ describe("collectEditedValues (--edit confirm-on-overwrite)", () => {
     expect(values).toEqual({})
     expect(skips).toEqual(["S:empty"])
   })
+
+  it("skips a whitespace-only value as empty", async () => {
+    const skips: string[] = []
+    const values = await collectEditedValues(["U"], unsealed, scriptedPrompt({ value: "   " }, []), (k, r) =>
+      skips.push(`${k}:${r}`),
+    )
+    expect(values).toEqual({})
+    expect(skips).toEqual(["U:empty"])
+  })
 })
 
 describe("resolveEditInput (--edit input source)", () => {
@@ -261,9 +270,11 @@ describe("parseStdinValue", () => {
     expect(parseStdinValue("secret").orThrow()).toBe("secret")
   })
 
-  it("is empty for empty input or a lone newline", () => {
+  it("is empty for empty input, a lone newline, or whitespace only", () => {
     expect(parseStdinValue("").isEmpty).toBe(true)
     expect(parseStdinValue("\n").isEmpty).toBe(true)
+    expect(parseStdinValue("   \n").isEmpty).toBe(true)
+    expect(parseStdinValue(" \t\r\n").isEmpty).toBe(true)
   })
 })
 
@@ -322,11 +333,25 @@ service = "other"
     expect(readFileSync(configPath, "utf-8")).toBe(before)
   })
 
+  it("fails on whitespace-only stdin", () => {
+    const before = readFileSync(configPath, "utf-8")
+    const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "   \n")
+    expect(status).toBe(2)
+    expect(stdout).toContain("No value on stdin for API_KEY")
+    expect(readFileSync(configPath, "utf-8")).toBe(before)
+  })
+
+  it("says it is reading stdin even without a terminal", () => {
+    const { stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "v\n")
+    expect(stdout).toContain("Reading the value for API_KEY from stdin")
+    expect(stdout).not.toContain("Ctrl-D")
+  })
+
   it("refuses several --edit keys without a terminal", () => {
-    const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY,OTHER_KEY"], {}, "value\n")
+    const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY,OTHER_KEY"], {}, "canary-k7q2x\n")
     expect(status).toBe(2)
     expect(stdout).toContain("exactly one key (got 2)")
-    expect(stdout).not.toContain("value\n")
+    expect(stdout).not.toContain("canary-k7q2x")
   })
 
   it("refuses --stdin without --edit", () => {

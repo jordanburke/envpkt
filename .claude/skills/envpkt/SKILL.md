@@ -709,7 +709,7 @@ printf '%s' "$NEW_VALUE" | envpkt seal --edit OPENAI_API_KEY --stdin
 envpkt seal --reseal
 ```
 
-Stdin carries one value, so it takes exactly one `--edit` key. envpkt strips one trailing newline, fails on empty input, and never prints the value. A piped value replaces a sealed one without the confirm prompt the terminal path shows. `--stdin` forces stdin even in a terminal.
+Stdin carries one value, so it takes exactly one `--edit` key. envpkt strips one trailing newline, fails on empty or whitespace-only input, and never prints the value. A piped value replaces a sealed one without the confirm prompt the terminal path shows. `--stdin` forces stdin even in a terminal.
 
 ### Editing Secret Metadata
 
