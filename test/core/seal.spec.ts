@@ -62,6 +62,31 @@ describe("ageEncrypt / ageDecrypt", () => {
   })
 })
 
+describe("ageDecrypt edge whitespace", () => {
+  it.skipIf(!ageInstalled)("returns the plaintext byte for byte, including edge whitespace", () => {
+    const keygenOutput = execFileSync("age-keygen", [], {
+      stdio: ["pipe", "pipe", "pipe"],
+      encoding: "utf-8",
+    })
+    const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
+    const recipient = recipientLine!.replace("# public key: ", "").trim()
+    const identityPath = join(tmpDir, "test-identity.txt")
+    writeFileSync(identityPath, keygenOutput)
+
+    const pem =
+      "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEA\n-----END PRIVATE KEY-----\n"
+    const padded = "  padded value\t"
+
+    ;[pem, padded].forEach((plaintext) => {
+      const roundTripped = ageEncrypt(plaintext, recipient).flatMap((ct) => ageDecrypt(ct, identityPath))
+      roundTripped.fold(
+        (err) => expect.unreachable(`Round trip failed: ${err.message}`),
+        (decrypted) => expect(decrypted).toBe(plaintext),
+      )
+    })
+  })
+})
+
 describe("sealSecrets", () => {
   it.skipIf(!ageInstalled)("seals all provided values and preserves meta without values", () => {
     const keygenOutput = execFileSync("age-keygen", [], {

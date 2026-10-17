@@ -24,7 +24,7 @@ export const ageEncrypt = (plaintext: string, recipient: string): Either<SealErr
   )
 }
 
-/** Decrypt an age-armored ciphertext using the given identity file */
+/** Decrypt an age-armored ciphertext using the given identity file. The plaintext is returned as-is, untrimmed. */
 export const ageDecrypt = (ciphertext: string, identityPath: string): Either<SealError, string> => {
   if (!ageAvailable()) {
     return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
@@ -38,7 +38,7 @@ export const ageDecrypt = (ciphertext: string, identityPath: string): Either<Sea
     }),
   ).fold<Either<SealError, string>>(
     (err) => Left({ _tag: "DecryptFailed", key: "", message: `age decrypt failed: ${err}` } as const),
-    (output) => Right(output.trim()),
+    (output) => Right(output),
   )
 }
 

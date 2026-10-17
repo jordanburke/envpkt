@@ -152,8 +152,8 @@ export const applySealedToml = (raw: string, sealedMeta: Record<string, { encryp
 }
 
 /**
- * A value with no non-whitespace content. Unsealing trims, so such a value would come back as
- * `""` — it is treated as empty on both the prompt and stdin paths.
+ * A value with no non-whitespace content. No credential is all whitespace, so such a value is a
+ * mistake — it is treated as empty on both the prompt and stdin paths.
  */
 const isBlank = (value: string): boolean => value.trim() === ""
 

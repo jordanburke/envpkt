@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Unsealing returns the value exactly as sealed. It used to trim edge whitespace, so a PEM key lost
+  its final newline, and `copy` and `seal --reseal` sealed the trimmed value back in. This reaches
+  `boot()`, `exec`, `env export`, `inspect` and the library's `ageDecrypt`/`unsealSecrets`. A value
+  encrypted by hand with a trailing newline (`echo value | age -r ...`) now keeps that newline; envpkt's
+  own seal paths never add one.
+
 ## [0.16.0] - 2026-10-17
 
 ### Added
