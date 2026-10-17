@@ -179,7 +179,7 @@ placeholder
 `
     writeFileSync(configPath, original)
 
-    // Empty input simulates user hitting enter on the prompt
+    // Empty or whitespace-only input is no value, as if the user hit enter at the prompt
     const { status, stdout } = run(["secret", "rotate", "API_KEY", "-c", configPath], input)
     expect(status).toBe(1)
     expect(stdout).toContain("Cancelled")
