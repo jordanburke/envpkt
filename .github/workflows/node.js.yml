@@ -10,16 +10,22 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Maintained Node lines only; see the engines field in package.json.
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: ["22", "24", "26"]
+
     steps:
       - uses: actions/checkout@v5
 
       - uses: pnpm/action-setup@v6
         name: Install pnpm
 
-      - name: Setup Node.js
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v5
         with:
-          node-version-file: ".nvmrc"
+          node-version: ${{ matrix.node-version }}
           cache: "pnpm"
 
       # Sealed-value tests decrypt with the `age` CLI, which is not preinstalled.
