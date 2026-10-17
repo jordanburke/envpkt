@@ -4,7 +4,14 @@ vi.mock("../../src/fnox/detect.js", () => ({ fnoxAvailable: () => false }))
 
 import { resolveValues } from "../../src/core/resolve-values.js"
 
-const KEYS = ["ENVPKT_TEST_NL", "ENVPKT_TEST_CRLF", "ENVPKT_TEST_TWO_NL", "ENVPKT_TEST_PADDED", "ENVPKT_TEST_ONLY_NL"]
+const KEYS = [
+  "ENVPKT_TEST_NL",
+  "ENVPKT_TEST_CRLF",
+  "ENVPKT_TEST_TWO_NL",
+  "ENVPKT_TEST_PADDED",
+  "ENVPKT_TEST_ONLY_NL",
+  "ENVPKT_TEST_BLANK",
+]
 
 describe("resolveValues env layer", () => {
   const originalIsTTY = process.stdin.isTTY
@@ -37,9 +44,10 @@ describe("resolveValues env layer", () => {
     })
   })
 
-  it("treats an env var holding only a newline as unset", async () => {
+  it("treats an env var holding only a newline or whitespace as unset", async () => {
     process.env["ENVPKT_TEST_ONLY_NL"] = "\n"
+    process.env["ENVPKT_TEST_BLANK"] = "  \t \n"
 
-    expect(await resolveValues(["ENVPKT_TEST_ONLY_NL"])).toEqual({})
+    expect(await resolveValues(["ENVPKT_TEST_ONLY_NL", "ENVPKT_TEST_BLANK"])).toEqual({})
   })
 })

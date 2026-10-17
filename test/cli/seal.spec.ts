@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { collectEditedValues, parseStdinValue, resolveEditInput } from "../../src/cli/commands/seal.js"
+import { bootSafe } from "../../src/core/boot.js"
 import { loadConfig } from "../../src/core/config.js"
 import { unsealSecrets } from "../../src/core/seal.js"
 
@@ -358,5 +359,65 @@ service = "other"
     const { status, stdout } = run(["seal", "-c", configPath, "--stdin"], {}, "value\n")
     expect(status).toBe(2)
     expect(stdout).toContain("--stdin needs --edit")
+  })
+})
+
+describe.skipIf(!ageInstalled)("envpkt seal — values survive sealing byte for byte", () => {
+  // A PEM key keeps its final newline; stdin strips the one extra newline after it.
+  const PEM =
+    "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEA\n-----END PRIVATE KEY-----\n"
+
+  beforeEach(() => {
+    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+    const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
+    const recipient = recipientLine!.replace("# public key: ", "").trim()
+    const identityPath = join(tmpDir, "age-key.txt")
+    writeFileSync(identityPath, keygenOutput)
+    writeFileSync(
+      configPath,
+      `version = 1
+
+[identity]
+name = "test"
+recipient = "${recipient}"
+key_file = "${identityPath}"
+
+[secret.ENVPKT_WS_PEM]
+service = "tls"
+
+[secret.ENVPKT_WS_TOKEN]
+service = "api"
+`,
+    )
+  })
+
+  const booted = (): Readonly<Record<string, string>> =>
+    bootSafe({ configPath, inject: false }).fold(
+      (err) => expect.unreachable(`boot failed: ${err._tag}`),
+      (result) => result.secrets,
+    )
+
+  it("--reseal keeps a value's edge whitespace, and boot() returns it unchanged", () => {
+    expect(run(["seal", "-c", configPath, "--edit", "ENVPKT_WS_PEM"], {}, `${PEM}\n`).status).toBe(0)
+    expect(run(["seal", "-c", configPath, "--edit", "ENVPKT_WS_TOKEN"], {}, "  padded\t\n").status).toBe(0)
+    expect(booted()).toEqual({ ENVPKT_WS_PEM: PEM, ENVPKT_WS_TOKEN: "  padded\t" })
+
+    const before = readFileSync(configPath, "utf-8")
+    expect(run(["seal", "-c", configPath, "--reseal"]).status).toBe(0)
+    expect(readFileSync(configPath, "utf-8")).not.toBe(before)
+    expect(booted()).toEqual({ ENVPKT_WS_PEM: PEM, ENVPKT_WS_TOKEN: "  padded\t" })
+  })
+
+  it("seals from env vars, stripping one trailing newline, and boot() returns the value", () => {
+    const { status } = run(["seal", "-c", configPath], { ENVPKT_WS_PEM: `${PEM}\n`, ENVPKT_WS_TOKEN: "tok\n" })
+    expect(status).toBe(0)
+    expect(booted()).toEqual({ ENVPKT_WS_PEM: PEM, ENVPKT_WS_TOKEN: "tok" })
+  })
+
+  it("skips a whitespace-only env var instead of sealing it", () => {
+    const { status, stdout } = run(["seal", "-c", configPath], { ENVPKT_WS_PEM: `${PEM}\n`, ENVPKT_WS_TOKEN: "   \n" })
+    expect(status).toBe(0)
+    expect(stdout).toContain("ENVPKT_WS_TOKEN")
+    expect(booted()).toEqual({ ENVPKT_WS_PEM: PEM })
   })
 })

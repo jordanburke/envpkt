@@ -7,7 +7,7 @@ import { fileURLToPath } from "node:url"
 import { parse } from "smol-toml"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { unsealSecrets } from "../../src/core/seal.js"
+import { ageEncrypt, unsealSecrets } from "../../src/core/seal.js"
 import type { SecretMeta } from "../../src/core/types.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
@@ -200,6 +200,33 @@ service = "b"
         (err) => expect.fail(`expected decrypt to succeed, got ${err.message}`),
         (values) => expect(values.API_KEY).toBe("sk-test-123"),
       )
+    },
+    60_000,
+  )
+
+  it.skipIf(!ageInstalled)(
+    "keeps a sealed value's edge whitespace when it reseals for the destination",
+    () => {
+      const aKey = join(tmpDir, "a-key.txt")
+      const bKey = join(tmpDir, "b-key.txt")
+      const aRec = ageKeygen(aKey)
+      const bRec = ageKeygen(bKey)
+
+      // Sealed by hand, as `age -r` would: the PEM keeps its final newline.
+      const pem =
+        "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEA\n-----END PRIVATE KEY-----\n"
+      const ciphertext = ageEncrypt(pem, aRec).orThrow()
+      const a = write(
+        "a.toml",
+        `version = 1\n\n[identity]\nname = "src"\nrecipient = "${aRec}"\nkey_file = "${aKey}"\n\n[secret.TLS_KEY]\nservice = "tls"\ncreated = "2025-01-01"\nencrypted_value = """\n${ciphertext}\n"""\n`,
+      )
+      const b = write(
+        "b.toml",
+        `version = 1\n\n[identity]\nname = "dest"\nrecipient = "${bRec}"\nkey_file = "${bKey}"\n`,
+      )
+      expect(cli(["copy", "TLS_KEY", "--from", a, "--to", b]).status).toBe(0)
+
+      expect(unsealSecrets({ TLS_KEY: parseSecret(b, "TLS_KEY") }, bKey).orThrow()).toEqual({ TLS_KEY: pem })
     },
     60_000,
   )

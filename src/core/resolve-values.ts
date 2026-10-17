@@ -38,7 +38,8 @@ export const resolveValues = async (
   const envSnapshot = [...remaining]
   envSnapshot.forEach((key) => {
     const envValue = stripTrailingNewline(process.env[key] ?? "")
-    if (envValue !== "") {
+    // A blank value is unset: no credential is all whitespace.
+    if (envValue.trim() !== "") {
       result[key] = envValue
       remaining.delete(key)
     }

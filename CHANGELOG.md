@@ -9,8 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- `envpkt seal` strips one trailing newline from a value it reads from an environment variable, as
-  the stdin path already does. A value set with `KEY=$'tok\n'` seals as `tok`.
+- `envpkt seal` and the library's `resolveValues` strip one trailing newline from a value read from an
+  environment variable, as the stdin path already does. A value set with `KEY=$'tok\n'` seals as
+  `tok`. An env var that is empty or whitespace-only once that newline is gone counts as unset.
 
 ### Fixed
 
