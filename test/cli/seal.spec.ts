@@ -362,7 +362,8 @@ service = "other"
   })
 })
 
-describe.skipIf(!ageInstalled)("envpkt seal — values survive sealing byte for byte", () => {
+// Each test spawns several CLI processes and age calls; allow for a slow CI runner.
+describe.skipIf(!ageInstalled)("envpkt seal — values survive sealing byte for byte", { timeout: 60_000 }, () => {
   // A PEM key keeps its final newline; stdin strips the one extra newline after it.
   const PEM =
     "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEA\n-----END PRIVATE KEY-----\n"
@@ -417,7 +418,8 @@ service = "api"
   it("skips a whitespace-only env var instead of sealing it", () => {
     const { status, stdout } = run(["seal", "-c", configPath], { ENVPKT_WS_PEM: `${PEM}\n`, ENVPKT_WS_TOKEN: "   \n" })
     expect(status).toBe(0)
-    expect(stdout).toContain("ENVPKT_WS_TOKEN")
+    expect(stdout).toContain("Skipped")
+    expect(stdout).toContain("key(s) with no value: ENVPKT_WS_TOKEN")
     expect(booted()).toEqual({ ENVPKT_WS_PEM: PEM })
   })
 })

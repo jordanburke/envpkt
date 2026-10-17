@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `envpkt seal` and the library's `resolveValues` strip one trailing newline from a value read from an
   environment variable, as the stdin path already does. A value set with `KEY=$'tok\n'` seals as
   `tok`. An env var that is empty or whitespace-only once that newline is gone counts as unset.
+- A whitespace-only value is treated as no value everywhere `envpkt` reads one: the `envpkt seal`
+  prompt skips the key, and `envpkt secret rotate` cancels without changing the file, as they
+  already did for an empty value.
 
 ### Fixed
 

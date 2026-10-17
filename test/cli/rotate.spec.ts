@@ -159,7 +159,10 @@ placeholder
     expect(loadConfig(configPath).isRight()).toBe(true)
   })
 
-  it("cancels with no changes when stdin is empty", () => {
+  it.each([
+    ["empty", ""],
+    ["whitespace-only", "   \n"],
+  ])("cancels with no changes when stdin is %s", (_label, input) => {
     const original = `version = 1
 
 [identity]
@@ -177,7 +180,7 @@ placeholder
     writeFileSync(configPath, original)
 
     // Empty input simulates user hitting enter on the prompt
-    const { status, stdout } = run(["secret", "rotate", "API_KEY", "-c", configPath], "")
+    const { status, stdout } = run(["secret", "rotate", "API_KEY", "-c", configPath], input)
     expect(status).toBe(1)
     expect(stdout).toContain("Cancelled")
     expect(readFileSync(configPath, "utf-8")).toBe(original)

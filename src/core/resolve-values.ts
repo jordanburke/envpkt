@@ -57,7 +57,7 @@ export const resolveValues = async (
     // eslint-disable-next-line functype/no-imperative-loops
     for (const key of remaining) {
       const value = await prompt(`Enter value for ${key}: `)
-      if (value !== "") {
+      if (value.trim() !== "") {
         result[key] = value
       }
     }

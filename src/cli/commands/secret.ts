@@ -542,7 +542,8 @@ const runSecretRotate = async (name: string, options: RotateOptions): Promise<vo
   const { recipient } = config.identity
 
   const value = await readNewValue(name)
-  if (value === "") {
+  // Whitespace-only is no value: no credential is all whitespace.
+  if (value.trim() === "") {
     console.error(`${YELLOW}Cancelled:${RESET} no value provided — ${BOLD}${name}${RESET} was not rotated.`)
     process.exit(1)
   }
