@@ -10,7 +10,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Maintained Node lines only; see the engines field in package.json.
+    # Maintained Node lines only; see the engines field in package.json. pnpm itself needs
+    # 22.13+, so the 22.12.0 engines floor is checked by hand, not here.
     strategy:
       fail-fast: false
       matrix:

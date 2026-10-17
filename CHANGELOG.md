@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- envpkt requires Node 22.12 or later (`engines` in `package.json`). Node 20 reached end of life on
+  2026-04-30, and 22.12 is the first 22.x that loads an ES module from CommonJS (`require(esm)`)
+  without a flag.
+
 ## [0.17.0] - 2026-10-17
 
 ### Changed

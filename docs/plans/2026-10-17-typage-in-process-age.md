@@ -97,8 +97,10 @@ like.
   level, so the linter catches a missed `await`.
 - `fnoxExport(profile, agentKey?)` takes one key. With `unwrapAgentKey` returning all keys, pass
   the first, as today.
-- Removing `AgeNotFound` also touches `src/cli/output.ts` (its error formatter),
-  `boot.ts`'s `AgeNotFound` case, and `ageInstallHint`.
+- Remove `AgeNotFound` at every site `grep -rn AgeNotFound src test` finds: the three unions in
+  `types.ts`, `seal.ts`, `keygen.ts`, `fnox/identity.ts`, the `output.ts` formatter, `boot.ts`'s
+  case, and their specs (`core/seal`, `fnox/identity`). `ageInstallHint` goes too (`doctor` uses
+  it; decision 4).
 - Add `IdentityFileError` to `IdentityError` (and so `BootError`), and export it from `index.ts`.
 - `src/cli/commands/`: `exec`, `env export`/`env github`, `headers`, `doctor` (via `bootSafe`);
   `seal` (3 seal/unseal calls and `unwrapAgentKey`); `secret rotate` (`ageEncrypt`); `copy` (unseal
@@ -109,12 +111,14 @@ like.
 ### 5. Node versions
 
 `package.json` had no `engines` field. Node 20 reached end of life on 2026-04-30, so envpkt claims
-the maintained lines only: `"engines": { "node": ">=22" }`. CI runs `pnpm validate` on 22, 24 and 26
-(22 is in maintenance until 2027-04-30). `.nvmrc` stays pinned at `24.20.0` for the publish job.
-Done ahead of step 2, so step 1's code is already tested on all three.
+the maintained lines only: `"engines": { "node": ">=22.12.0" }`. CI runs `pnpm validate` on the
+newest 22, 24 and 26 (22 is in maintenance until 2027-04-30). pnpm needs 22.13+, so CI can't run
+the 22.12.0 floor; it was checked by hand (all tests, the CLI, and `require(esm)` pass). Re-check
+it before the 0.18.0 release. `.nvmrc` stays pinned at `24.20.0` for the publish job. Done ahead of
+step 2, so step 1's code is already tested on all three lines.
 
 CommonJS callers load envpkt through `require(esm)` (unflagged from Node 22.12) and can't use
-top-level `await`; the CHANGELOG shows them `boot().then(…)`.
+top-level `await`; the 0.18.0 CHANGELOG entry must show them `boot().then(…)` (step 5).
 
 ## Format compatibility (the test that decides whether this is safe)
 
@@ -180,5 +184,5 @@ shape as today's `age` shell-out. It is additive, so it needs no further breakin
    Every recipient in the maintainer's configs is a plain `age1…` X25519 key.
 3. **Names: kept.** `boot`, `bootSafe`, `sealSecrets`, … keep their names and return Promises.
 4. **`doctor`: reports the bundled `age-encryption` version** in place of the `age` CLI check.
-5. **Node: maintained lines only.** `engines` is `>=22`, and CI tests 22, 24 and 26. When a line
+5. **Node: maintained lines only.** `engines` is `>=22.12.0`, and CI tests 22, 24 and 26. When a line
    reaches end of life, drop it from the matrix and raise `engines` in the next minor release.
