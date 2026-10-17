@@ -7,15 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-10-17
+
 ### Changed
 
 - `envpkt seal` and the library's `resolveValues` strip one trailing newline from a value read from an
   environment variable, as the stdin path already does. A value set with `KEY=$'tok\n'` seals as
   `tok`. An env var that is empty or whitespace-only once that newline is gone counts as unset.
-- A whitespace-only secret value typed at a prompt or piped on stdin is treated as no value: the
-  `envpkt seal` prompt skips the key, and `envpkt secret rotate` cancels without changing the file,
-  as they already did for an empty value. A blank value from fnox is still sealed as an empty
-  string.
+- A whitespace-only answer at the `envpkt seal` prompt (and the library's `resolveValues` prompt)
+  now skips the key, and a whitespace-only value given to `envpkt secret rotate` cancels without
+  changing the file, as both already did for an empty value. `envpkt seal --edit` has rejected
+  whitespace-only values since 0.16.0. A blank value from fnox is still sealed as an empty string.
 
 ### Fixed
 
