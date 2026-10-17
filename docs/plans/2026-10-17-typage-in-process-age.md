@@ -29,7 +29,7 @@ Correction for #41: it says "TypeScript/WASM". typage has no WASM; fix the issue
 | `age --encrypt --recipient R --armor`                | `src/core/seal.ts` `ageEncrypt`                     | `Encrypter.addRecipient` + `armor.encode`  |
 | `age --decrypt --identity FILE`                      | `src/core/seal.ts` `ageDecrypt`                     | `Decrypter.addIdentity` + `armor.decode`   |
 | `age-keygen`                                         | `src/core/keygen.ts` `generateKeypair`              | `generateIdentity` + `identityToRecipient` |
-| `age --decrypt FILE` (passphrase-protected key file) | `src/fnox/identity.ts` `unwrapAgentKey`             | `Decrypter.addPassphrase` (see decision 1) |
+| `age --decrypt FILE` (passphrase-protected key file) | `src/fnox/identity.ts` `unwrapAgentKey`             | dropped: clear error (decision 1)          |
 | `age --version`                                      | `src/fnox/identity.ts` `ageAvailable`, `ageVersion` | removed                                    |
 
 `unsealSecrets` spawns `age` once per sealed secret, and `ageAvailable()` spawns `age --version`
@@ -93,8 +93,7 @@ like.
 - `src/cli/commands/`: `exec`, `env export`/`env github`, `headers`, `doctor` (via `bootSafe`);
   `seal` (3 seal/unseal calls and `unwrapAgentKey`); `secret rotate` (`ageEncrypt`); `copy` (unseal
   and reseal); `inspect` (unseal); `keygen` (`generateKeypair`). Commander supports async actions.
-- `doctor` loses its `age` version check. Replace it with nothing, or with the bundled
-  `age-encryption` version (decision 4).
+- `doctor` replaces its `age` version check with the bundled `age-encryption` version (decision 4).
 
 ### 5. `engines`
 
@@ -153,13 +152,14 @@ library, and all in-repo callers can await. If a sync caller turns up, add `boot
 the async path in a child Node process via `execFileSync(process.execPath, [helper])`, the same
 shape as today's `age` shell-out. It is additive, so it needs no further breaking change.
 
-## Decisions needed before step 2
+## Decisions (2026-10-17)
 
-1. **Passphrase-protected key files.** Today `age --decrypt` prompts for the passphrase on the
-   terminal. Support it (envpkt prompts, then `addPassphrase`; fails clearly with no terminal) or
-   drop it with a clear error. No test covers it today, so usage is unknown.
-2. **Plugin keys** (`AGE-PLUGIN-…`, e.g. `age-plugin-yubikey`) and SSH keys. typage can't use them.
-   Fail with a message naming the line (recommended), or keep the `age` CLI as a fallback for them.
-3. **Names.** Keep `boot`/`bootSafe`/`sealSecrets`… with async return types (recommended), or add
-   `*Async` names and deprecate the sync ones.
-4. **`doctor`.** Drop the `age` check, or report the bundled `age-encryption` version.
+1. **Passphrase-protected key files: dropped.** A key file with no `AGE-SECRET-KEY-` line that
+   holds age ciphertext fails with a clear error saying envpkt needs a plain key file. envpkt never
+   creates one (`envpkt keygen` writes a plain key), and none of the maintainer's key files is one.
+   Remove "a passphrase-wrapped key blob" from `site/.../guides/runtime-injection.mdx`.
+2. **Plugin and SSH keys: dropped.** An `AGE-PLUGIN-` line (or any other non-key line that isn't a
+   comment) fails with a message naming the line type; the `age` CLI is not kept as a fallback.
+   Every recipient in the maintainer's configs is a plain `age1…` X25519 key.
+3. **Names: kept.** `boot`, `bootSafe`, `sealSecrets`, … keep their names and return Promises.
+4. **`doctor`: reports the bundled `age-encryption` version** in place of the `age` CLI check.
