@@ -3,6 +3,9 @@ import { createInterface } from "node:readline"
 import { fnoxExport } from "../fnox/cli.js"
 import { fnoxAvailable } from "../fnox/detect.js"
 
+/** Strip one trailing newline (`\n` or `\r\n`): a shell-set env var often carries one by mistake. */
+const stripTrailingNewline = (value: string): string => value.replace(/\r?\n$/, "")
+
 /** Resolve plaintext values for the given keys via cascade: fnox → env → interactive prompt */
 export const resolveValues = async (
   keys: ReadonlyArray<string>,
@@ -34,8 +37,8 @@ export const resolveValues = async (
   // Layer 2: try process.env
   const envSnapshot = [...remaining]
   envSnapshot.forEach((key) => {
-    const envValue = process.env[key]
-    if (envValue !== undefined && envValue !== "") {
+    const envValue = stripTrailingNewline(process.env[key] ?? "")
+    if (envValue !== "") {
       result[key] = envValue
       remaining.delete(key)
     }

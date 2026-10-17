@@ -7,13 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- `envpkt seal` strips one trailing newline from a value it reads from an environment variable, as
+  the stdin path already does. A value set with `KEY=$'tok\n'` seals as `tok`.
+
 ### Fixed
 
-- Unsealing returns the value exactly as sealed. It used to trim edge whitespace, so a PEM key lost
-  its final newline, and `copy` and `seal --reseal` sealed the trimmed value back in. This reaches
-  `boot()`, `exec`, `env export`, `inspect` and the library's `ageDecrypt`/`unsealSecrets`. A value
-  encrypted by hand with a trailing newline (`echo value | age -r ...`) now keeps that newline; envpkt's
-  own seal paths never add one.
+- Unsealing returns the value exactly as sealed. It used to trim edge whitespace, so values lost
+  leading and trailing spaces and newlines, and `copy` and `seal --reseal` sealed the trimmed value
+  back in. This reaches `boot()`, `exec`, `env export`, `headers`, `inspect` and the library's
+  `ageDecrypt`/`unsealSecrets`.
+  - A value already sealed with edge whitespace now comes back with it. That covers values sealed by
+    hand (`echo value | age -r ...`), from an environment variable before this release, or typed at
+    the prompt with a trailing space.
+  - `envpkt headers` rejects a value that contains a line break, so a value sealed with a trailing
+    newline now fails there. Re-seal it with `envpkt seal --edit KEY`.
+  - A value trimmed by an earlier `copy` or `seal --reseal` stays trimmed. Re-seal it from its source
+    to restore it.
 
 ## [0.16.0] - 2026-10-17
 
