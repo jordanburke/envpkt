@@ -33,6 +33,7 @@ const PLAINTEXTS: ReadonlyArray<readonly [string, string]> = [
   ["an empty string", ""],
   ["multi-line text", "line1\nline2\r\nline3"],
   ["non-ASCII text", "pässwörd-🔑"],
+  ["a leading byte-order mark", "\uFEFFvalue"],
 ]
 
 let tmpDir: string

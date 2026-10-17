@@ -1,5 +1,5 @@
 import { armor, Decrypter, Encrypter, generateX25519Identity, identityToRecipient } from "age-encryption"
-import { type Either, Left, Right, tryCatchAsync } from "functype"
+import { type Either, Left, Right, tryCatch, tryCatchAsync } from "functype"
 
 import type { IdentityFileError, KeygenError, SealError } from "./types.js"
 
@@ -19,23 +19,50 @@ export const encryptArmored = (plaintext: string, recipient: string): Promise<Ei
     (err): SealError => ({ _tag: "EncryptFailed", key: "", message: `age encrypt failed: ${String(err)}` }),
   )
 
-/** Decrypt armored age ciphertext with any of `identities` (`AGE-SECRET-KEY-…`). The plaintext is returned as-is. */
+const decryptFailed = (message: string): SealError => ({
+  _tag: "DecryptFailed",
+  key: "",
+  message: `age decrypt failed: ${message}`,
+})
+
+/** Mask any age secret key in an error message. typage's bech32 errors quote the key they rejected. */
+const redactKeys = (message: string): string => message.replace(/AGE-SECRET-KEY-[0-9A-Z-]+/gi, "AGE-SECRET-KEY-…")
+
+/** Add each identity to a fresh Decrypter. A malformed key fails with its position, never its text. */
+const toDecrypter = (identities: ReadonlyArray<string>): Either<SealError, Decrypter> =>
+  identities.reduce<Either<SealError, Decrypter>>(
+    (acc, identity, i) =>
+      acc.flatMap((decrypter) =>
+        tryCatch(
+          () => {
+            decrypter.addIdentity(identity)
+            return decrypter
+          },
+          () => decryptFailed(`identity ${i + 1} is not a valid age secret key`),
+        ),
+      ),
+    Right(new Decrypter()),
+  )
+
+// ignoreBOM keeps a leading U+FEFF; typage's "text" output would strip it.
+const utf8 = new TextDecoder("utf-8", { ignoreBOM: true })
+
+/**
+ * Decrypt armored age ciphertext with any of `identities` (`AGE-SECRET-KEY-…`). The plaintext is
+ * returned as-is: byte for byte when it is valid UTF-8.
+ */
 export const decryptArmored = (
   armored: string,
   identities: ReadonlyArray<string>,
 ): Promise<Either<SealError, string>> => {
-  if (identities.length === 0) {
-    return Promise.resolve(
-      Left<SealError, string>({ _tag: "DecryptFailed", key: "", message: "age decrypt failed: no identity provided" }),
-    )
-  }
-  return tryCatchAsync(
-    async () => {
-      const decrypter = new Decrypter()
-      identities.forEach((identity) => decrypter.addIdentity(identity))
-      return decrypter.decrypt(armor.decode(armored), "text")
-    },
-    (err): SealError => ({ _tag: "DecryptFailed", key: "", message: `age decrypt failed: ${String(err)}` }),
+  if (identities.length === 0) return Promise.resolve(Left(decryptFailed("no identity provided")))
+  return toDecrypter(identities).fold(
+    (err) => Promise.resolve(Left<SealError, string>(err)),
+    (decrypter) =>
+      tryCatchAsync(
+        async () => utf8.decode(await decrypter.decrypt(armor.decode(armored))),
+        (err): SealError => decryptFailed(redactKeys(String(err))),
+      ),
   )
 }
 
@@ -59,7 +86,8 @@ const unsupportedLine = (line: string, lineNumber: number): IdentityFileError =>
     return { _tag: "PassphraseProtectedIdentity" }
   }
   if (line.startsWith("AGE-PLUGIN-")) return { _tag: "UnsupportedIdentity", kind: "plugin", line: lineNumber }
-  if (line.startsWith("-----BEGIN OPENSSH PRIVATE KEY-----") || line.startsWith("ssh-")) {
+  // The age CLI reads any other PEM block as an SSH key.
+  if (line.startsWith("-----BEGIN") || line.startsWith("ssh-")) {
     return { _tag: "UnsupportedIdentity", kind: "ssh", line: lineNumber }
   }
   return { _tag: "UnsupportedIdentity", kind: "unknown", line: lineNumber }
