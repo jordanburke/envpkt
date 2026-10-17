@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-10-17
+
 ### Added
 
 - `envpkt seal --edit <key>` reads the new value from stdin when no terminal is attached, so an
@@ -14,16 +16,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   asks for this on purpose, even in a terminal. Stdin takes exactly one key, strips one trailing
   newline, fails on empty or whitespace-only input, and replaces a sealed value without the
   confirm prompt.
-
-### Changed
-
-- `envpkt seal --edit` skips a whitespace-only value typed at the prompt, as it already did an
-  empty one. Unsealing trims, so such a value came back as an empty string.
-
-## [0.16.0] - 2026-10-11
-
-### Added
-
 - `envpkt audit --unsealed` lists secrets with no `encrypted_value`: values envpkt resolves at
   runtime (env, fnox) plus `external = true` entries. Use `--status external` to list only the
   `external = true` entries. `--status` help now lists `missing_metadata` and `external`.
@@ -31,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- `envpkt seal --edit` skips a whitespace-only value typed at the prompt, as it already did an
+  empty one. Unsealing trims, so such a value came back as an empty string.
 - **Breaking (library):** `copyableSecretMeta` takes `created` in place of `today`. The caller
   now decides the date: today for a new entry, or the destination's own `created` when
   overwriting.
