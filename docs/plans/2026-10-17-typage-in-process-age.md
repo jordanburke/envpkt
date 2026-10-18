@@ -94,9 +94,10 @@ breaks anyway; a path-taking helper can read the file and call them.
 file, so identity resolution in `boot.ts` stays sync and the one `await` is the unseal itself.
 
 **Floating-promise risk.** A caller that keeps writing `boot()` without `await` gets a Promise
-nobody waits on, so secrets silently never reach `process.env`. The CHANGELOG entry must show
-`await boot()` (top-level await works; envpkt is ESM-only) and say what the silent failure looks
-like.
+nobody waits on: `boot()` returns before it injects, so the code after it reads `process.env`
+without the secrets (they arrive later, and a failure becomes an unhandled rejection). The
+CHANGELOG entry must show `await boot()` (top-level await works; envpkt is ESM-only) and say what
+the failure looks like.
 
 ### 4. Callers to migrate
 
@@ -164,6 +165,8 @@ byte-for-byte tests from 0.17.0 (`copy`, `--reseal`, env → `boot()`) carry ove
 - `site/.../guides/agent-ci-workflow.mdx`, `.claude/skills/envpkt/SKILL.md`,
   `.claude/skills/envpkt/references/common-patterns.md`: remove `age` installs; update the library
   examples to `await`.
+- `CLAUDE.md` (Dependencies says `age` is required at runtime; the `seal.ts` row says "via `age`
+  CLI") and `.claude/skills/envpkt/references/quick-reference.md` (`AgeNotFound`).
 - CHANGELOG `0.18.0`: **Breaking** entries under Changed (async API) and Removed (`ageAvailable`,
   `AgeNotFound`, the `age` CLI requirement); the inline-key and performance notes.
 

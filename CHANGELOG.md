@@ -7,11 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+envpkt no longer needs the `age` command. Sealing, unsealing and `envpkt keygen` run in-process
+through [age-encryption](https://github.com/FiloSottile/typage) (typage), by age's author. The
+file format is unchanged: values sealed by earlier releases unseal as before, and `age -d` still
+decrypts what envpkt seals.
+
+### Added
+
+- Library: `describeIdentityError(err)` explains an `IdentityError` without key material, and the
+  `IdentityFileError` type covers a key file envpkt can't read.
+
 ### Changed
 
+- **Breaking (library):** the crypto and boot API is async. `boot`, `bootSafe`, `ageEncrypt`,
+  `ageDecrypt`, `sealSecrets`, `unsealSecrets` and `generateKeypair` return Promises. Write
+  `await boot()`: without `await`, `boot()` returns before it injects anything, so the code after
+  it reads `process.env` without the secrets. From CommonJS, use `boot().then(…)`.
+- **Breaking (library):** `ageDecrypt` and `unsealSecrets` take secret keys (`AGE-SECRET-KEY-…`)
+  instead of a key file path. `unwrapAgentKey(path)` reads them from a file and now returns every
+  key in it, not just the first.
+- envpkt reads plain age key files only, like the ones `envpkt keygen` and `age-keygen` write. A
+  passphrase-protected key file, an age plugin key or an SSH key fails with an error that names
+  the file (and, for a plugin or SSH key, the line); `boot`, `exec` and `env export` stop instead
+  of injecting empty values.
+- `ENVPKT_AGE_KEY` (the inline CI key) stays in memory. It used to be written to a temp file for
+  the `age` command.
+- `envpkt doctor` reports the built-in age-encryption version instead of checking for `age`.
 - envpkt requires Node 22.12 or later (`engines` in `package.json`). Node 20 reached end of life on
   2026-04-30, and 22.12 is the first 22.x that loads an ES module from CommonJS (`require(esm)`)
   without a flag.
+
+### Removed
+
+- **Breaking:** the `age` command is no longer used or required. The library's `ageAvailable()` and
+  the `AgeNotFound` error are gone.
 
 ## [0.17.0] - 2026-10-17
 
