@@ -11,28 +11,31 @@ import { boot, loadConfig, computeAudit, scanFleet } from "envpkt"
 
 ## Boot API
 
-High-level API that loads config, resolves catalog, audits, and optionally injects secrets.
+High-level API that loads config, resolves catalog, audits, and optionally injects secrets. Both
+functions are async: `await` them. Without `await`, `boot()` returns before it injects anything, so
+the next line reads `process.env` without the secrets. From CommonJS, use `boot().then(…)`.
 
 ### `boot(options)`
 
 ```typescript
-const result = boot({ configPath: "envpkt.toml", inject: true })
+const result = await boot({ configPath: "envpkt.toml", inject: true })
 console.log(result.audit.status) // "healthy" | "degraded" | "critical"
 ```
 
-Throws `EnvpktBootError` on failure.
+Rejects with `EnvpktBootError` on failure.
 
 ### `bootSafe(options)`
 
 ```typescript
-const safe = bootSafe({ configPath: "envpkt.toml" })
+const safe = await bootSafe({ configPath: "envpkt.toml" })
 safe.fold(
   (err) => console.error("Boot failed:", err._tag),
   (result) => console.log(`${result.injected.length} secrets injected`),
 )
 ```
 
-Returns `Either<BootError, BootResult>`.
+Resolves to `Either<BootError, BootResult>`. An unexpected crash inside boot (a bug, or a logger
+that throws) rejects with the original error instead of becoming a `Left`.
 
 ### `BootOptions`
 
@@ -57,7 +60,7 @@ silent default (zero overhead).
 import { bootSafe, createDirectConsoleLogger } from "envpkt"
 
 const logger = createDirectConsoleLogger({ level: "debug" })
-bootSafe({ logger })
+await bootSafe({ logger })
 ```
 
 Emitted events (all scoped with `{ component: "envpkt.boot" }`):
@@ -66,7 +69,6 @@ Emitted events (all scoped with `{ component: "envpkt.boot" }`):
 | ------- | ------------------------------- | ---------------------------------------- |
 | `debug` | `alias.validate.success`        | `{ aliases: number }`                    |
 | `warn`  | `alias.validate.failed`         | `{ tag: AliasError._tag, key?: string }` |
-| `warn`  | `phase.sealed.no_identity_file` | `{ sealed_keys: number }`                |
 | `warn`  | `phase.sealed.decrypt_failed`   | `{ message: string }`                    |
 | `debug` | `phase.sealed.resolved`         | `{ key: string }`                        |
 | `warn`  | `phase.fnox.export_failed`      | `{ message: string, skipped: number }`   |
@@ -82,7 +84,7 @@ For tests, use `createDirectTestLogger` which captures entries in memory:
 import { bootSafe, createDirectTestLogger } from "envpkt"
 
 const { logger, entries, hasEntry } = createDirectTestLogger()
-bootSafe({ logger })
+await bootSafe({ logger })
 expect(hasEntry("debug", "phase.alias.copied")).toBe(true)
 ```
 
@@ -204,7 +206,8 @@ import { bootSafe, buildMcpHeaders, formatMcpHeadersError, loadConfig } from "en
 
 const config = loadConfig("./envpkt.toml").orThrow()
 
-bootSafe({ inject: false }).fold(
+const booted = await bootSafe({ inject: false })
+booted.fold(
   (err) => console.error(err._tag),
   (boot) =>
     buildMcpHeaders(config, boot.secrets, "civala-github").fold(
@@ -400,19 +403,20 @@ Check for inline age key in `ENVPKT_AGE_KEY` env var (for CI). Returns `Option<s
 
 ### `generateKeypair(options?)`
 
-Generate an age keypair and write to disk. Returns `Either<KeygenError, KeygenResult>`.
+Generate an age keypair in-process and write it to disk with `0600` permissions. Never overwrites an
+existing file. Resolves to `Either<KeygenError, KeygenResult>`.
 
 ```typescript
 import { generateKeypair } from "envpkt"
 
-const result = generateKeypair({ outputPath: "~/.envpkt/age-key.txt" })
+const result = await generateKeypair({ outputPath: "~/.envpkt/age-key.txt" })
 result.fold(
   (err) => console.error(`Keygen failed: ${err._tag}`),
   (res) => console.log(`Recipient: ${res.recipient}`),
 )
 ```
 
-Options: `{ force?: boolean; outputPath?: string }`
+Options: `{ outputPath?: string }`
 
 ### `updateConfigRecipient(configPath, recipient)`
 
@@ -446,9 +450,13 @@ Compare keys between fnox and envpkt for orphan detection.
 
 Retrieve secret values from fnox.
 
-### `ageAvailable()` / `unwrapAgentKey(identityPath)`
+### `unwrapAgentKey(identityPath)` / `describeIdentityError(err)`
 
-Check for age encryption support and decrypt agent keys.
+`unwrapAgentKey` reads every secret key (`AGE-SECRET-KEY-…`) from a plain age key file, returning
+`Either<IdentityError, ReadonlyArray<string>>`. Pass the keys to `ageDecrypt` or `unsealSecrets`.
+A missing, unreadable, passphrase-protected, plugin or SSH key file gives a typed `IdentityError`
+(see [Error Types](/reference/error-types/#identityerror)). `describeIdentityError` explains one
+without printing key material.
 
 ## MCP Server
 

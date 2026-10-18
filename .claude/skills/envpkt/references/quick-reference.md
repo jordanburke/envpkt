@@ -32,10 +32,10 @@
 
 ### Boot
 
-| Function   | Signature                                                  | Returns                             |
-| ---------- | ---------------------------------------------------------- | ----------------------------------- |
-| `boot`     | `(options?: BootOptions) => BootResult`                    | Throws `EnvpktBootError` on failure |
-| `bootSafe` | `(options?: BootOptions) => Either<BootError, BootResult>` | Functional error handling           |
+| Function   | Signature                                                           | Returns                                   |
+| ---------- | ------------------------------------------------------------------- | ----------------------------------------- |
+| `boot`     | `(options?: BootOptions) => Promise<BootResult>`                    | Rejects with `EnvpktBootError` on failure |
+| `bootSafe` | `(options?: BootOptions) => Promise<Either<BootError, BootResult>>` | Functional error handling                 |
 
 ### Config
 
@@ -61,12 +61,13 @@
 
 ### Sealing
 
-| Function                               | Returns                                         |
-| -------------------------------------- | ----------------------------------------------- |
-| `sealSecrets(meta, recipient)`         | `Either<SealError, Record<string, SecretMeta>>` |
-| `unsealSecrets(meta, identityPath)`    | `Either<SealError, Record<string, string>>`     |
-| `ageEncrypt(plaintext, recipient)`     | `Either<SealError, string>`                     |
-| `ageDecrypt(ciphertext, identityPath)` | `Either<SealError, string>`                     |
+| Function                               | Returns                                                   |
+| -------------------------------------- | --------------------------------------------------------- |
+| `sealSecrets(meta, values, recipient)` | `Promise<Either<SealError, Record<string, SecretMeta>>>`  |
+| `unsealSecrets(meta, keys)`            | `Promise<Either<SealError, Record<string, string>>>`      |
+| `ageEncrypt(plaintext, recipient)`     | `Promise<Either<SealError, string>>`                      |
+| `ageDecrypt(ciphertext, keys)`         | `Promise<Either<SealError, string>>`                      |
+| `unwrapAgentKey(keyFilePath)`          | `Either<IdentityError, ReadonlyArray<string>>` (the keys) |
 
 ### Catalog
 
@@ -174,31 +175,35 @@
 
 ## Error Tags
 
-| Tag                  | Source                  | Meaning                        |
-| -------------------- | ----------------------- | ------------------------------ |
-| `FileNotFound`       | ConfigError             | envpkt.toml not found          |
-| `ParseError`         | ConfigError             | TOML parse failure             |
-| `ValidationError`    | ConfigError             | Schema validation failed       |
-| `ReadError`          | ConfigError             | File read error                |
-| `FnoxNotFound`       | FnoxError               | fnox CLI not installed         |
-| `FnoxCliError`       | FnoxError               | fnox command failed            |
-| `FnoxParseError`     | FnoxError               | fnox output parse failure      |
-| `AuditFailed`        | BootError               | Audit policy violation         |
-| `CatalogNotFound`    | CatalogError            | Catalog file missing           |
-| `CatalogLoadError`   | CatalogError            | Catalog load/parse error       |
-| `SecretNotInCatalog` | CatalogError            | Key not in catalog             |
-| `MissingSecretsList` | CatalogError            | No secrets list on identity    |
-| `AgeNotFound`        | IdentityError           | age CLI not installed          |
-| `DecryptFailed`      | IdentityError/SealError | Decryption failure             |
-| `IdentityNotFound`   | IdentityError           | Identity file missing          |
-| `EncryptFailed`      | SealError               | Encryption failure             |
-| `NoRecipient`        | SealError               | No recipient public key        |
-| `McpHeaderInvalid`   | McpConfigError          | Header name not an HTTP token  |
-| `McpSchemeInvalid`   | McpConfigError          | Scheme not one word            |
-| `McpHeaderDuplicate` | McpConfigError          | (server, header) claimed twice |
-| `McpServerUnknown`   | McpHeadersError         | No secret names the server     |
-| `McpValueUnresolved` | McpHeadersError         | Bound value missing or empty   |
-| `McpValueInvalid`    | McpHeadersError         | Value has a line break/NUL     |
+| Tag                           | Source          | Meaning                         |
+| ----------------------------- | --------------- | ------------------------------- |
+| `FileNotFound`                | ConfigError     | envpkt.toml not found           |
+| `ParseError`                  | ConfigError     | TOML parse failure              |
+| `ValidationError`             | ConfigError     | Schema validation failed        |
+| `ReadError`                   | ConfigError     | File read error                 |
+| `FnoxNotFound`                | FnoxError       | fnox CLI not installed          |
+| `FnoxCliError`                | FnoxError       | fnox command failed             |
+| `FnoxParseError`              | FnoxError       | fnox output parse failure       |
+| `AuditFailed`                 | BootError       | Audit policy violation          |
+| `CatalogNotFound`             | CatalogError    | Catalog file missing            |
+| `CatalogLoadError`            | CatalogError    | Catalog load/parse error        |
+| `SecretNotInCatalog`          | CatalogError    | Key not in catalog              |
+| `MissingSecretsList`          | CatalogError    | No secrets list on identity     |
+| `SealKeyUnavailable`          | BootError       | Sealed values but no age key    |
+| `DecryptFailed`               | SealError       | Decryption failure              |
+| `IdentityNotFound`            | IdentityError   | Identity file missing           |
+| `IdentityUnreadable`          | IdentityError   | Key file can't be read          |
+| `NoIdentityKey`               | IdentityError   | No `AGE-SECRET-KEY-` line       |
+| `PassphraseProtectedIdentity` | IdentityError   | Passphrase-protected key file   |
+| `UnsupportedIdentity`         | IdentityError   | Plugin or SSH key, or not a key |
+| `EncryptFailed`               | SealError       | Encryption failure              |
+| `NoRecipient`                 | SealError       | No recipient public key         |
+| `McpHeaderInvalid`            | McpConfigError  | Header name not an HTTP token   |
+| `McpSchemeInvalid`            | McpConfigError  | Scheme not one word             |
+| `McpHeaderDuplicate`          | McpConfigError  | (server, header) claimed twice  |
+| `McpServerUnknown`            | McpHeadersError | No secret names the server      |
+| `McpValueUnresolved`          | McpHeadersError | Bound value missing or empty    |
+| `McpValueInvalid`             | McpHeadersError | Value has a line break/NUL      |
 
 ## Health Statuses
 

@@ -66,16 +66,28 @@ Errors from agent identity operations.
 
 ```typescript
 type IdentityError =
-  | { readonly _tag: "AgeNotFound"; readonly message: string }
-  | { readonly _tag: "DecryptFailed"; readonly message: string }
   | { readonly _tag: "IdentityNotFound"; readonly path: string }
+  | { readonly _tag: "IdentityUnreadable"; readonly path: string; readonly message: string }
+  | (IdentityFileError & { readonly source: string })
+
+type IdentityFileError =
+  | { readonly _tag: "NoIdentityKey" }
+  | { readonly _tag: "PassphraseProtectedIdentity" }
+  | { readonly _tag: "UnsupportedIdentity"; readonly kind: "plugin" | "ssh" | "unknown"; readonly line: number }
 ```
 
-| Tag                | When                                          |
-| ------------------ | --------------------------------------------- |
-| `AgeNotFound`      | age encryption tool not installed             |
-| `DecryptFailed`    | Agent key decryption failed                   |
-| `IdentityNotFound` | Identity key file not found at specified path |
+`source` is the key file's path, or `ENVPKT_AGE_KEY` for the inline key. None of these errors
+carries key material; `describeIdentityError(err)` turns any of them into a message.
+
+| Tag                           | When                                                                     |
+| ----------------------------- | ------------------------------------------------------------------------ |
+| `IdentityNotFound`            | Key file not found at the given path                                     |
+| `IdentityUnreadable`          | Key file exists but can't be read (permissions, a directory, I/O error)  |
+| `NoIdentityKey`               | The key source has no `AGE-SECRET-KEY-…` line                            |
+| `PassphraseProtectedIdentity` | The key file is passphrase-protected; unwrap it once with `age -d`       |
+| `UnsupportedIdentity`         | A line is an age plugin key, an SSH key, or not a key; `line` says which |
+
+In `boot()`, any of these stops boot when sealed values are declared, even under `warnOnly`.
 
 ## `KeygenError`
 
@@ -83,7 +95,6 @@ Errors from key generation and config update operations.
 
 ```typescript
 type KeygenError =
-  | { readonly _tag: "AgeNotFound"; readonly message: string }
   | { readonly _tag: "KeygenFailed"; readonly message: string }
   | { readonly _tag: "KeyExists"; readonly path: string }
   | { readonly _tag: "WriteError"; readonly message: string }
@@ -92,9 +103,8 @@ type KeygenError =
 
 | Tag                 | When                                                    |
 | ------------------- | ------------------------------------------------------- |
-| `AgeNotFound`       | `age-keygen` CLI not found on PATH                      |
-| `KeygenFailed`      | `age-keygen` command failed or output unreadable        |
-| `KeyExists`         | Identity file already exists (use `--force`)            |
+| `KeygenFailed`      | Key generation failed                                   |
+| `KeyExists`         | Identity file already exists (no overwrite; pass `-o`)  |
 | `WriteError`        | Failed to write identity file or create directory       |
 | `ConfigUpdateError` | Failed to read/write `envpkt.toml` for recipient update |
 
@@ -179,10 +189,18 @@ type BootError =
   | CatalogError
   | AliasError
   | { readonly _tag: "AuditFailed"; readonly audit: AuditResult; readonly message: string }
+  | {
+      readonly _tag: "SealKeyUnavailable"
+      readonly sealedKeys: ReadonlyArray<string>
+      readonly searched: ReadonlyArray<string>
+      readonly configuredKeyFile?: string
+    }
   | IdentityError
 ```
 
-The `AuditFailed` variant includes the full `AuditResult` for inspection.
+The `AuditFailed` variant includes the full `AuditResult` for inspection. `SealKeyUnavailable`
+means sealed values are declared but no age key was found anywhere; `searched` lists each place
+envpkt looked, in order. Boot refuses rather than inject empty values, even under `warnOnly`.
 
 ## Pattern Matching
 

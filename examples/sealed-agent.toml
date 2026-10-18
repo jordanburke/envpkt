@@ -3,10 +3,10 @@
 # Sealed agent — secrets encrypted inline with age, safe to commit to git.
 #
 # Setup:
-#   1. Generate a keypair:  age-keygen -o identity.txt
-#   2. Copy the public key into `recipient` below
-#   3. Add identity.txt to .gitignore
-#   4. Run: envpkt seal
+#   1. Generate a keypair:  envpkt keygen -c sealed-agent.toml -o identity.txt
+#      (writes identity.txt and sets `recipient` below; `age-keygen` keys work too)
+#   2. Add identity.txt to .gitignore
+#   3. Run: envpkt seal
 #
 # At runtime, `envpkt exec -- node app.js` (or boot() in code) will
 # decrypt sealed values using the identity file.

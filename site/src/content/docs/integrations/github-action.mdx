@@ -64,27 +64,16 @@ repository/organization secret named `ENVPKT_AGE_KEY` on the step's `env`:
     ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }}
 ```
 
-envpkt writes the inline key to a private (`0600`) temp file to decrypt and removes it
-afterwards — no key file needs to live in the repo or runner. Identity precedence:
+envpkt decrypts with the inline key in memory and never writes it to disk, so no key file needs to
+live in the repo or runner. Identity precedence:
 
 ```
 identity.key_file  >  ENVPKT_AGE_KEY_FILE  >  ENVPKT_AGE_KEY (inline)  >  ~/.envpkt/age-key.txt
 ```
 
-:::caution[Sealed packets need the `age` CLI on the runner]
-Decrypting `encrypted_value` packets shells out to [`age`](https://github.com/FiloSottile/age),
-which is **not** preinstalled on GitHub-hosted runners and has **no bundled/JS fallback** — it's
-a hard requirement for unsealing. Install it before the `envpkt` step:
-
-```yaml
-- run: sudo apt-get update && sudo apt-get install -y age
-```
-
-(Not needed if you only inject plaintext `[env.*]` defaults, or resolve via fnox.)
-
-**Gotcha:** because those plaintext defaults and fnox values resolve _without_ `age`, a run can
-look healthy while every sealed secret silently fails to decrypt. If sealed values aren't showing
-up in later steps, confirm `age` is installed — don't assume the packets are the problem.
+:::note[No `age` install needed]
+envpkt unseals in-process, so the runner needs only Node 22.12 or later. GitHub-hosted runners
+already have Node; add `actions/setup-node` before the `envpkt` step to pin a version.
 :::
 
 ## Masking

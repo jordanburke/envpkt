@@ -105,10 +105,8 @@ Sealed packets embed age-encrypted secret values directly in the TOML, making co
 #### Setup
 
 ```bash
-# Generate a keypair
-age-keygen -o examples/demo/agents/api-gateway/identity.txt
-
-# Note the public key printed (age1...)
+# Generate a keypair; writes identity.txt and sets identity.recipient in the config
+envpkt keygen -c examples/demo/agents/api-gateway/envpkt.toml -o examples/demo/agents/api-gateway/identity.txt
 ```
 
 #### Example config with sealed secrets

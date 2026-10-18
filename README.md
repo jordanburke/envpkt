@@ -141,9 +141,9 @@ See [`examples/`](./examples/) for more configurations.
 
 Sealed packets embed age-encrypted secret values directly in `envpkt.toml`. This makes your config fully self-contained — no external secrets backend needed at runtime.
 
-> **Requires the [`age`](https://github.com/FiloSottile/age) CLI.** envpkt shells out to `age` to seal and unseal `encrypted_value` — it's a runtime dependency, not bundled, and there is **no built-in / JS fallback**. Every path that decrypts a sealed value (`boot()`, `exec`, `env export`, `env github`, the GitHub Action) needs `age` on `PATH` plus the private key.
+> **No `age` install needed.** envpkt seals, unseals and makes keys in-process with [age-encryption](https://github.com/FiloSottile/typage), the TypeScript implementation by age's author. The format is standard [age](https://github.com/FiloSottile/age): `age -d` decrypts what envpkt seals, and envpkt unseals values sealed by the `age` CLI. Every path that decrypts a sealed value (`boot()`, `exec`, `env export`, `env github`, the GitHub Action) needs only the private key.
 >
-> **Gotcha — partial resolution hides a missing `age`.** Plaintext `[env.*]` defaults and fnox-backed values resolve _without_ `age`, so a config can look like it's working while every sealed secret silently fails to decrypt. If sealed values aren't showing up, confirm `age` is installed — `envpkt doctor` reports its presence.
+> envpkt reads plain age key files, like the ones `envpkt keygen` and `age-keygen` write. A passphrase-protected key file, an age plugin key or an SSH key fails with an error that names the file; `envpkt doctor` shows which key it found and why it can't use it.
 
 ### Setup
 
@@ -180,7 +180,7 @@ At runtime, sealed values are automatically decrypted:
 ```typescript
 import { boot } from "envpkt"
 
-const result = boot() // decrypts sealed values, injects into process.env
+const result = await boot() // decrypts sealed values, injects into process.env
 ```
 
 Mixed mode is supported — sealed values take priority, with fnox as fallback for keys without `encrypted_value`.
@@ -190,7 +190,7 @@ Mixed mode is supported — sealed values take priority, with fnox as fallback f
 Whether envpkt can replace a cloud secret store depends on one thing: **do you control how the process starts?**
 
 - **You launch it** (server, container, VM, k8s, systemd) → `envpkt exec -- yourapp` or `boot()` injects the decrypted values straight into the process environment. No cloud secret store needed: the sealed `envpkt.toml` ships with the app, and only the age key has to reach the runtime (N secrets collapse to 1 key).
-- **A platform launches it** (Cloudflare Workers, AWS Lambda, Vercel) → you don't own the launch, and the `age` CLI can't run inside the per-request isolate, so the platform's secret store is unavoidable. envpkt becomes the source of truth that populates and audits that store — not the injector.
+- **A platform launches it** (Cloudflare Workers, AWS Lambda, Vercel) → you don't own the launch, so the platform's secret store is unavoidable. envpkt becomes the source of truth that populates and audits that store — not the injector.
 
 > Rule of thumb: **own the launch → `exec`/`boot`, no store. Platform owns the launch → store required, envpkt feeds and audits it.** Full details: [Runtime injection guide](https://envpkt.dev/guides/runtime-injection/).
 
@@ -200,9 +200,6 @@ A composite action resolves the credentials in `envpkt.toml` into the CI job —
 
 ```yaml
 - uses: actions/checkout@v5
-
-# Sealed packets are decrypted with the `age` CLI (not preinstalled on runners).
-- run: sudo apt-get update && sudo apt-get install -y age
 
 - uses: jordanburke/envpkt@v0
   with:
@@ -214,11 +211,11 @@ A composite action resolves the credentials in `envpkt.toml` into the CI job —
 - run: ./deploy.sh # sees the resolved vars; secret values redacted in the log
 ```
 
-**How it works.** Commit sealed (`encrypted_value`) packets to the repo and supply the age private key as the `ENVPKT_AGE_KEY` secret. `boot()` materializes the inline key to a `0600` temp file to decrypt, then [`env github`](#envpkt-env-github) masks each secret (`::add-mask::`) and writes it to `$GITHUB_ENV`. Identity precedence: `identity.key_file` → `ENVPKT_AGE_KEY_FILE` → `ENVPKT_AGE_KEY` (inline) → `~/.envpkt/age-key.txt`.
+**How it works.** Commit sealed (`encrypted_value`) packets to the repo and supply the age private key as the `ENVPKT_AGE_KEY` secret. `boot()` decrypts with the inline key in memory (it never touches disk), then [`env github`](#envpkt-env-github) masks each secret (`::add-mask::`) and writes it to `$GITHUB_ENV`. Identity precedence: `identity.key_file` → `ENVPKT_AGE_KEY_FILE` → `ENVPKT_AGE_KEY` (inline) → `~/.envpkt/age-key.txt`.
 
 **Inputs:** `config`, `version` (npm version to run, default `latest`), `strict`, `profile`.
 
-> **The [`age`](https://github.com/FiloSottile/age) CLI is required on the runner to unseal `encrypted_value` packets** (install it first, as above) — envpkt shells out to `age`, with no bundled/JS fallback. Without it, sealed secrets won't decrypt or be injected, even though plaintext `[env.*]` defaults and fnox-backed values still resolve — which can mask the missing dependency until a sealed value turns up empty downstream. Reference `@v0` for the moving major tag (re-pointed to each `0.x` release), or pin an exact release like `@v0.13.6` for immutability. `@v1` ships when envpkt reaches 1.0. Node is assumed present; add `actions/setup-node` first to pin a version.
+> The runner needs no `age` install: envpkt unseals in-process. Reference `@v0` for the moving major tag (re-pointed to each `0.x` release), or pin an exact release like `@v0.13.6` for immutability. `@v1` ships when envpkt reaches 1.0. Node 22.12 or later is assumed present; add `actions/setup-node` first to pin a version.
 
 ### Anti-rot CI gate
 
@@ -408,16 +405,16 @@ Exit codes: `0` = healthy, `1` = degraded, `2` = critical.
 
 ### `envpkt doctor`
 
-One-shot environment check: is the `age` CLI installed, is a config resolvable here, and do its sealed secrets decrypt with an available key?
+One-shot environment check: is a config resolvable here, is a usable age key found, and do its sealed secrets decrypt with it? It also reports the built-in age-encryption version.
 
 ```bash
 envpkt doctor
-# ✓ age      v1.2.0
+# ✓ age      built in (age-encryption 0.3.1)
 # ✓ config   /path/to/envpkt.toml
 # ✓ secrets  5 resolved, 0 skipped
 ```
 
-If `age` is missing it prints the platform-specific install command; if a sealed packet has no key, it lists the paths it searched. Exits non-zero when a check fails.
+If a sealed packet has no key, it lists the paths it searched; if the key file can't be used (unreadable, passphrase-protected, a plugin or SSH key), it says why. Exits non-zero when a check fails.
 
 ### `envpkt resolve`
 
@@ -648,18 +645,18 @@ These are searched after CWD but before the built-in candidate paths. Useful for
 
 ## Library API
 
-envpkt is also available as a TypeScript library with a functional programming API built on [functype](https://github.com/jordanburke/functype). All functions return `Either<Error, Result>` or `Option<T>` — no thrown exceptions.
+envpkt is also available as a TypeScript library with a functional programming API built on [functype](https://github.com/jordanburke/functype). Fallible functions return `Either<Error, Result>` or `Option<T>` instead of throwing; `boot()` is the one throwing convenience wrapper. Functions that encrypt or decrypt (`boot`, `bootSafe`, `ageEncrypt`, `ageDecrypt`, `sealSecrets`, `unsealSecrets`, `generateKeypair`) return Promises, so `await` them. Without `await`, `boot()` returns before it injects anything.
 
 ```typescript
 import { boot, bootSafe, loadConfig, computeAudit, scanFleet, resolveConfig } from "envpkt"
 
 // Boot API — load config, resolve catalog, audit, inject secrets
-const result = boot({ configPath: "envpkt.toml", inject: true })
+const result = await boot({ configPath: "envpkt.toml", inject: true })
 console.log(result.audit.status) // "healthy" | "degraded" | "critical"
 console.log(result.configSource) // "flag" | "env" | "cwd" | "search"
 
 // Safe variant returns Either instead of throwing
-const safe = bootSafe({ configPath: "envpkt.toml" })
+const safe = await bootSafe({ configPath: "envpkt.toml" })
 safe.fold(
   (err) => console.error("Boot failed:", err._tag),
   (result) => console.log(`${result.injected.length} secrets injected`),
@@ -693,7 +690,7 @@ console.log(`${fleet.total_agents} agents, ${fleet.total_secrets} secrets`)
 import { boot } from "envpkt"
 
 // Resolve and inject credentials before agent startup
-const result = boot({ configPath: "envpkt.toml", inject: true })
+const result = await boot({ configPath: "envpkt.toml", inject: true })
 console.log(`${result.audit.status} — ${result.injected.length} secrets loaded`)
 
 // Now start your agent framework — process.env is populated
@@ -764,23 +761,31 @@ matchEnvVar("OPENAI_API_KEY", "sk-test123").fold(
 ### Seal API
 
 ```typescript
-import { ageEncrypt, ageDecrypt, sealSecrets, unsealSecrets } from "envpkt"
+import { ageEncrypt, ageDecrypt, describeIdentityError, sealSecrets, unsealSecrets, unwrapAgentKey } from "envpkt"
 
 // Encrypt a single value
-const encrypted = ageEncrypt("sk-my-api-key", "age1ql3z7hjy...")
+const encrypted = await ageEncrypt("sk-my-api-key", "age1ql3z7hjy...")
 encrypted.fold(
   (err) => console.error("Encrypt failed:", err.message),
   (ciphertext) => console.log(ciphertext), // -----BEGIN AGE ENCRYPTED FILE-----
 )
 
+// Decrypting takes secret keys (AGE-SECRET-KEY-…), not a path; unwrapAgentKey reads them from a key file
+const keys = unwrapAgentKey("/path/to/identity.txt").fold(
+  (err) => {
+    throw new Error(describeIdentityError(err))
+  },
+  (k) => k,
+)
+
 // Decrypt a single value
-const decrypted = ageDecrypt(ciphertext, "/path/to/identity.txt")
+const decrypted = await ageDecrypt(ciphertext, keys)
 
 // Seal all secrets in a config's meta
-const sealed = sealSecrets(config.meta, { OPENAI_API_KEY: "sk-..." }, recipientPublicKey)
+const sealed = await sealSecrets(config.meta, { OPENAI_API_KEY: "sk-..." }, recipientPublicKey)
 
 // Unseal all encrypted_value entries
-const values = unsealSecrets(config.meta, "/path/to/identity.txt")
+const values = await unsealSecrets(config.meta, keys)
 values.fold(
   (err) => console.error("Unseal failed:", err.message),
   (secrets) => console.log(secrets), // { OPENAI_API_KEY: "sk-..." }

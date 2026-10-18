@@ -5,8 +5,8 @@
 ```typescript
 import { bootSafe } from "envpkt"
 
-const main = () => {
-  const result = bootSafe({
+const main = async () => {
+  const result = await bootSafe({
     failOnExpired: true,
     inject: true,
   })
@@ -164,16 +164,13 @@ git add envpkt.toml && git commit -m "rotate: age keypair"
 # 1. Initialize with identity section
 envpkt init --identity --name "my-agent"
 
-# 2. Generate age keypair (if needed)
-age-keygen -o keys/agent.age
+# 2. Generate an age keypair (if needed); also sets identity.recipient in envpkt.toml
+envpkt keygen -o keys/agent.age
 
-# 3. Add recipient public key to envpkt.toml
-#    recipient = "age1..."
-
-# 4. Seal secret values
+# 3. Seal secret values
 envpkt seal --profile prod
 
-# 5. Commit — encrypted_value fields are safe to commit
+# 4. Commit — encrypted_value fields are safe to commit
 git add envpkt.toml
 git commit -m "seal: update encrypted credentials"
 
@@ -272,7 +269,7 @@ envpkt env scan --include-unknown
 ```typescript
 import { bootSafe } from "envpkt"
 
-const result = bootSafe()
+const result = await bootSafe()
 
 result.fold(
   (err) => {

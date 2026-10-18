@@ -101,11 +101,12 @@ envpkt audit --format json     # Machine-readable output
 ```typescript
 import { boot, bootSafe } from "envpkt"
 
+// Both are async: await them, or boot() returns before it injects anything.
 // Throwing API
-const result = boot()
+const result = await boot()
 
 // Either-based API (recommended)
-const result = bootSafe()
+const result = await bootSafe()
 result.fold(
   (err) => console.error(`Boot failed: ${err._tag}`),
   (ok) => console.log(`Injected ${ok.injected.length} secrets`),
@@ -120,7 +121,7 @@ Pass a `DirectLogger` via `BootOptions.logger` to trace each resolution phase
 ```typescript
 import { bootSafe, createDirectConsoleLogger } from "envpkt"
 
-bootSafe({ logger: createDirectConsoleLogger({ level: "debug" }) })
+await bootSafe({ logger: createDirectConsoleLogger({ level: "debug" }) })
 // Emits: alias.validate.success, phase.sealed.resolved, phase.fnox.resolved,
 // phase.alias.copied, etc. — all scoped with { component: "envpkt.boot" }
 ```
@@ -328,12 +329,12 @@ See `references/quick-reference.md` for a compact cheat sheet.
 CI: emits `::add-mask::` for each secret (redacts it from the log) and appends heredoc
 assignments to `$GITHUB_ENV` (using namespaced wire names) so later job steps inherit them;
 env defaults are written but not masked. `--strict` exits with the audit code (1/2) after
-injecting. There is also a composite Action: `uses: jordanburke/envpkt@v0.12.0` (pin to a
-released tag; no moving major tag is published yet).
+injecting. There is also a composite Action: `uses: jordanburke/envpkt@v0` (the moving major tag), or
+pin an exact release such as `@v0.18.0`. The runner needs Node 22.12+ and no `age` install.
 
 **CI age-key contract**: supply the age private key inline via the `ENVPKT_AGE_KEY` env var
-(e.g. a GitHub secret) — `boot()` materializes it to a `0600` temp file to decrypt sealed
-packets, no key file needed. Precedence: `identity.key_file` → `ENVPKT_AGE_KEY_FILE` →
+(e.g. a GitHub secret) — `boot()` decrypts sealed packets with it in memory and never writes
+it to disk, so no key file is needed. Precedence: `identity.key_file` → `ENVPKT_AGE_KEY_FILE` →
 `ENVPKT_AGE_KEY` (inline) → `~/.envpkt/age-key.txt`.
 
 ### Secret Management (CRUD)
@@ -400,11 +401,11 @@ packets, no key file needed. Precedence: `identity.key_file` → `ENVPKT_AGE_KEY
 ```typescript
 import { boot, bootSafe, EnvpktBootError } from "envpkt"
 
-// boot(options?) — throws EnvpktBootError on failure
-const result: BootResult = boot({ configPath: "./envpkt.toml" })
+// boot(options?) — rejects with EnvpktBootError on failure
+const result: BootResult = await boot({ configPath: "./envpkt.toml" })
 
-// bootSafe(options?) — returns Either<BootError, BootResult>
-const result: Either<BootError, BootResult> = bootSafe({ inject: true })
+// bootSafe(options?) — resolves to Either<BootError, BootResult>
+const result: Either<BootError, BootResult> = await bootSafe({ inject: true })
 ```
 
 **BootOptions**:
@@ -495,14 +496,18 @@ const service: string | undefined = deriveServiceFromName("AWS_SECRET_ACCESS_KEY
 
 ### Sealing (age encryption)
 
+envpkt encrypts in-process with age-encryption (typage); no `age` CLI is needed. These functions
+are async, and decrypting takes secret keys (`AGE-SECRET-KEY-…`), not a key file path.
+
 ```typescript
-import { sealSecrets, unsealSecrets, ageEncrypt, ageDecrypt } from "envpkt"
+import { sealSecrets, unsealSecrets, unwrapAgentKey } from "envpkt"
 
 // Encrypt values into config meta
-const sealed = sealSecrets(meta, recipientPublicKey)
+const sealed = await sealSecrets(meta, values, recipientPublicKey)
 
-// Decrypt sealed values
-const unsealed = unsealSecrets(meta, identityPath)
+// Read the keys from a plain age key file, then decrypt sealed values
+const keys = unwrapAgentKey(identityPath).orThrow()
+const unsealed = await unsealSecrets(meta, keys)
 ```
 
 ### Fleet Scanning
@@ -565,7 +570,7 @@ const updated = updateConfigRecipient("envpkt.toml", "age1...")
 
 ```typescript
 import { fnoxAvailable, detectFnox, fnoxExport, fnoxGet } from "envpkt"
-import { unwrapAgentKey, ageAvailable } from "envpkt"
+import { unwrapAgentKey, describeIdentityError } from "envpkt"
 import { readFnoxConfig, extractFnoxKeys, compareFnoxAndEnvpkt } from "envpkt"
 ```
 
@@ -576,8 +581,8 @@ import { readFnoxConfig, extractFnoxKeys, compareFnoxAndEnvpkt } from "envpkt"
 ```typescript
 import { bootSafe } from "envpkt"
 
-const main = () => {
-  const result = bootSafe({ failOnExpired: true })
+const main = async () => {
+  const result = await bootSafe({ failOnExpired: true })
 
   result.fold(
     (err) => {
@@ -751,30 +756,32 @@ All errors are tagged unions with a `_tag` discriminant:
 
 ### BootError Tags
 
-| Tag                  | Meaning                                  |
-| -------------------- | ---------------------------------------- |
-| `FileNotFound`       | `envpkt.toml` not found at path          |
-| `ParseError`         | TOML parse failure                       |
-| `ValidationError`    | Schema validation failed                 |
-| `ReadError`          | File read error                          |
-| `FnoxNotFound`       | fnox CLI not installed                   |
-| `FnoxCliError`       | fnox command failed                      |
-| `FnoxParseError`     | fnox output parse failure                |
-| `AuditFailed`        | Credential audit failed policy           |
-| `CatalogNotFound`    | Catalog file not found                   |
-| `CatalogLoadError`   | Catalog load/parse error                 |
-| `SecretNotInCatalog` | Requested secret not in catalog          |
-| `MissingSecretsList` | Identity has no secrets list for catalog |
-| `AgeNotFound`        | age CLI not installed                    |
-| `DecryptFailed`      | Decryption failed                        |
-| `IdentityNotFound`   | Agent identity file not found            |
+| Tag                           | Meaning                                             |
+| ----------------------------- | --------------------------------------------------- |
+| `FileNotFound`                | `envpkt.toml` not found at path                     |
+| `ParseError`                  | TOML parse failure                                  |
+| `ValidationError`             | Schema validation failed                            |
+| `ReadError`                   | File read error                                     |
+| `FnoxNotFound`                | fnox CLI not installed                              |
+| `FnoxCliError`                | fnox command failed                                 |
+| `FnoxParseError`              | fnox output parse failure                           |
+| `AuditFailed`                 | Credential audit failed policy                      |
+| `CatalogNotFound`             | Catalog file not found                              |
+| `CatalogLoadError`            | Catalog load/parse error                            |
+| `SecretNotInCatalog`          | Requested secret not in catalog                     |
+| `MissingSecretsList`          | Identity has no secrets list for catalog            |
+| `SealKeyUnavailable`          | Sealed values declared but no age key found         |
+| `IdentityNotFound`            | Agent identity file not found                       |
+| `IdentityUnreadable`          | Key file exists but can't be read                   |
+| `NoIdentityKey`               | Key source has no `AGE-SECRET-KEY-` line            |
+| `PassphraseProtectedIdentity` | Key file is passphrase-protected                    |
+| `UnsupportedIdentity`         | Plugin or SSH key, or not a key (`line` says which) |
 
 ### KeygenError Tags
 
 | Tag                 | Meaning                                              |
 | ------------------- | ---------------------------------------------------- |
-| `AgeNotFound`       | `age-keygen` CLI not found on PATH                   |
-| `KeygenFailed`      | `age-keygen` command failed                          |
+| `KeygenFailed`      | Key generation failed                                |
 | `KeyExists`         | Identity file already exists (`rm` first to replace) |
 | `WriteError`        | Failed to write identity file                        |
 | `ConfigUpdateError` | Failed to update `envpkt.toml`                       |
@@ -784,7 +791,8 @@ All errors are tagged unions with a `_tag` discriminant:
 ```typescript
 import { bootSafe } from "envpkt"
 
-bootSafe().fold(
+const booted = await bootSafe()
+booted.fold(
   (err) => {
     // Handle by tag
     switch (err._tag) {
@@ -868,7 +876,7 @@ Use `envpkt headers` as the server's `headersHelper` — see [MCP header binding
 
 - **Config not found**: envpkt searches up from cwd. Use `-c <path>` to specify explicitly.
 - **Audit shows "missing"**: The secret key is in `[secret.*]` but not in the environment. Check `envpkt env check`.
-- **Sealed values fail**: Ensure `age` CLI is installed and the identity file path in `[identity].identity` is correct.
+- **Sealed values fail**: Run `envpkt doctor`. It shows which key file it found and why it can't use it (missing, unreadable, passphrase-protected, plugin or SSH key). Check `[identity].key_file`, `ENVPKT_AGE_KEY_FILE` or `ENVPKT_AGE_KEY`.
 - **fnox errors**: Check `fnox` is installed and configured. Use `envpkt inspect --resolved` to see what the config looks like after catalog merge.
 - **Boot skips secrets**: Check `bootSafe()` result's `skipped` array and `warnings` for details.
 - **Schema validation**: Run `envpkt inspect` to see validation errors. The JSON schema is available at `envpkt/schema` export for editor autocomplete.

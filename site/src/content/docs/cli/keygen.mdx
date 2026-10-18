@@ -71,13 +71,13 @@ This prevents accidental key loss when multiple projects or agents run `keygen`.
 
 ## Behavior
 
-1. Checks that `age-keygen` is available on PATH
-2. Resolves the output path (flag > `--global` > env var > derived default)
-3. If file exists: refuses, prints guidance to `rm` or pass `-o`
-4. Generates keypair via `age-keygen`
-5. Writes identity file with `0600` permissions
-6. If `envpkt.toml` exists: updates `[identity]` with `name`, `recipient`, and `key_file`
-7. If no config found: prints next-step guidance
+1. Resolves the output path (flag > `--global` > env var > derived default)
+2. If file exists: refuses, prints guidance to `rm` or pass `-o`
+3. Generates an X25519 keypair in-process (no `age-keygen` needed); the file has the same format
+   `age-keygen` writes
+4. Writes identity file with `0600` permissions
+5. If `envpkt.toml` exists: updates `[identity]` with `name`, `recipient`, and `key_file`
+6. If no config found: prints next-step guidance
 
 ## Typical Workflow
 

@@ -39,7 +39,7 @@ Or self-inject from inside the app at startup:
 ```ts
 import { boot } from "envpkt"
 
-boot() // decrypts sealed packets + populates process.env before your code runs
+await boot() // decrypts sealed packets + populates process.env before your code runs
 ```
 
 The sealed `envpkt.toml` ships _with_ the app (committed, or baked into the image). The decrypted
@@ -52,8 +52,7 @@ The age key still has to reach the runtime. So you haven't removed _a_ secret; y
 traveling in the image." Deliver the key via:
 
 - an environment variable the orchestrator sets (`ENVPKT_AGE_KEY`),
-- a mounted file (k8s Secret / volume → `identity.key_file`),
-- or, for a VM you bootstrap, a passphrase-wrapped key blob.
+- or a mounted file (k8s Secret / volume → `identity.key_file`).
 
 One key, one channel — the same N→1 collapse envpkt gives you in CI, now at runtime.
 
@@ -66,10 +65,9 @@ for two stacked reasons:
    request. There is no startup command to wrap with `envpkt exec`, and no `boot()`-before-handler
    hook you control. The only path into the isolate is the platform's own env/binding mechanism,
    which is fed from its secret store (`wrangler secret put`, Lambda env / Secrets Manager).
-2. **Unseal can't run there.** Sealing uses the external `age` CLI as a runtime dependency. A
-   Worker has no subprocess and no filesystem, so `age` cannot execute inside it. Even if you
-   bundled the sealed packets, you couldn't decrypt them in-isolate — and you'd still need the age
-   key as a Worker secret, i.e. back in the platform store.
+2. **`boot()` isn't built for it.** envpkt decrypts in-process, but `boot()` reads `envpkt.toml`
+   and the key file from disk, and a Worker has no filesystem. Even if you bundled the sealed
+   packets, you'd still need the age key as a Worker secret, i.e. back in the platform store.
 
 So for serverless, envpkt's role is **source of truth + parity**, not injection: it holds the
 governed, sealed values and (with a thin orchestration step) populates the platform store from

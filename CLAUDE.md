@@ -43,7 +43,8 @@ The validate chain is customized in `ts-builds.config.json` to include `build:sc
 | `catalog.ts`        | Catalog resolution — merges shared secret metadata from a referenced catalog file into agent configs.                                                 |
 | `audit.ts`          | Health computation: compares secret metadata against lifecycle policies → `AuditResult` with per-secret status.                                       |
 | `boot.ts`           | Programmatic entry point. `boot()`/`bootSafe()` pipeline: load config → resolve catalog → audit → unseal → fnox fallback → inject into `process.env`. |
-| `seal.ts`           | Age encryption/decryption via `age` CLI. `sealSecrets`/`unsealSecrets` operate on config metadata records.                                            |
+| `age.ts`            | The only module that imports age-encryption (typage): encrypt, decrypt, keygen and key file parsing, in-process.                                      |
+| `seal.ts`           | Async seal/unseal on config metadata records (`sealSecrets`/`unsealSecrets`), built on `age.ts`. Decrypting takes secret keys, not a key file path.   |
 | `env.ts`            | Environment scanning (`envScan`) and drift detection (`envCheck`).                                                                                    |
 | `patterns.ts`       | Credential pattern registry: ~45 exact names, ~13 suffix patterns, ~29 value shape regexes for auto-discovery.                                        |
 | `fleet.ts`          | Directory tree scanner for `envpkt.toml` files, aggregates health across agents.                                                                      |
@@ -77,11 +78,11 @@ Bridge to the `fnox` credential store: detection, CLI invocation, TOML parsing, 
 - **smol-toml** — TOML parser
 - **commander** — CLI framework
 - **@modelcontextprotocol/sdk** — MCP server implementation
-- **age** (external CLI) — Required at runtime for seal/unseal operations
+- **age-encryption** (typage) — In-process age encryption, used only by `src/core/age.ts`. The `age` CLI is not needed at runtime; CI installs it only for the interop spec (`test/core/age-interop.spec.ts`).
 
 ## Test Structure
 
-Tests mirror source: `test/core/`, `test/cli/`, `test/fnox/`, `test/e2e/`, `test/mcp/`. Fixture data in `test/fixtures/demo-data.ts`. Vitest with v8 coverage.
+Tests mirror source: `test/core/`, `test/cli/`, `test/fnox/`, `test/e2e/`, `test/mcp/`. Fixture data in `test/fixtures/demo-data.ts`. `test/helpers/age.ts` makes key files and seals values in-process, so specs need no `age` install. Vitest with v8 coverage.
 
 ## Publishing
 
