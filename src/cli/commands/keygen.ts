@@ -1,7 +1,10 @@
-import { existsSync } from "node:fs"
+import { existsSync, realpathSync } from "node:fs"
 import { homedir } from "node:os"
-import { basename, dirname, join, resolve } from "node:path"
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path"
 
+import { Option, Try } from "functype"
+
+import { loadConfig } from "../../core/config.js"
 import { generateKeypair, resolveKeyPath, updateConfigIdentity } from "../../core/keygen.js"
 import { BOLD, CYAN, DIM, formatError, GREEN, RESET, YELLOW } from "../output.js"
 
@@ -19,6 +22,27 @@ const tildeShorten = (p: string): string => {
 
 /** Derive a default identity name from the config path's parent directory */
 const deriveIdentityName = (configPath: string): string => basename(dirname(resolve(configPath)))
+
+/** Keep the config's identity.name if it has one; otherwise derive one */
+const identityName = (configPath: string): string =>
+  loadConfig(configPath)
+    .toOption()
+    .flatMap((config) => Option(config.identity?.name))
+    .orElse(deriveIdentityName(configPath))
+
+/**
+ * The key_file value to write. boot resolves key_file against the config's directory, so a key
+ * inside that directory is written relative to it; any other key is written as an absolute path,
+ * shortened to ~ under $HOME.
+ */
+const keyFileFor = (configPath: string, identityPath: string): string => {
+  // Compare real paths: on macOS the cwd can be /private/var/… while a passed path says /var/….
+  const realPath = (p: string): string => Try(() => realpathSync(p)).orElse(resolve(p))
+  const abs = realPath(identityPath)
+  const rel = relative(realPath(dirname(configPath)), abs)
+  const outside = rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)
+  return outside ? tildeShorten(abs) : rel
+}
 
 /**
  * Derive a project-specific key path from the config path.
@@ -60,8 +84,8 @@ export const runKeygen = async (options: KeygenOptions): Promise<void> => {
 
       // Try to update envpkt.toml if it exists
       if (existsSync(configPath)) {
-        const name = deriveIdentityName(configPath)
-        const keyFile = tildeShorten(identityPath)
+        const name = identityName(configPath)
+        const keyFile = keyFileFor(configPath, identityPath)
         const updateResult = updateConfigIdentity(configPath, { recipient, name, keyFile })
         updateResult.fold(
           (err) => {

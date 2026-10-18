@@ -49,6 +49,15 @@ decrypts what envpkt seals.
 - **Breaking:** the `age` command is no longer used or required. The library's `ageAvailable()` and
   the `AgeNotFound` error are gone.
 
+### Fixed
+
+- `envpkt keygen -c <dir>/envpkt.toml -o <dir>/key.txt` run from another directory now writes a
+  `key_file` that `boot` finds. It used to write the path relative to the current directory, while
+  `boot` reads it relative to the config's directory. A key inside the config's directory is now
+  written relative to that directory, and any other key as an absolute path (`~` under `$HOME`).
+- `envpkt keygen` keeps an existing `identity.name`. It used to replace it with the config
+  directory's name.
+
 ## [0.17.0] - 2026-10-17
 
 ### Changed

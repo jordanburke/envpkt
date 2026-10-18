@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import { homedir, tmpdir } from "node:os"
 import { basename, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
@@ -96,10 +96,38 @@ describe("envpkt keygen", () => {
     expect(result.status).toBe(0)
 
     const config = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
-    // Existing name should be updated with derived name, recipient and key_file added
+    expect(config).toContain('name = "my-agent"')
+    expect(config).not.toContain(`name = "${basename(tmpDir)}"`)
     expect(config).toContain("recipient = ")
-    expect(config).toContain("name = ")
-    expect(config).toContain("key_file = ")
+    expect(config).toContain('key_file = "key.txt"')
+  })
+
+  it("writes key_file relative to the config's directory, not the cwd", () => {
+    const agentDir = join(tmpDir, "agents", "api")
+    mkdirSync(agentDir, { recursive: true })
+    const configPath = join(agentDir, "envpkt.toml")
+    writeFileSync(configPath, `version = 1\n`)
+
+    const result = run(["keygen", "-c", "agents/api/envpkt.toml", "-o", "agents/api/key.txt"], { cwd: tmpDir })
+
+    expect(result.status).toBe(0)
+    expect(existsSync(join(agentDir, "key.txt"))).toBe(true)
+    expect(readFileSync(configPath, "utf-8")).toContain('key_file = "key.txt"')
+  })
+
+  it("writes an absolute key_file for a key outside the config's directory", () => {
+    const agentDir = join(tmpDir, "agent")
+    mkdirSync(agentDir)
+    const configPath = join(agentDir, "envpkt.toml")
+    writeFileSync(configPath, `version = 1\n`)
+    const keyPath = join(tmpDir, "keys", "agent-key.txt")
+    mkdirSync(dirname(keyPath))
+
+    const result = run(["keygen", "-c", configPath, "-o", keyPath], { cwd: agentDir })
+
+    expect(result.status).toBe(0)
+    const keyFile = /key_file = "([^"]+)"/.exec(readFileSync(configPath, "utf-8"))?.[1] ?? ""
+    expect(realpathSync(resolve(agentDir, keyFile.replace(/^~/, homedir())))).toBe(realpathSync(keyPath))
   })
 
   it("defaults to project-specific path derived from config", () => {
