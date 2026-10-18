@@ -41,6 +41,8 @@ decrypts what envpkt seals.
 - envpkt requires Node 22.12 or later (`engines` in `package.json`). Node 20 reached end of life on
   2026-04-30, and 22.12 is the first 22.x that loads an ES module from CommonJS (`require(esm)`)
   without a flag.
+- functype is now `^1.18.0`. In 1.18.0, `Either.mapAsync` and `flatMapAsync` reject when the callback
+  rejects or throws. Before that, they caught the error as a `Left`.
 
 ### Removed
 
