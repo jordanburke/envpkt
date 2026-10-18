@@ -266,8 +266,9 @@ export type BootError =
   | IdentityError
 
 export type IdentityError =
-  | { readonly _tag: "DecryptFailed"; readonly message: string }
   | { readonly _tag: "IdentityNotFound"; readonly path: string }
+  // The key file exists but can't be read (permissions, a directory, an I/O error).
+  | { readonly _tag: "IdentityUnreadable"; readonly path: string; readonly message: string }
   // A key was found but can't be used. `source` is the key file's path, or ENVPKT_AGE_KEY.
   | (IdentityFileError & { readonly source: string })
 

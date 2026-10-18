@@ -28,11 +28,16 @@ decrypts what envpkt seals.
   key in it, not just the first.
 - envpkt reads plain age key files only, like the ones `envpkt keygen` and `age-keygen` write. A
   passphrase-protected key file, an age plugin key or an SSH key fails with an error that names
-  the file (and, for a plugin or SSH key, the line); `boot`, `exec` and `env export` stop instead
-  of injecting empty values.
+  the file (and, for a plugin or SSH key, the line). So does a key file that exists but can't be
+  read, such as one without read permission, which used to be only a warning. In each case
+  `boot`, `exec` and `env export` stop instead of injecting empty values, and `envpkt doctor`
+  reports it on its key line.
+- **Breaking (library):** an unreadable key file is now an `IdentityUnreadable` error (with `path`
+  and `message`) instead of `DecryptFailed`. `IdentityError` no longer includes `DecryptFailed`.
 - `ENVPKT_AGE_KEY` (the inline CI key) stays in memory. It used to be written to a temp file for
   the `age` command.
-- `envpkt doctor` reports the built-in age-encryption version instead of checking for `age`.
+- `envpkt doctor` reports the built-in age-encryption version instead of checking for `age`. Its
+  help text no longer says it checks that `age` is installed.
 - envpkt requires Node 22.12 or later (`engines` in `package.json`). Node 20 reached end of life on
   2026-04-30, and 22.12 is the first 22.x that loads an ES module from CommonJS (`require(esm)`)
   without a flag.

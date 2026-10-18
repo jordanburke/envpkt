@@ -63,8 +63,9 @@ file. With typage:
 - The identity precedence chain (`key_file` > `ENVPKT_AGE_KEY_FILE` > `ENVPKT_AGE_KEY` >
   `~/.envpkt/age-key.txt`) and `describeSealKeySearch` stay as they are; they resolve to key strings
   instead of a path.
-- **An unusable key stops `boot`.** A key source that exists but can't be read (passphrase-protected,
-  plugin or SSH; decisions 1 and 2) returns its `IdentityError` from `bootSafe`, even under
+- **An unusable key stops `boot`.** A key source that exists but can't be used (a file that can't be
+  read, or a passphrase-protected, plugin or SSH key; decisions 1 and 2) returns its `IdentityError`
+  from `bootSafe`, even under
   `warnOnly`, the same way `SealKeyUnavailable` does. A wrong key (decrypt fails) stays a warning, as
   it was with the CLI. `ENVPKT_AGE_KEY` goes through the same parser as a file, named
   `ENVPKT_AGE_KEY` in errors.
@@ -159,7 +160,8 @@ byte-for-byte tests from 0.17.0 (`copy`, `--reseal`, env → `boot()`) carry ove
 ## Docs
 
 - README, `site/.../getting-started/installation.mdx`: remove the `age` install step.
-- `site/.../cli/keygen.mdx`, `site/.../reference/error-types.mdx`: drop `AgeNotFound`.
+- `site/.../cli/keygen.mdx`, `site/.../reference/error-types.mdx`: drop `AgeNotFound`; in
+  `IdentityError`, replace `DecryptFailed` with `IdentityUnreadable`.
 - `site/.../integrations/github-action.mdx`: remove the "Sealed packets need the `age` CLI"
   caution and its gotcha.
 - `site/.../guides/agent-ci-workflow.mdx`, `.claude/skills/envpkt/SKILL.md`,

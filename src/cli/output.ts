@@ -180,6 +180,7 @@ export const formatError = (error: { _tag: string; message?: string; path?: stri
       return `${RED}Error:${RESET} Config validation failed:\n${String(error.errors)}`
     case "ReadError":
       return `${RED}Error:${RESET} Could not read file: ${error.message}`
+    case "IdentityUnreadable":
     case "NoIdentityKey":
     case "PassphraseProtectedIdentity":
     case "UnsupportedIdentity":

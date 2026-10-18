@@ -2,7 +2,7 @@ import { ageEncryptionVersion } from "../../core/age.js"
 import { bootSafe } from "../../core/boot.js"
 import { resolveConfigPath } from "../../core/config.js"
 import type { BootError } from "../../core/types.js"
-import { describeIdentityError } from "../../fnox/identity.js"
+import { describeIdentityError, isIdentityError } from "../../fnox/identity.js"
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "../output.js"
 
 type DoctorOptions = {
@@ -20,11 +20,7 @@ const reportResolution = async (configPath: string): Promise<boolean> =>
       if (err._tag === "SealKeyUnavailable") {
         bad("key   ", `${err.sealedKeys.length} sealed secret(s) but no decryption key`)
         err.searched.forEach((line) => console.log(`${DIM}        ${line}${RESET}`))
-      } else if (
-        err._tag === "NoIdentityKey" ||
-        err._tag === "PassphraseProtectedIdentity" ||
-        err._tag === "UnsupportedIdentity"
-      ) {
+      } else if (isIdentityError(err)) {
         bad("key   ", describeIdentityError(err))
       } else {
         bad("config", `${err._tag}`)

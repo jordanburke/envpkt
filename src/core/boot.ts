@@ -176,7 +176,8 @@ const checkExpiration = (
 
 /**
  * Sealed values are declared, so a usable key is required. No key anywhere → SealKeyUnavailable;
- * a key that can't be read (passphrase-protected, plugin, SSH) → its IdentityError. Either way
+ * a key that can't be used (an unreadable file, or a passphrase-protected, plugin or SSH key) → its
+ * IdentityError. Either way
  * boot refuses rather than inject empty values — even under warnOnly, which governs soft issues
  * like expiry, not an absent key.
  */
@@ -232,242 +233,237 @@ export const bootSafe = async (options?: BootOptions): Promise<Either<BootError,
   const warnOnly = opts.warnOnly ?? false
   const log = (opts.logger ?? directSilentLogger).withContext({ component: "envpkt.boot" })
 
-  return resolveAndLoad(opts).flatMapAsync(({ config, configPath, configDir, configSource }) =>
-    validateAliases(config).fold<Promise<Either<BootError, BootResult>>>(
-      (err) => {
-        log.warn("alias.validate.failed", { tag: err._tag, key: "key" in err ? err.key : undefined })
-        return Promise.resolve(Left(err))
-      },
-      (aliasTable) => {
-        log.debug("alias.validate.success", { aliases: aliasTable.entries.size })
-        const secretEntries = config.secret ?? {}
-        const envEntries = config.env ?? {}
+  const loaded = resolveAndLoad(opts)
+  if (loaded.isLeft()) return Left(loaded.value)
+  const { config, configPath, configDir, configSource } = loaded.value
 
-        // Namespace boundary: internal records stay keyed by the logical name;
-        // only process.env reads/writes use the namespaced wire name. Per-entry
-        // `namespace` overrides the file-level prefix ("" opts out).
-        const namer = makeEnvNamer(config)
-        const secretEnv = (key: string): string => namer(key, secretEntries[key]?.namespace)
-        const envEnv = (key: string): string => namer(key, envEntries[key]?.namespace)
+  const aliases = validateAliases(config)
+  if (aliases.isLeft()) {
+    const err = aliases.value
+    log.warn("alias.validate.failed", { tag: err._tag, key: "key" in err ? err.key : undefined })
+    return Left(err)
+  }
+  const aliasTable = aliases.value
+  log.debug("alias.validate.success", { aliases: aliasTable.entries.size })
+  const secretEntries = config.secret ?? {}
+  const envEntries = config.env ?? {}
 
-        // Logical → wire name map for every known key, surfaced on BootResult so
-        // shell-facing consumers (exec, env export) inject under the real name.
-        const envNames: Record<string, string> = {
-          ...Object.fromEntries(Object.keys(envEntries).map((k) => [k, envEnv(k)])),
-          ...Object.fromEntries(Object.keys(secretEntries).map((k) => [k, secretEnv(k)])),
-        }
+  // Namespace boundary: internal records stay keyed by the logical name;
+  // only process.env reads/writes use the namespaced wire name. Per-entry
+  // `namespace` overrides the file-level prefix ("" opts out).
+  const namer = makeEnvNamer(config)
+  const secretEnv = (key: string): string => namer(key, secretEntries[key]?.namespace)
+  const envEnv = (key: string): string => namer(key, envEntries[key]?.namespace)
 
-        // Separate alias from non-alias entries. Aliases carry no value of
-        // their own; they copy from their target after the real entries resolve.
-        const nonAliasSecretEntries = Object.fromEntries(
-          Object.entries(secretEntries).filter(([, meta]) => meta.from_key === undefined),
-        )
-        const aliasSecretKeys = Object.entries(secretEntries)
-          .filter(([, meta]) => meta.from_key !== undefined)
-          .map(([k]) => k)
-        const nonAliasEnvEntries = Object.entries(envEntries).filter(([, meta]) => meta.from_key === undefined)
-        const aliasEnvKeys = Object.entries(envEntries)
-          .filter(([, meta]) => meta.from_key !== undefined)
-          .map(([k]) => k)
+  // Logical → wire name map for every known key, surfaced on BootResult so
+  // shell-facing consumers (exec, env export) inject under the real name.
+  const envNames: Record<string, string> = {
+    ...Object.fromEntries(Object.keys(envEntries).map((k) => [k, envEnv(k)])),
+    ...Object.fromEntries(Object.keys(secretEntries).map((k) => [k, secretEnv(k)])),
+  }
 
-        const nonAliasMetaKeys = Object.keys(nonAliasSecretEntries)
-        const hasSealedValues = Object.values(nonAliasSecretEntries).some((meta) => !!meta.encrypted_value)
+  // Separate alias from non-alias entries. Aliases carry no value of
+  // their own; they copy from their target after the real entries resolve.
+  const nonAliasSecretEntries = Object.fromEntries(
+    Object.entries(secretEntries).filter(([, meta]) => meta.from_key === undefined),
+  )
+  const aliasSecretKeys = Object.entries(secretEntries)
+    .filter(([, meta]) => meta.from_key !== undefined)
+    .map(([k]) => k)
+  const nonAliasEnvEntries = Object.entries(envEntries).filter(([, meta]) => meta.from_key === undefined)
+  const aliasEnvKeys = Object.entries(envEntries)
+    .filter(([, meta]) => meta.from_key !== undefined)
+    .map(([k]) => k)
 
-        // Resolve identity key — non-fatal when sealed values exist (identity may be a plain age identity)
-        const identityKeyResult = resolveIdentityKey(config, configDir)
-        const identityKey = identityKeyResult.fold(
-          () => Option<string>(undefined),
-          (k) => k,
-        )
+  const nonAliasMetaKeys = Object.keys(nonAliasSecretEntries)
+  const hasSealedValues = Object.values(nonAliasSecretEntries).some((meta) => !!meta.encrypted_value)
 
-        // If identity key resolution failed AND no sealed values, propagate the error
-        if (identityKeyResult.isLeft() && !hasSealedValues) {
-          return Promise.resolve(
-            identityKeyResult.fold<Either<BootError, BootResult>>(
-              (err) => Left(err),
-              () => Left({ _tag: "ReadError", message: "unexpected" } as BootError),
-            ),
-          )
-        }
+  // Resolve identity key — non-fatal when sealed values exist (identity may be a plain age identity)
+  const identityKeyResult = resolveIdentityKey(config, configDir)
+  const identityKey = identityKeyResult.fold(
+    () => Option<string>(undefined),
+    (k) => k,
+  )
 
-        const fnoxKeys = detectFnoxKeys(configDir)
-        const audit = computeAudit(config, fnoxKeys, undefined, aliasTable)
+  // If identity key resolution failed AND no sealed values, propagate the error
+  if (identityKeyResult.isLeft() && !hasSealedValues) return Left(identityKeyResult.value)
 
-        // Fail fast when sealed values are declared but no usable key resolves (requireSealKeys).
-        // Resolved once here and threaded into Phase 1 below.
-        const sealKeys: Either<BootError, ReadonlyArray<string>> = hasSealedValues
-          ? requireSealKeys(config, configDir, nonAliasSecretEntries)
-          : Right([])
+  const fnoxKeys = detectFnoxKeys(configDir)
+  const audit = computeAudit(config, fnoxKeys, undefined, aliasTable)
 
-        return sealKeys
-          .flatMap((unsealKeys) =>
-            checkExpiration(audit, failOnExpired, warnOnly).map((warnings) => ({ unsealKeys, warnings })),
-          )
-          .mapAsync(async ({ unsealKeys, warnings }) => {
-            const secrets: Record<string, string> = {}
-            const injected: string[] = []
-            const skipped: string[] = []
+  // Fail fast when sealed values are declared but no usable key resolves (requireSealKeys).
+  // Resolved once here and threaded into Phase 1 below.
+  const sealKeys: Either<BootError, ReadonlyArray<string>> = hasSealedValues
+    ? requireSealKeys(config, configDir, nonAliasSecretEntries)
+    : Right([])
 
-            // Phase 0: apply env defaults + misclassification check
-            warnings.push(...checkEnvMisclassification(config))
+  if (sealKeys.isLeft()) return Left(sealKeys.value)
+  const unsealKeys = sealKeys.value
 
-            // Flag a namespace separator that would break shell consumers (e.g. '.', ':').
-            // Non-fatal: injection still works for process.env-based consumers.
-            const nsSeparator = config.namespace?.separator
-            if (nsSeparator !== undefined && !isShellSafeSeparator(nsSeparator)) {
-              warnings.push(
-                `[namespace] separator "${nsSeparator}" is not shell-safe — injected names won't be usable via shell $VAR/export. Use '_' or '__'.`,
-              )
-            }
+  const expiration = checkExpiration(audit, failOnExpired, warnOnly)
+  if (expiration.isLeft()) return Left(expiration.value)
+  const warnings = expiration.value
 
-            // Non-alias env defaults: inject literal values only if process.env[key] is unset
-            const envDefaults: Record<string, string> = Object.fromEntries(
-              nonAliasEnvEntries.flatMap(([key, entry]) =>
-                Option(process.env[envEnv(key)]).fold<ReadonlyArray<readonly [string, string]>>(
-                  () =>
-                    Option(entry.value).fold<ReadonlyArray<readonly [string, string]>>(
-                      () => [],
-                      (v) => [[key, v] as const],
-                    ),
-                  () => [],
-                ),
-              ),
-            )
-            const overridden: string[] = nonAliasEnvEntries.flatMap(([key]) =>
-              Option(process.env[envEnv(key)]).fold<string[]>(
-                () => [],
-                () => [key],
-              ),
-            )
+  const secrets: Record<string, string> = {}
+  const injected: string[] = []
+  const skipped: string[] = []
 
-            if (inject) {
-              Object.entries(envDefaults).forEach(([key, value]) => {
-                process.env[envEnv(key)] = value
-              })
-            }
+  // Phase 0: apply env defaults + misclassification check
+  warnings.push(...checkEnvMisclassification(config))
 
-            // Phase 1: try sealed values (encrypted_value in meta) — non-alias only
-            const sealedKeys = new Set<string>()
+  // Flag a namespace separator that would break shell consumers (e.g. '.', ':').
+  // Non-fatal: injection still works for process.env-based consumers.
+  const nsSeparator = config.namespace?.separator
+  if (nsSeparator !== undefined && !isShellSafeSeparator(nsSeparator)) {
+    warnings.push(
+      `[namespace] separator "${nsSeparator}" is not shell-safe — injected names won't be usable via shell $VAR/export. Use '_' or '__'.`,
+    )
+  }
 
-            if (hasSealedValues) {
-              const unsealResult = await unsealSecrets(nonAliasSecretEntries, unsealKeys)
-              unsealResult.fold(
-                (err) => {
-                  log.warn("phase.sealed.decrypt_failed", { message: err.message })
-                  warnings.push(`Sealed value decryption failed: ${err.message}`)
-                },
-                (unsealed) => {
-                  const unsealedEntries = Object.entries(unsealed)
-                  Object.assign(secrets, unsealed)
-                  injected.push(...unsealedEntries.map(([key]) => key))
-                  unsealedEntries.forEach(([key]) => {
-                    sealedKeys.add(key)
-                    log.debug("phase.sealed.resolved", { key })
-                  })
-                },
-              )
-            }
-
-            // Phase 2: fnox for remaining non-alias keys
-            const remainingKeys = nonAliasMetaKeys.filter((k) => !sealedKeys.has(k))
-
-            if (remainingKeys.length > 0) {
-              if (fnoxAvailable()) {
-                fnoxExport(opts.profile, identityKey.orUndefined()).fold(
-                  (err) => {
-                    log.warn("phase.fnox.export_failed", { message: err.message, skipped: remainingKeys.length })
-                    warnings.push(`fnox export failed: ${err.message}`)
-                    skipped.push(...remainingKeys)
-                  },
-                  (exported) => {
-                    const found = remainingKeys.filter((key) => key in exported)
-                    const notFound = remainingKeys.filter((key) => !(key in exported))
-                    found.forEach((key) => {
-                      secrets[key] = exported[key]!
-                      log.debug("phase.fnox.resolved", { key, profile: opts.profile })
-                    })
-                    notFound.forEach((key) => {
-                      log.debug("phase.fnox.not_in_export", { key, profile: opts.profile })
-                    })
-                    injected.push(...found)
-                    skipped.push(...notFound)
-                  },
-                )
-              } else {
-                log.debug("phase.fnox.unavailable", { skipped: remainingKeys.length })
-                if (!hasSealedValues) {
-                  warnings.push("fnox not available — no secrets injected")
-                } else {
-                  warnings.push("fnox not available — unsealed secrets could not be resolved")
-                }
-                skipped.push(...remainingKeys)
-              }
-            }
-
-            // Phase 3: alias copy pass — aliases reuse their target's resolved value.
-            // Side-effectful pipeline: mutates `secrets`, appends to `injected`/`skipped` audit trails,
-            // and emits structured log events — all of which are load-bearing outputs of boot.
-            /* eslint-disable functype/prefer-map -- building three parallel audit-trail arrays via deliberate mutation; reducing would obscure the per-key trace events */
-            aliasSecretKeys.forEach((aliasKey) => {
-              const entry = aliasTable.entries.get(`secret.${aliasKey}`)
-              if (!entry) return
-              Option(secrets[entry.targetKey]).fold(
-                () => {
-                  skipped.push(aliasKey)
-                  log.debug("phase.alias.target_unresolved", { alias: aliasKey, target: entry.targetKey })
-                },
-                (targetValue) => {
-                  secrets[aliasKey] = targetValue
-                  injected.push(aliasKey)
-                  log.debug("phase.alias.copied", { alias: aliasKey, target: entry.targetKey })
-                },
-              )
-            })
-            /* eslint-enable functype/prefer-map */
-
-            // Env alias copy pass — copy target's resolved env default if canonical not already set
-            /* eslint-disable functype/prefer-map -- audit-trail mutation (overridden, envDefaults); see Phase 3 rationale */
-            aliasEnvKeys.forEach((aliasKey) => {
-              const entry = aliasTable.entries.get(`env.${aliasKey}`)
-              if (!entry) return
-              if (process.env[envEnv(aliasKey)] !== undefined) {
-                overridden.push(aliasKey)
-                return
-              }
-              const targetEntry = envEntries[entry.targetKey]
-              if (targetEntry?.value === undefined) return
-              // Prefer the already-injected/overriding value so alias tracks its target at runtime
-              const resolvedTarget = process.env[envEnv(entry.targetKey)] ?? targetEntry.value
-              envDefaults[aliasKey] = resolvedTarget
-            })
-            /* eslint-enable functype/prefer-map */
-
-            if (inject) {
-              // Inject env alias defaults (and any env defaults added by the alias pass)
-              Object.entries(envDefaults).forEach(([key, value]) => {
-                process.env[envEnv(key)] ??= value
-              })
-              Object.entries(secrets).forEach(([key, value]) => {
-                process.env[secretEnv(key)] = value
-              })
-            }
-
-            return {
-              audit,
-              injected: injected as ReadonlyArray<string>,
-              skipped: skipped as ReadonlyArray<string>,
-              secrets: secrets as Readonly<Record<string, string>>,
-              warnings: warnings as ReadonlyArray<string>,
-              envDefaults: envDefaults as Readonly<Record<string, string>>,
-              overridden: overridden as ReadonlyArray<string>,
-              envNames: envNames as Readonly<Record<string, string>>,
-              configPath,
-              configSource,
-            }
-          })
-      },
+  // Non-alias env defaults: inject literal values only if process.env[key] is unset
+  const envDefaults: Record<string, string> = Object.fromEntries(
+    nonAliasEnvEntries.flatMap(([key, entry]) =>
+      Option(process.env[envEnv(key)]).fold<ReadonlyArray<readonly [string, string]>>(
+        () =>
+          Option(entry.value).fold<ReadonlyArray<readonly [string, string]>>(
+            () => [],
+            (v) => [[key, v] as const],
+          ),
+        () => [],
+      ),
     ),
   )
+  const overridden: string[] = nonAliasEnvEntries.flatMap(([key]) =>
+    Option(process.env[envEnv(key)]).fold<string[]>(
+      () => [],
+      () => [key],
+    ),
+  )
+
+  if (inject) {
+    Object.entries(envDefaults).forEach(([key, value]) => {
+      process.env[envEnv(key)] = value
+    })
+  }
+
+  // Phase 1: try sealed values (encrypted_value in meta) — non-alias only
+  const sealedKeys = new Set<string>()
+
+  if (hasSealedValues) {
+    const unsealResult = await unsealSecrets(nonAliasSecretEntries, unsealKeys)
+    unsealResult.fold(
+      (err) => {
+        log.warn("phase.sealed.decrypt_failed", { message: err.message })
+        warnings.push(`Sealed value decryption failed: ${err.message}`)
+      },
+      (unsealed) => {
+        const unsealedEntries = Object.entries(unsealed)
+        Object.assign(secrets, unsealed)
+        injected.push(...unsealedEntries.map(([key]) => key))
+        unsealedEntries.forEach(([key]) => {
+          sealedKeys.add(key)
+          log.debug("phase.sealed.resolved", { key })
+        })
+      },
+    )
+  }
+
+  // Phase 2: fnox for remaining non-alias keys
+  const remainingKeys = nonAliasMetaKeys.filter((k) => !sealedKeys.has(k))
+
+  if (remainingKeys.length > 0) {
+    if (fnoxAvailable()) {
+      fnoxExport(opts.profile, identityKey.orUndefined()).fold(
+        (err) => {
+          log.warn("phase.fnox.export_failed", { message: err.message, skipped: remainingKeys.length })
+          warnings.push(`fnox export failed: ${err.message}`)
+          skipped.push(...remainingKeys)
+        },
+        (exported) => {
+          const found = remainingKeys.filter((key) => key in exported)
+          const notFound = remainingKeys.filter((key) => !(key in exported))
+          found.forEach((key) => {
+            secrets[key] = exported[key]!
+            log.debug("phase.fnox.resolved", { key, profile: opts.profile })
+          })
+          notFound.forEach((key) => {
+            log.debug("phase.fnox.not_in_export", { key, profile: opts.profile })
+          })
+          injected.push(...found)
+          skipped.push(...notFound)
+        },
+      )
+    } else {
+      log.debug("phase.fnox.unavailable", { skipped: remainingKeys.length })
+      if (!hasSealedValues) {
+        warnings.push("fnox not available — no secrets injected")
+      } else {
+        warnings.push("fnox not available — unsealed secrets could not be resolved")
+      }
+      skipped.push(...remainingKeys)
+    }
+  }
+
+  // Phase 3: alias copy pass — aliases reuse their target's resolved value.
+  // Side-effectful pipeline: mutates `secrets`, appends to `injected`/`skipped` audit trails,
+  // and emits structured log events — all of which are load-bearing outputs of boot.
+  /* eslint-disable functype/prefer-map -- building three parallel audit-trail arrays via deliberate mutation; reducing would obscure the per-key trace events */
+  aliasSecretKeys.forEach((aliasKey) => {
+    const entry = aliasTable.entries.get(`secret.${aliasKey}`)
+    if (!entry) return
+    Option(secrets[entry.targetKey]).fold(
+      () => {
+        skipped.push(aliasKey)
+        log.debug("phase.alias.target_unresolved", { alias: aliasKey, target: entry.targetKey })
+      },
+      (targetValue) => {
+        secrets[aliasKey] = targetValue
+        injected.push(aliasKey)
+        log.debug("phase.alias.copied", { alias: aliasKey, target: entry.targetKey })
+      },
+    )
+  })
+  /* eslint-enable functype/prefer-map */
+
+  // Env alias copy pass — copy target's resolved env default if canonical not already set
+  /* eslint-disable functype/prefer-map -- audit-trail mutation (overridden, envDefaults); see Phase 3 rationale */
+  aliasEnvKeys.forEach((aliasKey) => {
+    const entry = aliasTable.entries.get(`env.${aliasKey}`)
+    if (!entry) return
+    if (process.env[envEnv(aliasKey)] !== undefined) {
+      overridden.push(aliasKey)
+      return
+    }
+    const targetEntry = envEntries[entry.targetKey]
+    if (targetEntry?.value === undefined) return
+    // Prefer the already-injected/overriding value so alias tracks its target at runtime
+    const resolvedTarget = process.env[envEnv(entry.targetKey)] ?? targetEntry.value
+    envDefaults[aliasKey] = resolvedTarget
+  })
+  /* eslint-enable functype/prefer-map */
+
+  if (inject) {
+    // Inject env alias defaults (and any env defaults added by the alias pass)
+    Object.entries(envDefaults).forEach(([key, value]) => {
+      process.env[envEnv(key)] ??= value
+    })
+    Object.entries(secrets).forEach(([key, value]) => {
+      process.env[secretEnv(key)] = value
+    })
+  }
+
+  return Right({
+    audit,
+    injected: injected as ReadonlyArray<string>,
+    skipped: skipped as ReadonlyArray<string>,
+    secrets: secrets as Readonly<Record<string, string>>,
+    warnings: warnings as ReadonlyArray<string>,
+    envDefaults: envDefaults as Readonly<Record<string, string>>,
+    overridden: overridden as ReadonlyArray<string>,
+    envNames: envNames as Readonly<Record<string, string>>,
+    configPath,
+    configSource,
+  })
 }
 
 /* eslint-disable functype/prefer-either -- boot() is the intentional throwing wrapper; bootSafe() returns Either */
@@ -518,10 +514,8 @@ const formatBootError = (error: BootError): string => {
       return `Secret "${error.key}" not found in catalog: ${error.catalogPath}`
     case "MissingSecretsList":
       return `Missing secrets list: ${error.message}`
-    case "DecryptFailed":
-      return `Decrypt failed: ${error.message}`
     case "IdentityNotFound":
-      return `Identity file not found: ${error.path}`
+    case "IdentityUnreadable":
     case "NoIdentityKey":
     case "PassphraseProtectedIdentity":
     case "UnsupportedIdentity":

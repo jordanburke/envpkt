@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { mkdtempSync, writeFileSync, rmSync } from "node:fs"
+import { mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
@@ -62,6 +62,22 @@ describe("unwrapAgentKey", () => {
     )
 
     expect(leftOf(unwrapAgentKey(keyFile))).toEqual({ _tag: "PassphraseProtectedIdentity", source: keyFile })
+  })
+
+  it("rejects a key file it can't read, naming the file", () => {
+    // A directory exists but can't be read as a file, on every platform and as any user (even root).
+    const keyDir = join(tmpDir, "key-dir")
+    mkdirSync(keyDir)
+
+    const err = leftOf(unwrapAgentKey(keyDir))
+    expect(err._tag).toBe("IdentityUnreadable")
+    if (err._tag === "IdentityUnreadable") {
+      expect(err.path).toBe(keyDir)
+      expect(err.message).toMatch(/EISDIR/)
+    }
+    expect(describeIdentityError(err)).toBe(
+      `Can't read key file ${keyDir}: ${err._tag === "IdentityUnreadable" ? err.message : ""}`,
+    )
   })
 
   it("rejects a plugin key with its line number", async () => {

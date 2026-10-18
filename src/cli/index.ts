@@ -233,7 +233,7 @@ program
 
 program
   .command("doctor")
-  .description("Check that age is installed and that the resolved config's sealed secrets can be decrypted")
+  .description("Check that the config resolves, a usable age key is found, and its sealed secrets decrypt")
   .option("-c, --config <path>", "Path to envpkt.toml")
   .action(async (options) => {
     await runDoctor(options)

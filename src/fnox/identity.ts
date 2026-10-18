@@ -18,7 +18,8 @@ export const parseIdentityKeys = (content: string, source: string): Either<Ident
 
 /**
  * Read every secret key from a plain age identity file (as written by `envpkt keygen` or
- * `age-keygen`). Passphrase-protected, plugin and SSH key files are rejected with a typed error.
+ * `age-keygen`). A missing or unreadable file, and passphrase-protected, plugin and SSH key files,
+ * are rejected with a typed error.
  */
 export const unwrapAgentKey = (identityPath: string): Either<IdentityError, ReadonlyArray<string>> => {
   if (!existsSync(identityPath)) {
@@ -26,20 +27,32 @@ export const unwrapAgentKey = (identityPath: string): Either<IdentityError, Read
   }
 
   return Try(() => readFileSync(identityPath, "utf-8")).fold<Either<IdentityError, ReadonlyArray<string>>>(
-    (err) => Left({ _tag: "DecryptFailed", message: `Failed to read identity file: ${err}` } as const),
+    (err) => Left({ _tag: "IdentityUnreadable", path: identityPath, message: err.message } as const),
     (content) => parseIdentityKeys(content, identityPath),
   )
 }
+
+const IDENTITY_ERROR_TAGS: ReadonlySet<string> = new Set<IdentityError["_tag"]>([
+  "IdentityNotFound",
+  "IdentityUnreadable",
+  "NoIdentityKey",
+  "PassphraseProtectedIdentity",
+  "UnsupportedIdentity",
+])
+
+/** True when `err` is about the age key itself rather than the config. */
+export const isIdentityError = (err: { readonly _tag: string }): err is IdentityError =>
+  IDENTITY_ERROR_TAGS.has(err._tag)
 
 const UNSUPPORTED_KIND = { plugin: "an age plugin key", ssh: "an SSH key", unknown: "not an age secret key" } as const
 
 /** Explain an identity error. Never includes key material. */
 export const describeIdentityError = (err: IdentityError): string => {
   switch (err._tag) {
-    case "DecryptFailed":
-      return err.message
     case "IdentityNotFound":
       return `Identity file not found: ${err.path}`
+    case "IdentityUnreadable":
+      return `Can't read key file ${err.path}: ${err.message}`
     case "NoIdentityKey":
       return `${err.source} has no age secret key (AGE-SECRET-KEY-…)`
     case "PassphraseProtectedIdentity":

@@ -614,6 +614,28 @@ describe("bootSafe fail-fast on missing seal key (B1)", () => {
     )
   })
 
+  it("refuses a key_file that can't be read, even under warnOnly", async () => {
+    // A directory passes the existence check but can't be read as a file, even as root.
+    const keyDir = join(tmpDir, "key-dir")
+    mkdirSync(keyDir)
+
+    const result = await bootSafe({
+      configPath: sealedConfig([`key_file = "${keyDir}"`]),
+      inject: false,
+      warnOnly: true,
+    })
+    result.fold(
+      (err) => {
+        expect(err._tag).toBe("IdentityUnreadable")
+        if (err._tag === "IdentityUnreadable") expect(err.path).toBe(keyDir)
+      },
+      () => expect.unreachable("Expected Left(IdentityUnreadable)"),
+    )
+    await expect(boot({ configPath: sealedConfig([`key_file = "${keyDir}"`]), inject: false })).rejects.toThrow(
+      /Can't read key file .*key-dir: .*EISDIR/,
+    )
+  })
+
   it("refuses an inline ENVPKT_AGE_KEY that holds no age secret key, without echoing it", async () => {
     process.env["ENVPKT_AGE_KEY"] = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6"
 

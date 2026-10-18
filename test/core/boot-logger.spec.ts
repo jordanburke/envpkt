@@ -2,10 +2,10 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
-import { createDirectTestLogger } from "functype-log"
+import { createDirectTestLogger, type DirectLogger, directSilentLogger } from "functype-log"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
-import { bootSafe } from "../../src/core/boot.js"
+import { boot, bootSafe } from "../../src/core/boot.js"
 
 let tmpDir: string
 
@@ -90,6 +90,31 @@ describe("bootSafe logger", () => {
     expect(all.length).toBeGreaterThan(0)
     all.forEach((entry) => {
       expect(entry.metadata?.component).toBe("envpkt.boot")
+    })
+  })
+
+  // A crash inside boot is a bug, not a BootError: it must reject with the original error and
+  // stack, never come back as a Left (which boot() would print as "Boot error: {}").
+  describe("when the logger throws", () => {
+    const crash = new Error("logger crashed")
+    // Throws from the alias copy pass, which runs after secrets resolve: the last async phase.
+    const throwingLogger: DirectLogger = {
+      ...directSilentLogger,
+      debug: (message) => {
+        if (message.startsWith("phase.alias.")) throw crash
+      },
+      withContext: () => throwingLogger,
+    }
+    const aliasConfig = `version = 1\n[secret.TARGET]\nservice = "svc"\n\n[secret.ALIAS]\nfrom_key = "secret.TARGET"\n`
+
+    it("bootSafe rejects with the logger's error", async () => {
+      const configPath = writeConfig(aliasConfig)
+      await expect(bootSafe({ configPath, inject: false, logger: throwingLogger })).rejects.toBe(crash)
+    })
+
+    it("boot rejects with the logger's error", async () => {
+      const configPath = writeConfig(aliasConfig)
+      await expect(boot({ configPath, inject: false, logger: throwingLogger })).rejects.toBe(crash)
     })
   })
 })
