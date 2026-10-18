@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-10-18
+
 envpkt no longer needs the `age` command. Sealing, unsealing and `envpkt keygen` run in-process
 through [age-encryption](https://github.com/FiloSottile/typage) (typage), by age's author. The
 file format is unchanged: values sealed by earlier releases unseal as before, and `age -d` still
