@@ -105,7 +105,7 @@ Sealed packets embed age-encrypted secret values directly in the TOML, making co
 #### Setup
 
 ```bash
-# Generate a keypair; writes identity.txt and sets identity.recipient in the config
+# Generate a keypair; writes identity.txt and sets identity.recipient and key_file (and name, if unset)
 envpkt keygen -c examples/demo/agents/api-gateway/envpkt.toml -o examples/demo/agents/api-gateway/identity.txt
 ```
 
@@ -150,7 +150,7 @@ Or in code:
 
 ```typescript
 import { boot } from "envpkt"
-const result = boot({ configPath: "envpkt.toml" })
+const result = await boot({ configPath: "envpkt.toml" })
 // Sealed values decrypted and injected into process.env
 ```
 

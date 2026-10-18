@@ -215,7 +215,7 @@ A composite action resolves the credentials in `envpkt.toml` into the CI job —
 
 **Inputs:** `config`, `version` (npm version to run, default `latest`), `strict`, `profile`.
 
-> The runner needs no `age` install: envpkt unseals in-process. Reference `@v0` for the moving major tag (re-pointed to each `0.x` release), or pin an exact release like `@v0.13.6` for immutability. `@v1` ships when envpkt reaches 1.0. Node 22.12 or later is assumed present; add `actions/setup-node` first to pin a version.
+> The runner needs no `age` install: envpkt unseals in-process. Reference `@v0` for the moving major tag (re-pointed to each `0.x` release), or pin an exact release like `@v0.13.6` for immutability. `@v1` ships when envpkt reaches 1.0. The action does not set up Node: it runs on the runner's Node, which must be 22.12 or later. Add `actions/setup-node` first if the runner's Node is older.
 
 ### Anti-rot CI gate
 
@@ -409,9 +409,12 @@ One-shot environment check: is a config resolvable here, is a usable age key fou
 
 ```bash
 envpkt doctor
-# ✓ age      built in (age-encryption 0.3.1)
-# ✓ config   /path/to/envpkt.toml
-# ✓ secrets  5 resolved, 0 skipped
+#   ✓ age     built in (age-encryption 0.3.1)
+#   ✓ config  /path/to/envpkt.toml
+#   ✓ secrets  5 resolved, 0 skipped
+#   • audit   healthy
+#
+# ✓ no issues
 ```
 
 If a sealed packet has no key, it lists the paths it searched; if the key file can't be used (unreadable, passphrase-protected, a plugin or SSH key), it says why. Exits non-zero when a check fails.
@@ -781,11 +784,11 @@ const keys = unwrapAgentKey("/path/to/identity.txt").fold(
 // Decrypt a single value
 const decrypted = await ageDecrypt(ciphertext, keys)
 
-// Seal all secrets in a config's meta
-const sealed = await sealSecrets(config.meta, { OPENAI_API_KEY: "sk-..." }, recipientPublicKey)
+// Seal all secrets in a config's [secret] table
+const sealed = await sealSecrets(config.secret ?? {}, { OPENAI_API_KEY: "sk-..." }, recipientPublicKey)
 
 // Unseal all encrypted_value entries
-const values = await unsealSecrets(config.meta, keys)
+const values = await unsealSecrets(config.secret ?? {}, keys)
 values.fold(
   (err) => console.error("Unseal failed:", err.message),
   (secrets) => console.log(secrets), // { OPENAI_API_KEY: "sk-..." }

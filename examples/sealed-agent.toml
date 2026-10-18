@@ -4,7 +4,8 @@
 #
 # Setup:
 #   1. Generate a keypair:  envpkt keygen -c sealed-agent.toml -o identity.txt
-#      (writes identity.txt and sets `recipient` below; `age-keygen` keys work too)
+#      (writes identity.txt and sets [identity] recipient and key_file, plus name if unset;
+#      `age-keygen` keys work too)
 #   2. Add identity.txt to .gitignore
 #   3. Run: envpkt seal
 #

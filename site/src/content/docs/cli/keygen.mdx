@@ -76,7 +76,10 @@ This prevents accidental key loss when multiple projects or agents run `keygen`.
 3. Generates an X25519 keypair in-process (no `age-keygen` needed); the file has the same format
    `age-keygen` writes
 4. Writes identity file with `0600` permissions
-5. If `envpkt.toml` exists: updates `[identity]` with `name`, `recipient`, and `key_file`
+5. If `envpkt.toml` exists: sets `[identity]` `recipient` and `key_file`, and `name` if the config
+   has none (an existing `name` is kept). `key_file` is written relative to the config's directory
+   when the key is inside it, and as an absolute path (`~` under `$HOME`) otherwise, so `boot` finds
+   it from any working directory
 6. If no config found: prints next-step guidance
 
 ## Typical Workflow

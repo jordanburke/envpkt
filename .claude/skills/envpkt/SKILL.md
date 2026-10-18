@@ -551,10 +551,10 @@ const values = resolveValues(config, options)
 ### Keygen
 
 ```typescript
-import { generateKeypair, resolveKeyPath, resolveInlineKey, updateConfigRecipient } from "envpkt"
+import { generateKeypair, resolveKeyPath, resolveInlineKey, updateConfigIdentity } from "envpkt"
 
-// Generate age keypair
-const result = generateKeypair({ outputPath: "~/.envpkt/age-key.txt" })
+// Generate age keypair (outputPath defaults to resolveKeyPath(); the library doesn't expand ~)
+const result = await generateKeypair()
 
 // Resolve key path: ENVPKT_AGE_KEY_FILE env > ~/.envpkt/age-key.txt
 const keyPath: string = resolveKeyPath()
@@ -562,8 +562,8 @@ const keyPath: string = resolveKeyPath()
 // Check for inline key (CI): ENVPKT_AGE_KEY env
 const inlineKey: Option<string> = resolveInlineKey()
 
-// Update identity.recipient in envpkt.toml
-const updated = updateConfigRecipient("envpkt.toml", "age1...")
+// Set [identity] recipient (and optionally key_file, name) in envpkt.toml: Either<KeygenError, true>
+const updated = updateConfigIdentity("envpkt.toml", { recipient: "age1...", keyFile: "key.txt" })
 ```
 
 ### fnox Integration

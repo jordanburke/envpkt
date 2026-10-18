@@ -72,8 +72,9 @@ identity.key_file  >  ENVPKT_AGE_KEY_FILE  >  ENVPKT_AGE_KEY (inline)  >  ~/.env
 ```
 
 :::note[No `age` install needed]
-envpkt unseals in-process, so the runner needs only Node 22.12 or later. GitHub-hosted runners
-already have Node; add `actions/setup-node` before the `envpkt` step to pin a version.
+envpkt unseals in-process, so the runner needs only Node 22.12 or later. The action does not set
+up Node; it uses the runner's. Add `actions/setup-node` before the `envpkt` step if that Node is
+older than 22.12.
 :::
 
 ## Masking

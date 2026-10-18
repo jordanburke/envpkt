@@ -164,7 +164,7 @@ git add envpkt.toml && git commit -m "rotate: age keypair"
 # 1. Initialize with identity section
 envpkt init --identity --name "my-agent"
 
-# 2. Generate an age keypair (if needed); also sets identity.recipient in envpkt.toml
+# 2. Generate an age keypair (if needed); also sets identity.recipient and key_file (keeps the name)
 envpkt keygen -o keys/agent.age
 
 # 3. Seal secret values

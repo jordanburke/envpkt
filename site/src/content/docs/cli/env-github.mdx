@@ -58,8 +58,8 @@ with a warning instead — useful for previewing output off-runner.
 ## Resolving secrets in CI
 
 Sealed (`encrypted_value`) packets are the typical CI source. Commit them to the repo and
-supply the age private key as a GitHub secret via **`ENVPKT_AGE_KEY`** — `boot()` materializes
-it to a private temp file to decrypt, no key file needed. Identity precedence:
+supply the age private key as a GitHub secret via **`ENVPKT_AGE_KEY`**. `boot()` decrypts with it
+in memory; the key never touches disk, and no key file is needed. Identity precedence:
 
 ```
 identity.key_file  >  ENVPKT_AGE_KEY_FILE  >  ENVPKT_AGE_KEY (inline)  >  ~/.envpkt/age-key.txt

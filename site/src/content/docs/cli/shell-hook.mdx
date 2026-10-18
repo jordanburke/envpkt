@@ -46,10 +46,9 @@ Decryption happens only when the resolved package changes (not on every `cd`), a
 resolve step runs in subdirectories of the same project — so the hook stays cheap.
 
 :::caution[Ambient loading needs an unlocked key]
-Because the hook decrypts on `cd`, it can't prompt for a passphrase. A `scope = "shell"` package
-must use a key that resolves non-interactively (a plain `0600` key file, or `ENVPKT_AGE_KEY`/
-`ENVPKT_AGE_KEY_FILE`). Passphrase- or manager-locked keys are for bootstrapping or for
-`scope = "exec"` packages, where you launch deliberately. If a `shell`-scope package's key is
+Because the hook decrypts on `cd`, it can't prompt for anything. envpkt reads only plain key files
+(a `0600` key file, or `ENVPKT_AGE_KEY`/`ENVPKT_AGE_KEY_FILE`) in every scope; a
+passphrase-protected key is reported as an error, not prompted for. If a `shell`-scope package's key is
 missing, the hook surfaces a clear error on `cd` and injects nothing (see
 [fail-fast key handling](/reference/error-types/)).
 :::

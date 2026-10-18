@@ -118,8 +118,9 @@ Exit codes:
 Encrypt secret values into the config file using [age](https://github.com/FiloSottile/age). Sealed packets are safe to commit to git.
 
 ```bash
-# Generate an age identity (one-time setup); writes the key file and sets identity.recipient
-envpkt keygen -c agents/api-gateway/envpkt.toml -o key.txt
+# Generate an age identity (one-time setup). Writes ~/.envpkt/api-gateway-key.txt and sets
+# [identity] recipient and key_file in the config, plus name if it has none
+envpkt keygen -c agents/api-gateway/envpkt.toml
 # Store the key file's AGE-SECRET-KEY-… line as the ENVPKT_AGE_KEY CI secret
 
 # Seal all secrets in a config

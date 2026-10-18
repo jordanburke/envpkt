@@ -409,18 +409,21 @@ existing file. Resolves to `Either<KeygenError, KeygenResult>`.
 ```typescript
 import { generateKeypair } from "envpkt"
 
-const result = await generateKeypair({ outputPath: "~/.envpkt/age-key.txt" })
+const result = await generateKeypair() // writes to resolveKeyPath()
 result.fold(
   (err) => console.error(`Keygen failed: ${err._tag}`),
   (res) => console.log(`Recipient: ${res.recipient}`),
 )
 ```
 
-Options: `{ outputPath?: string }`
+Options: `{ outputPath?: string }`. `outputPath` defaults to `resolveKeyPath()`. It is used as given,
+so `~` is not expanded: pass `join(homedir(), ".envpkt", "age-key.txt")`, not `"~/.envpkt/age-key.txt"`.
 
-### `updateConfigRecipient(configPath, recipient)`
+### `updateConfigIdentity(configPath, { recipient, keyFile?, name? })`
 
-Update `identity.recipient` in an `envpkt.toml` file, preserving TOML structure. Creates `[identity]` section if missing. Returns `Either<KeygenError, true>`.
+Set `identity.recipient`, and `identity.key_file` and `identity.name` when given, in an `envpkt.toml`
+file, preserving TOML structure. Creates the `[identity]` section if missing. Returns
+`Either<KeygenError, true>`.
 
 ### `KeygenResult`
 
