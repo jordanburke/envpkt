@@ -1,10 +1,11 @@
-import { execFileSync, spawnSync } from "node:child_process"
+import { spawnSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { ageKeygen, sealTo } from "../helpers/age.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__testDir, "../..")
@@ -38,18 +39,11 @@ const run = (
   return { stdout: result.stdout, stderr: result.stderr, status: result.status ?? 1 }
 }
 
-const ageInstalled = (() => {
-  try {
-    execFileSync("age", ["--version"], { stdio: "pipe" })
-    return true
-  } catch {
-    return false
-  }
-})()
-
 /** Seal `values` with a fresh age key in tmpDir; return TOML for [identity] + one [secret.*] per key. */
-const sealedSecrets = (values: Record<string, string>): { identity: string; secrets: Record<string, string> } => {
-  const keygen = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+const sealedSecrets = async (
+  values: Record<string, string>,
+): Promise<{ identity: string; secrets: Record<string, string> }> => {
+  const keygen = await ageKeygen()
   const recipient = keygen
     .split("\n")
     .find((l) => l.startsWith("# public key:"))!
@@ -57,10 +51,7 @@ const sealedSecrets = (values: Record<string, string>): { identity: string; secr
     .trim()
   writeFileSync(join(tmpDir, "identity.txt"), keygen)
   const secrets = Object.fromEntries(
-    Object.entries(values).map(([key, value]) => [
-      key,
-      execFileSync("age", ["--encrypt", "-r", recipient, "--armor"], { input: value, encoding: "utf-8" }),
-    ]),
+    await Promise.all(Object.entries(values).map(async ([key, value]) => [key, `${await sealTo(value, recipient)}\n`])),
   )
   return {
     identity: `[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n`,
@@ -69,8 +60,8 @@ const sealedSecrets = (values: Record<string, string>): { identity: string; secr
 }
 
 describe("envpkt headers", () => {
-  it.skipIf(!ageInstalled)("prints only a JSON object on stdout under a stripped env", () => {
-    const { identity, secrets } = sealedSecrets({ GH_KEY: "gh-token" })
+  it("prints only a JSON object on stdout under a stripped env", async () => {
+    const { identity, secrets } = await sealedSecrets({ GH_KEY: "gh-token" })
     writeFileSync(
       join(tmpDir, "envpkt.toml"),
       `version = 1\n\n${identity}\n[secret.GH_KEY]\nservice = "github"\nmcp = [{ server = "civala-github" }]\nencrypted_value = """\n${secrets.GH_KEY}"""\n`,
@@ -82,8 +73,8 @@ describe("envpkt headers", () => {
     expect(JSON.parse(result.stdout)).toEqual({ Authorization: "Bearer gh-token" })
   })
 
-  it.skipIf(!ageInstalled)("resolves an aliased key (from_key)", () => {
-    const { identity, secrets } = sealedSecrets({ SOURCE: "shared-value" })
+  it("resolves an aliased key (from_key)", async () => {
+    const { identity, secrets } = await sealedSecrets({ SOURCE: "shared-value" })
     writeFileSync(
       join(tmpDir, "envpkt.toml"),
       `version = 1\n\n${identity}\n[secret.SOURCE]\nencrypted_value = """\n${secrets.SOURCE}"""\n\n[secret.ALIAS]\nfrom_key = "secret.SOURCE"\nmcp = [{ server = "corpus" }]\n`,
@@ -95,8 +86,8 @@ describe("envpkt headers", () => {
     expect(JSON.parse(result.stdout)).toEqual({ Authorization: "Bearer shared-value" })
   })
 
-  it.skipIf(!ageInstalled)("resolves namespaced keys, including a per-entry namespace opt-out", () => {
-    const { identity, secrets } = sealedSecrets({ API_KEY: "prefixed", RAW_KEY: "unprefixed" })
+  it("resolves namespaced keys, including a per-entry namespace opt-out", async () => {
+    const { identity, secrets } = await sealedSecrets({ API_KEY: "prefixed", RAW_KEY: "unprefixed" })
     writeFileSync(
       join(tmpDir, "envpkt.toml"),
       `version = 1\n\n[namespace]\nprefix = "CIV"\n\n${identity}\n` +
@@ -110,8 +101,8 @@ describe("envpkt headers", () => {
     expect(JSON.parse(result.stdout)).toEqual({ Authorization: "Bearer prefixed", "x-raw": "unprefixed" })
   })
 
-  it.skipIf(!ageInstalled)('sends the raw value with scheme = "" and header = "x-api-key"', () => {
-    const { identity, secrets } = sealedSecrets({ CF_KEY: "cf-raw" })
+  it('sends the raw value with scheme = "" and header = "x-api-key"', async () => {
+    const { identity, secrets } = await sealedSecrets({ CF_KEY: "cf-raw" })
     writeFileSync(
       join(tmpDir, "envpkt.toml"),
       `version = 1\n\n${identity}\n[secret.CF_KEY]\nmcp = [{ server = "cloudflare", header = "x-api-key", scheme = "" }]\nencrypted_value = """\n${secrets.CF_KEY}"""\n`,
@@ -123,8 +114,8 @@ describe("envpkt headers", () => {
     expect(JSON.parse(result.stdout)).toEqual({ "x-api-key": "cf-raw" })
   })
 
-  it.skipIf(!ageInstalled)("exits non-zero naming the server when nothing matches, with empty stdout", () => {
-    const { identity, secrets } = sealedSecrets({ GH_KEY: "gh-token" })
+  it("exits non-zero naming the server when nothing matches, with empty stdout", async () => {
+    const { identity, secrets } = await sealedSecrets({ GH_KEY: "gh-token" })
     writeFileSync(
       join(tmpDir, "envpkt.toml"),
       `version = 1\n\n${identity}\n[secret.GH_KEY]\nmcp = [{ server = "civala-github" }]\nencrypted_value = """\n${secrets.GH_KEY}"""\n`,
@@ -147,8 +138,8 @@ describe("envpkt headers", () => {
     expect(result.stderr).toContain("civala-github")
   })
 
-  it.skipIf(!ageInstalled)("prefers the [server] argument over CLAUDE_CODE_MCP_SERVER_NAME", () => {
-    const { identity, secrets } = sealedSecrets({ A: "a-val", B: "b-val" })
+  it("prefers the [server] argument over CLAUDE_CODE_MCP_SERVER_NAME", async () => {
+    const { identity, secrets } = await sealedSecrets({ A: "a-val", B: "b-val" })
     writeFileSync(
       join(tmpDir, "envpkt.toml"),
       `version = 1\n\n${identity}\n` +

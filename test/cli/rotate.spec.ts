@@ -7,20 +7,12 @@ import { fileURLToPath } from "node:url"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { loadConfig } from "../../src/core/config.js"
+import { ageKeygen } from "../helpers/age.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__testDir, "../..")
 const CLI_SRC = resolve(PROJECT_ROOT, "src/cli/index.ts")
 const TSX = resolve(PROJECT_ROOT, "node_modules/.bin/tsx")
-
-const ageInstalled = (() => {
-  try {
-    execFileSync("age", ["--version"], { stdio: "pipe" })
-    return true
-  } catch {
-    return false
-  }
-})()
 
 const today = new Date().toISOString().slice(0, 10)
 
@@ -117,12 +109,12 @@ created = "2024-01-01"
   })
 })
 
-describe.skipIf(!ageInstalled)("secret rotate (sealed)", () => {
+describe("secret rotate (sealed)", () => {
   let recipient: string
   let identityPath: string
 
-  beforeEach(() => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  beforeEach(async () => {
+    const keygenOutput = await ageKeygen()
     const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
     recipient = recipientLine!.replace("# public key: ", "").trim()
     identityPath = join(tmpDir, "key.txt")

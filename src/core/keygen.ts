@@ -18,7 +18,7 @@ export const resolveInlineKey = (): Option<string> => {
 }
 
 /** The identity file `age-keygen` writes: creation time, public key, secret key. */
-const identityFileContent = (identity: string, recipient: string): string =>
+export const identityFileContent = (identity: string, recipient: string): string =>
   `# created: ${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}\n# public key: ${recipient}\n${identity}\n`
 
 /** Write the identity file (0600), creating its directory if needed. Never overwrites a file. */

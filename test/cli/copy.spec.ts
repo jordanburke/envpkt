@@ -10,20 +10,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { ageEncrypt, unsealSecrets } from "../../src/core/seal.js"
 import { unwrapAgentKey } from "../../src/fnox/identity.js"
 import type { SecretMeta } from "../../src/core/types.js"
+import { ageKeygen, recipientOf } from "../helpers/age.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__testDir, "../..")
 const CLI_SRC = resolve(PROJECT_ROOT, "src/cli/index.ts")
 const TSX = resolve(PROJECT_ROOT, "node_modules/.bin/tsx")
-
-const ageInstalled = ((): boolean => {
-  try {
-    execFileSync("age", ["--version"], { stdio: "pipe" })
-    return true
-  } catch {
-    return false
-  }
-})()
 
 let tmpDir: string
 
@@ -53,12 +45,11 @@ const cli = (args: string[], env?: Record<string, string>): { stdout: string; st
   }
 }
 
-const ageKeygen = (path: string): string => {
-  execFileSync("age-keygen", ["-o", path], { stdio: "pipe" })
-  const line = readFileSync(path, "utf-8")
-    .split("\n")
-    .find((l) => l.startsWith("# public key:"))!
-  return line.replace("# public key: ", "").trim()
+/** Write a fresh age key file to `path` and return its recipient. */
+const writeKeyFile = async (path: string): Promise<string> => {
+  const keyFileText = await ageKeygen()
+  writeFileSync(path, keyFileText, { mode: 0o600 })
+  return recipientOf(keyFileText)
 }
 
 const parseSecret = (path: string, key: string): SecretMeta =>
@@ -169,69 +160,55 @@ service = "b"
     expect(readFileSync(b, "utf-8")).not.toContain("PORT")
   })
 
-  it.skipIf(!ageInstalled)(
-    "unseals from the source and reseals for the destination recipient",
-    async () => {
-      const aKey = join(tmpDir, "a-key.txt")
-      const bKey = join(tmpDir, "b-key.txt")
-      const aRec = ageKeygen(aKey)
-      const bRec = ageKeygen(bKey)
+  it("unseals from the source and reseals for the destination recipient", async () => {
+    const aKey = join(tmpDir, "a-key.txt")
+    const bKey = join(tmpDir, "b-key.txt")
+    const aRec = await writeKeyFile(aKey)
+    const bRec = await writeKeyFile(bKey)
 
-      const a = write(
-        "a.toml",
-        `version = 1\n\n[identity]\nname = "src"\nrecipient = "${aRec}"\nkey_file = "${aKey}"\n\n[secret.API_KEY]\nservice = "stripe"\ncreated = "2025-01-01"\n`,
-      )
-      // Seal the source value (resolved from the environment).
-      const sealed = cli(["seal", "--config", a], { API_KEY: "sk-test-123" })
-      expect(sealed.status).toBe(0)
-      expect(readFileSync(a, "utf-8")).toContain("encrypted_value")
+    const a = write(
+      "a.toml",
+      `version = 1\n\n[identity]\nname = "src"\nrecipient = "${aRec}"\nkey_file = "${aKey}"\n\n[secret.API_KEY]\nservice = "stripe"\ncreated = "2025-01-01"\n`,
+    )
+    // Seal the source value (resolved from the environment).
+    const sealed = cli(["seal", "--config", a], { API_KEY: "sk-test-123" })
+    expect(sealed.status).toBe(0)
+    expect(readFileSync(a, "utf-8")).toContain("encrypted_value")
 
-      const b = write(
-        "b.toml",
-        `version = 1\n\n[identity]\nname = "dest"\nrecipient = "${bRec}"\nkey_file = "${bKey}"\n`,
-      )
-      const { status } = cli(["copy", "API_KEY", "--from", a, "--to", b])
-      expect(status).toBe(0)
+    const b = write("b.toml", `version = 1\n\n[identity]\nname = "dest"\nrecipient = "${bRec}"\nkey_file = "${bKey}"\n`)
+    const { status } = cli(["copy", "API_KEY", "--from", a, "--to", b])
+    expect(status).toBe(0)
 
-      // The resealed value must decrypt with the DESTINATION's key, not the source's.
-      const destMeta = parseSecret(b, "API_KEY")
-      expect(destMeta.encrypted_value).toBeTruthy()
-      const decrypted = await unsealSecrets({ API_KEY: destMeta }, unwrapAgentKey(bKey).orThrow())
-      decrypted.fold(
-        (err) => expect.fail(`expected decrypt to succeed, got ${err.message}`),
-        (values) => expect(values.API_KEY).toBe("sk-test-123"),
-      )
-    },
-    60_000,
-  )
+    // The resealed value must decrypt with the DESTINATION's key, not the source's.
+    const destMeta = parseSecret(b, "API_KEY")
+    expect(destMeta.encrypted_value).toBeTruthy()
+    const decrypted = await unsealSecrets({ API_KEY: destMeta }, unwrapAgentKey(bKey).orThrow())
+    decrypted.fold(
+      (err) => expect.fail(`expected decrypt to succeed, got ${err.message}`),
+      (values) => expect(values.API_KEY).toBe("sk-test-123"),
+    )
+  }, 60_000)
 
-  it.skipIf(!ageInstalled)(
-    "keeps a sealed value's edge whitespace when it reseals for the destination",
-    async () => {
-      const aKey = join(tmpDir, "a-key.txt")
-      const bKey = join(tmpDir, "b-key.txt")
-      const aRec = ageKeygen(aKey)
-      const bRec = ageKeygen(bKey)
+  it("keeps a sealed value's edge whitespace when it reseals for the destination", async () => {
+    const aKey = join(tmpDir, "a-key.txt")
+    const bKey = join(tmpDir, "b-key.txt")
+    const aRec = await writeKeyFile(aKey)
+    const bRec = await writeKeyFile(bKey)
 
-      // Sealed by hand, as `age -r` would: the PEM keeps its final newline.
-      const pem =
-        "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEA\n-----END PRIVATE KEY-----\n"
-      const ciphertext = (await ageEncrypt(pem, aRec)).orThrow()
-      const a = write(
-        "a.toml",
-        `version = 1\n\n[identity]\nname = "src"\nrecipient = "${aRec}"\nkey_file = "${aKey}"\n\n[secret.TLS_KEY]\nservice = "tls"\ncreated = "2025-01-01"\nencrypted_value = """\n${ciphertext}\n"""\n`,
-      )
-      const b = write(
-        "b.toml",
-        `version = 1\n\n[identity]\nname = "dest"\nrecipient = "${bRec}"\nkey_file = "${bKey}"\n`,
-      )
-      expect(cli(["copy", "TLS_KEY", "--from", a, "--to", b]).status).toBe(0)
+    // Sealed by hand, as `age -r` would: the PEM keeps its final newline.
+    const pem =
+      "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEA\n-----END PRIVATE KEY-----\n"
+    const ciphertext = (await ageEncrypt(pem, aRec)).orThrow()
+    const a = write(
+      "a.toml",
+      `version = 1\n\n[identity]\nname = "src"\nrecipient = "${aRec}"\nkey_file = "${aKey}"\n\n[secret.TLS_KEY]\nservice = "tls"\ncreated = "2025-01-01"\nencrypted_value = """\n${ciphertext}\n"""\n`,
+    )
+    const b = write("b.toml", `version = 1\n\n[identity]\nname = "dest"\nrecipient = "${bRec}"\nkey_file = "${bKey}"\n`)
+    expect(cli(["copy", "TLS_KEY", "--from", a, "--to", b]).status).toBe(0)
 
-      const unsealed = await unsealSecrets({ TLS_KEY: parseSecret(b, "TLS_KEY") }, unwrapAgentKey(bKey).orThrow())
-      expect(unsealed.orThrow()).toEqual({ TLS_KEY: pem })
-    },
-    60_000,
-  )
+    const unsealed = await unsealSecrets({ TLS_KEY: parseSecret(b, "TLS_KEY") }, unwrapAgentKey(bKey).orThrow())
+    expect(unsealed.orThrow()).toEqual({ TLS_KEY: pem })
+  }, 60_000)
 
   it("copies metadata only (no value) for a secret with no sealed value", async () => {
     const a = write("a.toml", `version = 1\n\n[secret.API_KEY]\nservice = "stripe"\ncreated = "2025-01-01"\n`)

@@ -157,6 +157,12 @@ byte-for-byte tests from 0.17.0 (`copy`, `--reseal`, env → `boot()`) carry ove
 `action-smoke.yml` generates its key with `age-keygen`; switch it to `envpkt keygen` and drop the
 `age` install there, which proves the Action works without `age`.
 
+As built (step 4): the action runs `npx envpkt@<version>`, and npm `latest` stays 0.17.0 (which
+needs `age`) until the release. So the local `smoke` job packs envpkt from the checkout and passes
+`file:<tarball>` as the action's `version`, with no `age` installed; it makes its key with
+`envpkt keygen` and seals with `envpkt seal --edit --stdin`. It now also runs on `src/**` changes.
+`smoke-published` keeps its `age` install until `@v0` and npm `latest` are 0.18.0 (step 5).
+
 ## Docs
 
 - README, `site/.../getting-started/installation.mdx`: remove the `age` install step.
@@ -181,7 +187,8 @@ byte-for-byte tests from 0.17.0 (`copy`, `--reseal`, env → `boot()`) carry ove
    signatures break (`await`, keys instead of a key path); the age-keygen setup and `skipIf` guards
    still move in step 4.
 4. Test-setup migration and `action-smoke.yml`.
-5. Docs, CHANGELOG, release 0.18.0.
+5. Docs, CHANGELOG, release 0.18.0. After the release lands, drop the `age` install from
+   `smoke-published` and switch its key setup to `envpkt keygen`.
 
 ## Deferred
 

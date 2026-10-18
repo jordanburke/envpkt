@@ -32,13 +32,16 @@ export const unwrapAgentKey = (identityPath: string): Either<IdentityError, Read
   )
 }
 
-const IDENTITY_ERROR_TAGS: ReadonlySet<string> = new Set<IdentityError["_tag"]>([
-  "IdentityNotFound",
-  "IdentityUnreadable",
-  "NoIdentityKey",
-  "PassphraseProtectedIdentity",
-  "UnsupportedIdentity",
-])
+// `satisfies` makes leaving out an IdentityError tag a compile error, not a silent mismatch.
+const IDENTITY_ERROR_TAGS: ReadonlySet<string> = new Set(
+  Object.keys({
+    IdentityNotFound: true,
+    IdentityUnreadable: true,
+    NoIdentityKey: true,
+    PassphraseProtectedIdentity: true,
+    UnsupportedIdentity: true,
+  } satisfies Record<IdentityError["_tag"], true>),
+)
 
 /** True when `err` is about the age key itself rather than the config. */
 export const isIdentityError = (err: { readonly _tag: string }): err is IdentityError =>

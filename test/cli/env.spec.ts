@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url"
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 import { Platform } from "functype-os"
+import { ageKeygen, sealTo } from "../helpers/age.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__testDir, "../..")
@@ -200,15 +201,6 @@ describe("envpkt shell-hook", () => {
   })
 })
 
-const ageInstalled = (() => {
-  try {
-    execFileSync("age", ["--version"], { stdio: "pipe" })
-    return true
-  } catch {
-    return false
-  }
-})()
-
 describe("envpkt env export", () => {
   it("exits 0 with a valid config (no secrets source)", () => {
     const toml = `version = 1\n\n[secret.OPENAI_API_KEY]\nservice = "openai"\n`
@@ -231,11 +223,8 @@ describe("envpkt env export", () => {
     expect(result.status).toBe(2)
   })
 
-  it.skipIf(!ageInstalled)("outputs export lines for sealed secrets", () => {
-    const keygenOutput = execFileSync("age-keygen", [], {
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    })
+  it("outputs export lines for sealed secrets", async () => {
+    const keygenOutput = await ageKeygen()
     const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
     const recipient = recipientLine!.replace("# public key: ", "").trim()
 
@@ -243,11 +232,7 @@ describe("envpkt env export", () => {
     writeFileSync(identityPath, keygenOutput)
 
     // Encrypt a test value
-    const encrypted = execFileSync("age", ["-r", recipient, "-a"], {
-      input: "sk-test-secret-value",
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    })
+    const encrypted = `${await sealTo("sk-test-secret-value", recipient)}\n`
 
     const toml = `version = 1\nscope = "shell"\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
@@ -269,8 +254,8 @@ describe("envpkt env export", () => {
     expect(result.stdout).not.toContain("export LOG_LEVEL='info'")
   })
 
-  it.skipIf(!ageInstalled)("emits the namespaced wire name for sealed secrets", () => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  it("emits the namespaced wire name for sealed secrets", async () => {
+    const keygenOutput = await ageKeygen()
     const recipient = keygenOutput
       .split("\n")
       .find((l) => l.startsWith("# public key:"))!
@@ -278,11 +263,7 @@ describe("envpkt env export", () => {
       .trim()
     writeFileSync(join(tmpDir, "identity.txt"), keygenOutput)
 
-    const encrypted = execFileSync("age", ["-r", recipient, "-a"], {
-      input: "sk-test-secret-value",
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    })
+    const encrypted = `${await sealTo("sk-test-secret-value", recipient)}\n`
 
     const toml = `version = 1\nscope = "shell"\n\n[namespace]\nprefix = "CIV"\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)
@@ -307,19 +288,15 @@ describe("envpkt env export", () => {
     expect(tracked.stdout).toContain(`_ENVPKT_INJECTED='LOG_LEVEL'`)
   })
 
-  it.skipIf(!ageInstalled)("plain export emits secrets at default scope; --track withholds them (decouple)", () => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  it("plain export emits secrets at default scope; --track withholds them (decouple)", async () => {
+    const keygenOutput = await ageKeygen()
     const recipient = keygenOutput
       .split("\n")
       .find((l) => l.startsWith("# public key:"))!
       .replace("# public key: ", "")
       .trim()
     writeFileSync(join(tmpDir, "identity.txt"), keygenOutput)
-    const encrypted = execFileSync("age", ["-r", recipient, "-a"], {
-      input: "sk-test-secret-value",
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    })
+    const encrypted = `${await sealTo("sk-test-secret-value", recipient)}\n`
 
     // No top-level scope → defaults to "exec".
     const toml = `version = 1\n\n[identity]\nname = "test"\nrecipient = "${recipient}"\nkey_file = "identity.txt"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
@@ -354,8 +331,8 @@ describe("envpkt env github", () => {
     expect(result.stdout).not.toContain("::add-mask::info")
   })
 
-  it("masks sealed secret values and writes them to $GITHUB_ENV", { skip: !ageInstalled }, () => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  it("masks sealed secret values and writes them to $GITHUB_ENV", async () => {
+    const keygenOutput = await ageKeygen()
     const recipient = keygenOutput
       .split("\n")
       .find((l) => l.startsWith("# public key:"))!
@@ -365,11 +342,7 @@ describe("envpkt env github", () => {
       .split("\n")
       .find((l) => l.startsWith("AGE-SECRET-KEY-"))!
       .trim()
-    const encrypted = execFileSync("age", ["-r", recipient, "-a"], {
-      input: "sk-ci-secret-value",
-      encoding: "utf-8",
-      stdio: ["pipe", "pipe", "pipe"],
-    })
+    const encrypted = `${await sealTo("sk-ci-secret-value", recipient)}\n`
 
     const toml = `version = 1\n\n[namespace]\nprefix = "CIV"\n\n[identity]\nname = "ci"\nrecipient = "${recipient}"\n\n[secret.MY_SECRET]\nservice = "test"\nencrypted_value = """\n${encrypted}"""\n`
     writeFileSync(join(tmpDir, "envpkt.toml"), toml)

@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process"
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
 import { chmodSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
@@ -6,15 +5,7 @@ import { tmpdir } from "node:os"
 
 import { boot, bootSafe, EnvpktBootError } from "../../src/core/boot.js"
 import { ageEncrypt } from "../../src/core/seal.js"
-
-const ageInstalled = (() => {
-  try {
-    execFileSync("age", ["--version"], { stdio: "pipe" })
-    return true
-  } catch {
-    return false
-  }
-})()
+import { ageKeygen } from "../helpers/age.js"
 
 let tmpDir: string
 
@@ -290,12 +281,9 @@ describe("boot with catalog", () => {
 })
 
 describe("boot with sealed values", () => {
-  it.skipIf(!ageInstalled)("decrypts sealed values during boot", async () => {
+  it("decrypts sealed values during boot", async () => {
     // Generate a test keypair
-    const keygenOutput = execFileSync("age-keygen", [], {
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    })
+    const keygenOutput = await ageKeygen()
     const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
     const recipient = recipientLine!.replace("# public key: ", "").trim()
 
@@ -342,8 +330,8 @@ describe("boot with sealed values", () => {
     delete process.env["SEALED_KEY"]
   })
 
-  it.skipIf(!ageInstalled)("decrypts sealed values from an inline ENVPKT_AGE_KEY with no key_file", async () => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  it("decrypts sealed values from an inline ENVPKT_AGE_KEY with no key_file", async () => {
+    const keygenOutput = await ageKeygen()
     const recipient = keygenOutput
       .split("\n")
       .find((l) => l.startsWith("# public key:"))!
@@ -406,11 +394,8 @@ describe("boot with sealed values", () => {
     }
   })
 
-  it.skipIf(!ageInstalled)("decrypts sealed values using default key path when key_file is unset", async () => {
-    const keygenOutput = execFileSync("age-keygen", [], {
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    })
+  it("decrypts sealed values using default key path when key_file is unset", async () => {
+    const keygenOutput = await ageKeygen()
     const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
     const recipient = recipientLine!.replace("# public key: ", "").trim()
 
@@ -464,11 +449,8 @@ describe("boot with sealed values", () => {
     }
   })
 
-  it.skipIf(!ageInstalled)("falls back to fnox for keys without encrypted_value", async () => {
-    const keygenOutput = execFileSync("age-keygen", [], {
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    })
+  it("falls back to fnox for keys without encrypted_value", async () => {
+    const keygenOutput = await ageKeygen()
     const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
     const recipient = recipientLine!.replace("# public key: ", "").trim()
 
@@ -678,8 +660,8 @@ describe("bootSafe fail-fast on missing seal key (B1)", () => {
 })
 
 describe("bootSafe with aliases", () => {
-  it.skipIf(!ageInstalled)("secret alias inherits target's sealed value", async () => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  it("secret alias inherits target's sealed value", async () => {
+    const keygenOutput = await ageKeygen()
     const recipient = keygenOutput
       .split("\n")
       .find((l) => l.startsWith("# public key:"))!
@@ -1058,8 +1040,8 @@ describe("bootSafe with namespace", () => {
     }
   })
 
-  it.skipIf(!ageInstalled)("a sealed secret alias bridges to a namespaced canonical value when opted out", async () => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  it("a sealed secret alias bridges to a namespaced canonical value when opted out", async () => {
+    const keygenOutput = await ageKeygen()
     const recipient = keygenOutput
       .split("\n")
       .find((l) => l.startsWith("# public key:"))!
@@ -1114,8 +1096,8 @@ describe("bootSafe with namespace", () => {
     }
   })
 
-  it.skipIf(!ageInstalled)("injects a sealed secret under the namespaced wire name", async () => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  it("injects a sealed secret under the namespaced wire name", async () => {
+    const keygenOutput = await ageKeygen()
     const recipient = keygenOutput
       .split("\n")
       .find((l) => l.startsWith("# public key:"))!

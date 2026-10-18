@@ -1,4 +1,3 @@
-import { execFileSync } from "node:child_process"
 import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
@@ -7,15 +6,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigIdentity } from "../../src/core/keygen.js"
 import { unwrapAgentKey } from "../../src/fnox/identity.js"
-
-const ageInstalled = (() => {
-  try {
-    execFileSync("age", ["--version"], { stdio: "pipe" })
-    return true
-  } catch {
-    return false
-  }
-})()
 
 let tmpDir: string
 
@@ -62,7 +52,7 @@ describe("resolveInlineKey", () => {
 })
 
 describe("generateKeypair", () => {
-  it.skipIf(!ageInstalled)("generates keypair to specified path", async () => {
+  it("generates keypair to specified path", async () => {
     const outputPath = join(tmpDir, "test-key.txt")
     const result = await generateKeypair({ outputPath })
 
@@ -86,7 +76,7 @@ describe("generateKeypair", () => {
     )
   })
 
-  it.skipIf(!ageInstalled)("returns KeyExists when file exists and force=false", async () => {
+  it("returns KeyExists when file exists and force=false", async () => {
     const outputPath = join(tmpDir, "existing-key.txt")
     writeFileSync(outputPath, "existing content")
 
@@ -103,7 +93,7 @@ describe("generateKeypair", () => {
     )
   })
 
-  it.skipIf(!ageInstalled)("sets file permissions to 0o600", async () => {
+  it("sets file permissions to 0o600", async () => {
     const outputPath = join(tmpDir, "perms-key.txt")
     await generateKeypair({ outputPath })
 
@@ -112,7 +102,7 @@ describe("generateKeypair", () => {
     expect(mode).toBe(0o600)
   })
 
-  it.skipIf(!ageInstalled)("creates parent directory if missing", async () => {
+  it("creates parent directory if missing", async () => {
     const outputPath = join(tmpDir, "nested", "dir", "key.txt")
     const result = await generateKeypair({ outputPath })
 

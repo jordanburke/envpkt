@@ -11,20 +11,12 @@ import { bootSafe } from "../../src/core/boot.js"
 import { loadConfig } from "../../src/core/config.js"
 import { unsealSecrets } from "../../src/core/seal.js"
 import { unwrapAgentKey } from "../../src/fnox/identity.js"
+import { ageKeygen } from "../helpers/age.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__testDir, "../..")
 const CLI_SRC = resolve(PROJECT_ROOT, "src/cli/index.ts")
 const TSX = resolve(PROJECT_ROOT, "node_modules/.bin/tsx")
-
-const ageInstalled = (() => {
-  try {
-    execFileSync("age", ["--version"], { stdio: "pipe" })
-    return true
-  } catch {
-    return false
-  }
-})()
 
 let tmpDir: string
 let configPath: string
@@ -56,11 +48,11 @@ const run = (args: string[], env?: Record<string, string>, input?: string): RunR
   }
 }
 
-describe.skipIf(!ageInstalled)("envpkt seal — alias handling", () => {
+describe("envpkt seal — alias handling", () => {
   let recipient: string
 
-  beforeEach(() => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  beforeEach(async () => {
+    const keygenOutput = await ageKeygen()
     const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
     recipient = recipientLine!.replace("# public key: ", "").trim()
   })
@@ -280,12 +272,12 @@ describe("parseStdinValue", () => {
   })
 })
 
-describe.skipIf(!ageInstalled)("envpkt seal --edit from stdin", () => {
+describe("envpkt seal --edit from stdin", () => {
   let recipient: string
   let identityPath: string
 
-  beforeEach(() => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  beforeEach(async () => {
+    const keygenOutput = await ageKeygen()
     const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
     recipient = recipientLine!.replace("# public key: ", "").trim()
     identityPath = join(tmpDir, "age-key.txt")
@@ -364,13 +356,13 @@ service = "other"
 })
 
 // Each test spawns several CLI processes and age calls; allow for a slow CI runner.
-describe.skipIf(!ageInstalled)("envpkt seal — values survive sealing byte for byte", { timeout: 60_000 }, () => {
+describe("envpkt seal — values survive sealing byte for byte", { timeout: 60_000 }, () => {
   // A PEM key keeps its final newline; stdin strips the one extra newline after it.
   const PEM =
     "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEA\n-----END PRIVATE KEY-----\n"
 
-  beforeEach(() => {
-    const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
+  beforeEach(async () => {
+    const keygenOutput = await ageKeygen()
     const recipientLine = keygenOutput.split("\n").find((l) => l.startsWith("# public key:"))
     const recipient = recipientLine!.replace("# public key: ", "").trim()
     const identityPath = join(tmpDir, "age-key.txt")

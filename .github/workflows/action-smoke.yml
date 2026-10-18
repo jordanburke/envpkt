@@ -6,14 +6,15 @@ name: Action Smoke Test
 # to a later step via $GITHUB_ENV. No repository secrets required.
 #
 # Two jobs:
-#   smoke           — runs the LOCAL action (uses: ./), gated to action/workflow changes.
+#   smoke           — runs the LOCAL action (uses: ./) against envpkt built from this checkout,
+#                     with no `age` installed, gated to action/workflow/source changes.
 #   smoke-published — runs the PUBLISHED ref (uses: jordanburke/envpkt@v0), the exact path
 #                     consumers use, on the weekly cron + manual dispatch.
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: "envpkt version the action should run via npx"
+        description: "envpkt version the published action (@v0) should run via npx"
         required: false
         default: "latest"
   # Gate changes to the action itself / this workflow.
@@ -21,11 +22,17 @@ on:
     paths:
       - "action.yml"
       - ".github/workflows/action-smoke.yml"
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
   push:
     branches: [main]
     paths:
       - "action.yml"
       - ".github/workflows/action-smoke.yml"
+      - "src/**"
+      - "package.json"
+      - "pnpm-lock.yaml"
   # Catch drift in the published CLI that the action runs (no commit required).
   schedule:
     - cron: "0 9 * * 1" # Mondays 09:00 UTC
@@ -36,28 +43,41 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      # Sealed packets are decrypted with the `age` CLI, which is not preinstalled.
-      - name: Install age
-        run: sudo apt-get update && sudo apt-get install -y age
+      - uses: pnpm/action-setup@v6
+        name: Install pnpm
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: ".nvmrc"
+          cache: "pnpm"
+
+      # No `age` install: envpkt seals, unseals and makes keys in-process, and this job proves it.
+      # The action runs `npx envpkt@<version>`, so pack this checkout and point the action at it.
+      - name: Build and pack envpkt from this checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm build
+          npm pack --pack-destination "$RUNNER_TEMP"
+          echo "ENVPKT_SMOKE_VERSION=file:$(ls "$RUNNER_TEMP"/envpkt-*.tgz)" >> "$GITHUB_ENV"
 
       - name: Create an ephemeral sealed config
         shell: bash
         run: |
           set -euo pipefail
-          keys="$(age-keygen 2>/dev/null)"
-          recipient="$(echo "$keys" | sed -n 's/# public key: //p')"
-          secret="$(echo "$keys" | grep '^AGE-SECRET-KEY-')"
-          ciphertext="$(printf 'smoke-value' | age -r "$recipient" -a)"
-
+          # The point of this job: nothing below may need the age CLI.
+          if command -v age; then echo "::error::age is installed; this job must run without it"; exit 1; fi
+          envpkt="node $GITHUB_WORKSPACE/dist/cli.js"
           cfg="$RUNNER_TEMP/envpkt.toml"
-          {
-            echo 'version = 1'
-            echo '[namespace]'
-            echo 'prefix = "CIV"'
-            echo '[secret.SMOKE_KEY]'
-            echo 'service = "smoke"'
-            printf 'encrypted_value = """\n%s"""\n' "$ciphertext"
-          } > "$cfg"
+          key="$RUNNER_TEMP/smoke-key.txt"
+          printf 'version = 1\n[namespace]\nprefix = "CIV"\n[secret.SMOKE_KEY]\nservice = "smoke"\n' > "$cfg"
+          $envpkt keygen -c "$cfg" -o "$key"
+          printf 'smoke-value' | $envpkt seal -c "$cfg" --edit SMOKE_KEY --stdin
+          secret="$(grep '^AGE-SECRET-KEY-' "$key")"
+          # Like a real CI job: the config's key_file is a dev-local path that isn't here, so the
+          # action must fall through to the inline ENVPKT_AGE_KEY.
+          rm "$key"
 
           # Throwaway key — mask it and hand it to the action via the job env.
           echo "::add-mask::$secret"
@@ -70,7 +90,7 @@ jobs:
         uses: ./
         with:
           config: ${{ env.ENVPKT_SMOKE_CONFIG }}
-          version: ${{ inputs.version || 'latest' }}
+          version: ${{ env.ENVPKT_SMOKE_VERSION }}
           strict: "true"
         env:
           ENVPKT_AGE_KEY: ${{ env.ENVPKT_AGE_KEY }}
@@ -98,7 +118,8 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      # Sealed packets are decrypted with the `age` CLI, which is not preinstalled.
+      # envpkt 0.17.0 and earlier decrypt with the `age` CLI, which is not preinstalled, and this
+      # step also makes the test key. Drop it once @v0 and npm `latest` are 0.18.0 or later.
       - name: Install age
         run: sudo apt-get update && sudo apt-get install -y age
 
