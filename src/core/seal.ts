@@ -1,91 +1,54 @@
-import { execFileSync } from "node:child_process"
+import { Either, Right } from "functype"
 
-import { type Either, Left, Right, Try } from "functype"
-
-import { ageAvailable } from "../fnox/identity.js"
+import { decryptArmored, encryptArmored } from "./age.js"
 import type { SecretMeta } from "./schema.js"
 import type { SealError } from "./types.js"
 
-/** Encrypt a plaintext string using age with the given recipient public key (armored output) */
-export const ageEncrypt = (plaintext: string, recipient: string): Either<SealError, string> => {
-  if (!ageAvailable()) {
-    return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
-  }
+/** Encrypt a plaintext string to an age recipient public key (armored output) */
+export const ageEncrypt = (plaintext: string, recipient: string): Promise<Either<SealError, string>> =>
+  encryptArmored(plaintext, recipient)
 
-  return Try(() =>
-    execFileSync("age", ["--encrypt", "--recipient", recipient, "--armor"], {
-      input: plaintext,
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    }),
-  ).fold<Either<SealError, string>>(
-    (err) => Left({ _tag: "EncryptFailed", key: "", message: `age encrypt failed: ${err}` } as const),
-    (output) => Right(output.trim()),
-  )
-}
-
-/** Decrypt an age-armored ciphertext using the given identity file. The plaintext is returned as-is, untrimmed. */
-export const ageDecrypt = (ciphertext: string, identityPath: string): Either<SealError, string> => {
-  if (!ageAvailable()) {
-    return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
-  }
-
-  return Try(() =>
-    execFileSync("age", ["--decrypt", "--identity", identityPath], {
-      input: ciphertext,
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    }),
-  ).fold<Either<SealError, string>>(
-    (err) => Left({ _tag: "DecryptFailed", key: "", message: `age decrypt failed: ${err}` } as const),
-    (output) => Right(output),
-  )
-}
+/**
+ * Decrypt an age-armored ciphertext with any of the given secret keys (`AGE-SECRET-KEY-…`, as
+ * returned by `unwrapAgentKey`). The plaintext is returned as-is, untrimmed.
+ */
+export const ageDecrypt = (ciphertext: string, identities: ReadonlyArray<string>): Promise<Either<SealError, string>> =>
+  decryptArmored(ciphertext, identities)
 
 /** Seal multiple secrets: encrypt each value with the recipient key and set encrypted_value on meta */
-export const sealSecrets = (
+export const sealSecrets = async (
   meta: Readonly<Record<string, SecretMeta>>,
   values: Readonly<Record<string, string>>,
   recipient: string,
-): Either<SealError, Record<string, SecretMeta>> => {
-  if (!ageAvailable()) {
-    return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
-  }
+): Promise<Either<SealError, Record<string, SecretMeta>>> => {
+  const sealed = await Either.traverseAsync(
+    Object.entries(meta),
+    async ([key, secretMeta]): Promise<Either<SealError, readonly [string, SecretMeta]>> => {
+      const value = values[key]
+      if (value === undefined) return Right([key, secretMeta] as const)
 
-  return Object.entries(meta).reduce<Either<SealError, Record<string, SecretMeta>>>(
-    (acc, [key, secretMeta]) =>
-      acc.flatMap((result) => {
-        const value = values[key]
-        if (value === undefined) {
-          return Right({ ...result, [key]: secretMeta })
-        }
-
-        return ageEncrypt(value, recipient)
-          .mapLeft((err) => ({ _tag: "EncryptFailed" as const, key, message: err.message }))
-          .map((ciphertext) => ({ ...result, [key]: { ...secretMeta, encrypted_value: ciphertext } }))
-      }),
-    Right({}),
+      return (await ageEncrypt(value, recipient))
+        .mapLeft((err): SealError => ({ _tag: "EncryptFailed", key, message: err.message }))
+        .map((ciphertext) => [key, { ...secretMeta, encrypted_value: ciphertext }] as const)
+    },
   )
+  return sealed.map((entries) => Object.fromEntries(entries))
 }
 
-/** Unseal secrets: decrypt encrypted_value for each meta entry that has one */
-export const unsealSecrets = (
+/** Unseal secrets: decrypt encrypted_value for each meta entry that has one, with any of `identities` */
+export const unsealSecrets = async (
   meta: Readonly<Record<string, SecretMeta>>,
-  identityPath: string,
-): Either<SealError, Record<string, string>> => {
-  if (!ageAvailable()) {
-    return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
-  }
-
-  return Object.entries(meta)
-    .filter(([, secretMeta]) => secretMeta.encrypted_value !== undefined && secretMeta.encrypted_value !== "")
-    .reduce<Either<SealError, Record<string, string>>>(
-      (acc, [key, secretMeta]) =>
-        acc.flatMap((result) =>
-          ageDecrypt(secretMeta.encrypted_value!, identityPath)
-            .mapLeft((err) => ({ _tag: "DecryptFailed" as const, key, message: err.message }))
-            .map((plaintext) => ({ ...result, [key]: plaintext })),
-        ),
-      Right({}),
-    )
+  identities: ReadonlyArray<string>,
+): Promise<Either<SealError, Record<string, string>>> => {
+  const sealedEntries = Object.entries(meta).filter(
+    ([, secretMeta]) => secretMeta.encrypted_value !== undefined && secretMeta.encrypted_value !== "",
+  )
+  const unsealed = await Either.traverseAsync(
+    sealedEntries,
+    async ([key, secretMeta]): Promise<Either<SealError, readonly [string, string]>> =>
+      (await ageDecrypt(secretMeta.encrypted_value!, identities))
+        .mapLeft((err): SealError => ({ _tag: "DecryptFailed", key, message: err.message }))
+        .map((plaintext) => [key, plaintext] as const),
+  )
+  return unsealed.map((entries) => Object.fromEntries(entries))
 }

@@ -36,11 +36,11 @@ const deriveKeyPath = (configPath: string): string => {
   return join(homedir(), ".envpkt", `${name}-key.txt`)
 }
 
-export const runKeygen = (options: KeygenOptions): void => {
+export const runKeygen = async (options: KeygenOptions): Promise<void> => {
   const configPath = resolve(options.config ?? join(process.cwd(), "envpkt.toml"))
   const outputPath = options.output ?? (options.global ? resolveKeyPath() : deriveKeyPath(configPath))
 
-  const result = generateKeypair({ outputPath })
+  const result = await generateKeypair({ outputPath })
 
   result.fold(
     (err) => {

@@ -38,6 +38,7 @@ export type {
   HealthStatus,
   Identity,
   IdentityError,
+  IdentityFileError,
   KeygenError,
   KeygenResult,
   LifecycleConfig,
@@ -137,7 +138,7 @@ export { scanFleet } from "./core/fleet.js"
 // fnox integration
 export { fnoxExport, fnoxGet } from "./fnox/cli.js"
 export { detectFnox, fnoxAvailable } from "./fnox/detect.js"
-export { ageAvailable, unwrapAgentKey } from "./fnox/identity.js"
+export { describeIdentityError, unwrapAgentKey } from "./fnox/identity.js"
 export { extractFnoxKeys, readFnoxConfig } from "./fnox/parse.js"
 export { compareFnoxAndEnvpkt } from "./fnox/sync.js"
 

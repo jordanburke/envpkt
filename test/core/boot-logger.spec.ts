@@ -24,21 +24,21 @@ const writeConfig = (content: string): string => {
 }
 
 describe("bootSafe logger", () => {
-  it("emits no log records when no logger is provided (silent default)", () => {
+  it("emits no log records when no logger is provided (silent default)", async () => {
     const configPath = writeConfig(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
     // Just confirms no crash / no stray output when logger is omitted.
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
       (boot) => expect(boot).toBeDefined(),
     )
   })
 
-  it("emits alias.validate.success + phase.fnox.unavailable for a typical boot", () => {
+  it("emits alias.validate.success + phase.fnox.unavailable for a typical boot", async () => {
     const { logger, entries, hasEntry } = createDirectTestLogger()
 
     const configPath = writeConfig(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
-    bootSafe({ configPath, inject: false, logger })
+    await bootSafe({ configPath, inject: false, logger })
 
     expect(hasEntry("debug", "alias.validate.success")).toBe(true)
     expect(hasEntry("debug", "phase.fnox.unavailable")).toBe(true)
@@ -51,23 +51,23 @@ describe("bootSafe logger", () => {
       })
   })
 
-  it("emits phase.alias.target_unresolved when alias target cannot resolve", () => {
+  it("emits phase.alias.target_unresolved when alias target cannot resolve", async () => {
     const { logger, hasEntry } = createDirectTestLogger()
 
     const configPath = writeConfig(
       `version = 1\n[secret.TARGET]\nservice = "svc"\n\n[secret.ALIAS]\nfrom_key = "secret.TARGET"\n`,
     )
-    bootSafe({ configPath, inject: false, logger })
+    await bootSafe({ configPath, inject: false, logger })
 
     // Target falls to skipped (fnox unavailable), alias copy sees no value
     expect(hasEntry("debug", "phase.alias.target_unresolved")).toBe(true)
   })
 
-  it("emits alias.validate.failed with error tag when config has invalid alias", () => {
+  it("emits alias.validate.failed with error tag when config has invalid alias", async () => {
     const { logger, entries } = createDirectTestLogger()
 
     const configPath = writeConfig(`version = 1\n[secret.ALIAS]\nfrom_key = "secret.NONEXISTENT"\n`)
-    bootSafe({ configPath, inject: false, logger })
+    await bootSafe({ configPath, inject: false, logger })
 
     const failures = entries().filter((e) => e.message === "alias.validate.failed")
     expect(failures.size).toBe(1)
@@ -80,11 +80,11 @@ describe("bootSafe logger", () => {
     )
   })
 
-  it("binds component=envpkt.boot context on every record", () => {
+  it("binds component=envpkt.boot context on every record", async () => {
     const { logger, entries } = createDirectTestLogger()
 
     const configPath = writeConfig(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
-    bootSafe({ configPath, inject: false, logger })
+    await bootSafe({ configPath, inject: false, logger })
 
     const all = entries().toArray()
     expect(all.length).toBeGreaterThan(0)

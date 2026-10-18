@@ -6,6 +6,7 @@ import { tmpdir } from "node:os"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigIdentity } from "../../src/core/keygen.js"
+import { unwrapAgentKey } from "../../src/fnox/identity.js"
 
 const ageInstalled = (() => {
   try {
@@ -28,14 +29,14 @@ afterEach(() => {
 })
 
 describe("resolveKeyPath", () => {
-  it("returns default path when env var is not set", () => {
+  it("returns default path when env var is not set", async () => {
     delete process.env["ENVPKT_AGE_KEY_FILE"]
     const path = resolveKeyPath()
     expect(path).toContain(".envpkt")
     expect(path).toContain("age-key.txt")
   })
 
-  it("returns env var override when set", () => {
+  it("returns env var override when set", async () => {
     vi.stubEnv("ENVPKT_AGE_KEY_FILE", "/custom/path/key.txt")
     const path = resolveKeyPath()
     expect(path).toBe("/custom/path/key.txt")
@@ -43,13 +44,13 @@ describe("resolveKeyPath", () => {
 })
 
 describe("resolveInlineKey", () => {
-  it("returns None when ENVPKT_AGE_KEY is not set", () => {
+  it("returns None when ENVPKT_AGE_KEY is not set", async () => {
     vi.stubEnv("ENVPKT_AGE_KEY", "")
     const result = resolveInlineKey()
     expect(result.isNone()).toBe(true)
   })
 
-  it("returns Some when ENVPKT_AGE_KEY is set", () => {
+  it("returns Some when ENVPKT_AGE_KEY is set", async () => {
     vi.stubEnv("ENVPKT_AGE_KEY", "AGE-SECRET-KEY-1234")
     const result = resolveInlineKey()
     expect(result.isSome()).toBe(true)
@@ -61,9 +62,9 @@ describe("resolveInlineKey", () => {
 })
 
 describe("generateKeypair", () => {
-  it.skipIf(!ageInstalled)("generates keypair to specified path", () => {
+  it.skipIf(!ageInstalled)("generates keypair to specified path", async () => {
     const outputPath = join(tmpDir, "test-key.txt")
-    const result = generateKeypair({ outputPath })
+    const result = await generateKeypair({ outputPath })
 
     result.fold(
       (err) => expect.unreachable(`Keygen failed: ${err._tag}`),
@@ -74,16 +75,22 @@ describe("generateKeypair", () => {
 
         const content = readFileSync(outputPath, "utf-8")
         expect(content).toContain("AGE-SECRET-KEY-")
-        expect(content).toContain("# public key: age1")
+        expect(content).toContain(`# public key: ${res.recipient}`)
+        // The file is a plain age identity file: envpkt reads exactly one key back from it.
+        expect(
+          unwrapAgentKey(outputPath)
+            .map((keys) => keys.length)
+            .orThrow(),
+        ).toBe(1)
       },
     )
   })
 
-  it.skipIf(!ageInstalled)("returns KeyExists when file exists and force=false", () => {
+  it.skipIf(!ageInstalled)("returns KeyExists when file exists and force=false", async () => {
     const outputPath = join(tmpDir, "existing-key.txt")
     writeFileSync(outputPath, "existing content")
 
-    const result = generateKeypair({ outputPath })
+    const result = await generateKeypair({ outputPath })
 
     result.fold(
       (err) => {
@@ -96,18 +103,18 @@ describe("generateKeypair", () => {
     )
   })
 
-  it.skipIf(!ageInstalled)("sets file permissions to 0o600", () => {
+  it.skipIf(!ageInstalled)("sets file permissions to 0o600", async () => {
     const outputPath = join(tmpDir, "perms-key.txt")
-    generateKeypair({ outputPath })
+    await generateKeypair({ outputPath })
 
     const stats = statSync(outputPath)
     const mode = stats.mode & 0o777
     expect(mode).toBe(0o600)
   })
 
-  it.skipIf(!ageInstalled)("creates parent directory if missing", () => {
+  it.skipIf(!ageInstalled)("creates parent directory if missing", async () => {
     const outputPath = join(tmpDir, "nested", "dir", "key.txt")
-    const result = generateKeypair({ outputPath })
+    const result = await generateKeypair({ outputPath })
 
     result.fold(
       (err) => expect.unreachable(`Keygen failed: ${err._tag}`),
@@ -121,7 +128,7 @@ describe("generateKeypair", () => {
 })
 
 describe("updateConfigIdentity", () => {
-  it("adds recipient to existing [identity] section", () => {
+  it("adds recipient to existing [identity] section", async () => {
     const configPath = join(tmpDir, "envpkt.toml")
     writeFileSync(configPath, `version = 1\n\n[identity]\nname = "test-agent"\n\n[secret.MY_KEY]\nservice = "test"\n`)
 
@@ -138,7 +145,7 @@ describe("updateConfigIdentity", () => {
     expect(content).toContain("[secret.MY_KEY]")
   })
 
-  it("creates [identity] section with all fields when missing", () => {
+  it("creates [identity] section with all fields when missing", async () => {
     const configPath = join(tmpDir, "envpkt.toml")
     writeFileSync(configPath, `version = 1\n\n[secret.MY_KEY]\nservice = "test"\n`)
 
@@ -155,7 +162,7 @@ describe("updateConfigIdentity", () => {
     expect(content).toContain('key_file = "~/.envpkt/my-key.txt"')
   })
 
-  it("updates existing recipient value", () => {
+  it("updates existing recipient value", async () => {
     const configPath = join(tmpDir, "envpkt.toml")
     writeFileSync(configPath, `version = 1\n\n[identity]\nname = "test"\nrecipient = "age1oldkey"\n`)
 
@@ -166,7 +173,7 @@ describe("updateConfigIdentity", () => {
     expect(content).not.toContain("age1oldkey")
   })
 
-  it("preserves TOML structure", () => {
+  it("preserves TOML structure", async () => {
     const configPath = join(tmpDir, "envpkt.toml")
     const original = `version = 1\n\n[identity]\nname = "test"\n\n[lifecycle]\nstale_warning_days = 90\n\n[secret.KEY]\nservice = "svc"\n`
     writeFileSync(configPath, original)

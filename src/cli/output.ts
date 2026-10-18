@@ -1,7 +1,7 @@
 import type { CheckResult, ScanResult } from "../core/env.js"
 import type { ConfidenceLevel } from "../core/patterns.js"
-import type { AuditResult, FleetHealth, HealthStatus, SecretHealth } from "../core/types.js"
-import { ageInstallHint } from "../fnox/identity.js"
+import type { AuditResult, FleetHealth, HealthStatus, IdentityError, SecretHealth } from "../core/types.js"
+import { describeIdentityError } from "../fnox/identity.js"
 
 const RESET = "\x1b[0m"
 const BOLD = "\x1b[1m"
@@ -180,8 +180,10 @@ export const formatError = (error: { _tag: string; message?: string; path?: stri
       return `${RED}Error:${RESET} Config validation failed:\n${String(error.errors)}`
     case "ReadError":
       return `${RED}Error:${RESET} Could not read file: ${error.message}`
-    case "AgeNotFound":
-      return `${RED}Error:${RESET} age is required for this operation but was not found on PATH.\n${DIM}${ageInstallHint()}${RESET}`
+    case "NoIdentityKey":
+    case "PassphraseProtectedIdentity":
+    case "UnsupportedIdentity":
+      return `${RED}Error:${RESET} ${describeIdentityError(error as unknown as IdentityError)}`
     case "DecryptFailed":
       return `${RED}Error:${RESET} Decrypt failed: ${error.message}`
     case "IdentityNotFound":

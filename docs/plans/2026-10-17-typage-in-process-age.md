@@ -63,26 +63,35 @@ file. With typage:
 - The identity precedence chain (`key_file` > `ENVPKT_AGE_KEY_FILE` > `ENVPKT_AGE_KEY` >
   `~/.envpkt/age-key.txt`) and `describeSealKeySearch` stay as they are; they resolve to key strings
   instead of a path.
+- **An unusable key stops `boot`.** A key source that exists but can't be read (passphrase-protected,
+  plugin or SSH; decisions 1 and 2) returns its `IdentityError` from `bootSafe`, even under
+  `warnOnly`, the same way `SealKeyUnavailable` does. A wrong key (decrypt fails) stays a warning, as
+  it was with the CLI. `ENVPKT_AGE_KEY` goes through the same parser as a file, named
+  `ENVPKT_AGE_KEY` in errors.
 
 ### 3. Public API (breaking)
 
 Keep the names; change the return types. Exports from `src/index.ts`:
 
-| Export                                           | Today                           | 0.18.0                                                   |
-| ------------------------------------------------ | ------------------------------- | -------------------------------------------------------- |
-| `bootSafe(opts)`                                 | `Either<BootError, BootResult>` | `Promise<Either<BootError, BootResult>>`                 |
-| `boot(opts)`                                     | `BootResult` (throws)           | `Promise<BootResult>` (rejects)                          |
-| `ageEncrypt(plaintext, recipient)`               | `Either`                        | `Promise<Either>`                                        |
-| `ageDecrypt(ciphertext, identityPath)`           | `Either`                        | `ageDecrypt(ciphertext, identities)` → `Promise<Either>` |
-| `sealSecrets(meta, values, recipient)`           | `Either`                        | `Promise<Either>`                                        |
-| `unsealSecrets(meta, identityPath)`              | `Either`                        | `unsealSecrets(meta, identities)` → `Promise<Either>`    |
-| `generateKeypair(opts)`                          | `Either`                        | `Promise<Either>`                                        |
-| `unwrapAgentKey(path)`                           | `Either<IdentityError, string>` | `Promise<Either<IdentityError, ReadonlyArray<string>>>`  |
-| `ageAvailable()`                                 | `boolean`                       | **removed**                                              |
-| `AgeNotFound` error tag (3 unions in `types.ts`) | present                         | **removed**                                              |
+| Export                                            | Today                           | 0.18.0                                                   |
+| ------------------------------------------------- | ------------------------------- | -------------------------------------------------------- |
+| `bootSafe(opts)`                                  | `Either<BootError, BootResult>` | `Promise<Either<BootError, BootResult>>`                 |
+| `boot(opts)`                                      | `BootResult` (throws)           | `Promise<BootResult>` (rejects)                          |
+| `ageEncrypt(plaintext, recipient)`                | `Either`                        | `Promise<Either>`                                        |
+| `ageDecrypt(ciphertext, identityPath)`            | `Either`                        | `ageDecrypt(ciphertext, identities)` → `Promise<Either>` |
+| `sealSecrets(meta, values, recipient)`            | `Either`                        | `Promise<Either>`                                        |
+| `unsealSecrets(meta, identityPath)`               | `Either`                        | `unsealSecrets(meta, identities)` → `Promise<Either>`    |
+| `generateKeypair(opts)`                           | `Either`                        | `Promise<Either>`                                        |
+| `unwrapAgentKey(path)`                            | `Either<IdentityError, string>` | `Either<IdentityError, ReadonlyArray<string>>` (sync)    |
+| `ageAvailable()`                                  | `boolean`                       | **removed**                                              |
+| `describeIdentityError(err)`, `IdentityFileError` | —                               | **new**: explain a key-file error without key material   |
+| `AgeNotFound` error tag (3 unions in `types.ts`)  | present                         | **removed**                                              |
 
 `ageDecrypt` and `unsealSecrets` take key strings rather than a file path, since the signature
 breaks anyway; a path-taking helper can read the file and call them.
+
+`unwrapAgentKey` stays synchronous: without the `age --decrypt` fallback it only reads and parses a
+file, so identity resolution in `boot.ts` stays sync and the one `await` is the unseal itself.
 
 **Floating-promise risk.** A caller that keeps writing `boot()` without `await` gets a Promise
 nobody waits on, so secrets silently never reach `process.env`. The CHANGELOG entry must show
@@ -162,7 +171,10 @@ byte-for-byte tests from 0.17.0 (`copy`, `--reseal`, env → `boot()`) carry ove
 
 1. `src/core/age.ts` + its unit tests + the interop spec.
 2. Core callers: `seal.ts`, `keygen.ts`, `fnox/identity.ts`, `boot.ts`; types; `index.ts` exports.
-3. CLI callers.
+3. CLI callers. Steps 2 and 3 land as one commit: the CLI can't typecheck or lint against an async
+   core, and each commit must pass `pnpm validate`. That commit also updates the specs the new
+   signatures break (`await`, keys instead of a key path); the age-keygen setup and `skipIf` guards
+   still move in step 4.
 4. Test-setup migration and `action-smoke.yml`.
 5. Docs, CHANGELOG, release 0.18.0.
 

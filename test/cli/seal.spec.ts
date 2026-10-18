@@ -10,6 +10,7 @@ import { collectEditedValues, parseStdinValue, resolveEditInput } from "../../sr
 import { bootSafe } from "../../src/core/boot.js"
 import { loadConfig } from "../../src/core/config.js"
 import { unsealSecrets } from "../../src/core/seal.js"
+import { unwrapAgentKey } from "../../src/fnox/identity.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
 const PROJECT_ROOT = resolve(__testDir, "../..")
@@ -64,7 +65,7 @@ describe.skipIf(!ageInstalled)("envpkt seal — alias handling", () => {
     recipient = recipientLine!.replace("# public key: ", "").trim()
   })
 
-  it("skips alias entries instead of trying to seal them", () => {
+  it("skips alias entries instead of trying to seal them", async () => {
     writeFileSync(
       configPath,
       `version = 1
@@ -98,7 +99,7 @@ from_key = "secret.REAL_KEY"
     expect(stdout).toContain("alias")
   })
 
-  it("--edit refuses to seal an alias with a clear message", () => {
+  it("--edit refuses to seal an alias with a clear message", async () => {
     writeFileSync(
       configPath,
       `version = 1
@@ -121,7 +122,7 @@ from_key = "secret.REAL_KEY"
     expect(stdout).toContain("from_key")
   })
 
-  it("skips external entries instead of trying to seal them", () => {
+  it("skips external entries instead of trying to seal them", async () => {
     writeFileSync(
       configPath,
       `version = 1
@@ -153,7 +154,7 @@ external = true
     expect(stdout).toContain("external")
   })
 
-  it("--edit refuses to seal an external entry with a clear message", () => {
+  it("--edit refuses to seal an external entry with a clear message", async () => {
     writeFileSync(
       configPath,
       `version = 1
@@ -237,20 +238,20 @@ describe("collectEditedValues (--edit confirm-on-overwrite)", () => {
 })
 
 describe("resolveEditInput (--edit input source)", () => {
-  it("prompts when a terminal is attached and --stdin is not passed", () => {
+  it("prompts when a terminal is attached and --stdin is not passed", async () => {
     expect(resolveEditInput(1, { stdin: false, isTTY: true }).orThrow()).toBe("prompt")
     expect(resolveEditInput(3, { stdin: false, isTTY: true }).orThrow()).toBe("prompt")
   })
 
-  it("reads stdin for one key when no terminal is attached", () => {
+  it("reads stdin for one key when no terminal is attached", async () => {
     expect(resolveEditInput(1, { stdin: false, isTTY: false }).orThrow()).toBe("stdin")
   })
 
-  it("reads stdin for one key when --stdin is passed, even in a terminal", () => {
+  it("reads stdin for one key when --stdin is passed, even in a terminal", async () => {
     expect(resolveEditInput(1, { stdin: true, isTTY: true }).orThrow()).toBe("stdin")
   })
 
-  it("refuses several keys on stdin", () => {
+  it("refuses several keys on stdin", async () => {
     const noTty = resolveEditInput(2, { stdin: false, isTTY: false })
     expect(noTty.isLeft()).toBe(true)
     expect(
@@ -264,14 +265,14 @@ describe("resolveEditInput (--edit input source)", () => {
 })
 
 describe("parseStdinValue", () => {
-  it("strips exactly one trailing newline", () => {
+  it("strips exactly one trailing newline", async () => {
     expect(parseStdinValue("secret\n").orThrow()).toBe("secret")
     expect(parseStdinValue("secret\r\n").orThrow()).toBe("secret")
     expect(parseStdinValue("secret\n\n").orThrow()).toBe("secret\n")
     expect(parseStdinValue("secret").orThrow()).toBe("secret")
   })
 
-  it("is empty for empty input, a lone newline, or whitespace only", () => {
+  it("is empty for empty input, a lone newline, or whitespace only", async () => {
     expect(parseStdinValue("").isEmpty).toBe(true)
     expect(parseStdinValue("\n").isEmpty).toBe(true)
     expect(parseStdinValue("   \n").isEmpty).toBe(true)
@@ -306,27 +307,27 @@ service = "other"
     )
   })
 
-  const unsealed = (): Record<string, string> => {
+  const unsealed = async (): Promise<Record<string, string>> => {
     const config = loadConfig(configPath).orThrow()
-    return unsealSecrets(config.secret ?? {}, identityPath).orThrow()
+    return (await unsealSecrets(config.secret ?? {}, unwrapAgentKey(identityPath).orThrow())).orThrow()
   }
 
-  it("seals one key from piped stdin, stripping the trailing newline, and never prints it", () => {
+  it("seals one key from piped stdin, stripping the trailing newline, and never prints it", async () => {
     const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "piped-value-123\n")
     expect(status).toBe(0)
     expect(stdout).not.toContain("piped-value-123")
-    expect(unsealed()).toEqual({ API_KEY: "piped-value-123" })
+    expect(await unsealed()).toEqual({ API_KEY: "piped-value-123" })
   })
 
-  it("replaces an already-sealed value without a confirm prompt (rotation)", () => {
+  it("replaces an already-sealed value without a confirm prompt (rotation)", async () => {
     expect(run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "first\n").status).toBe(0)
     const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY", "--stdin"], {}, "second\n")
     expect(status).toBe(0)
     expect(stdout).not.toContain("Replace the sealed value")
-    expect(unsealed()).toEqual({ API_KEY: "second" })
+    expect(await unsealed()).toEqual({ API_KEY: "second" })
   })
 
-  it("fails clearly on empty stdin and leaves the file unchanged", () => {
+  it("fails clearly on empty stdin and leaves the file unchanged", async () => {
     const before = readFileSync(configPath, "utf-8")
     const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "")
     expect(status).toBe(2)
@@ -334,7 +335,7 @@ service = "other"
     expect(readFileSync(configPath, "utf-8")).toBe(before)
   })
 
-  it("fails on whitespace-only stdin", () => {
+  it("fails on whitespace-only stdin", async () => {
     const before = readFileSync(configPath, "utf-8")
     const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "   \n")
     expect(status).toBe(2)
@@ -342,20 +343,20 @@ service = "other"
     expect(readFileSync(configPath, "utf-8")).toBe(before)
   })
 
-  it("says it is reading stdin even without a terminal", () => {
+  it("says it is reading stdin even without a terminal", async () => {
     const { stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY"], {}, "v\n")
     expect(stdout).toContain("Reading the value for API_KEY from stdin")
     expect(stdout).not.toContain("Ctrl-D")
   })
 
-  it("refuses several --edit keys without a terminal", () => {
+  it("refuses several --edit keys without a terminal", async () => {
     const { status, stdout } = run(["seal", "-c", configPath, "--edit", "API_KEY,OTHER_KEY"], {}, "canary-k7q2x\n")
     expect(status).toBe(2)
     expect(stdout).toContain("exactly one key (got 2)")
     expect(stdout).not.toContain("canary-k7q2x")
   })
 
-  it("refuses --stdin without --edit", () => {
+  it("refuses --stdin without --edit", async () => {
     const { status, stdout } = run(["seal", "-c", configPath, "--stdin"], {}, "value\n")
     expect(status).toBe(2)
     expect(stdout).toContain("--stdin needs --edit")
@@ -392,34 +393,34 @@ service = "api"
     )
   })
 
-  const booted = (): Readonly<Record<string, string>> =>
-    bootSafe({ configPath, inject: false }).fold(
+  const booted = async (): Promise<Readonly<Record<string, string>>> =>
+    (await bootSafe({ configPath, inject: false })).fold(
       (err) => expect.unreachable(`boot failed: ${err._tag}`),
       (result) => result.secrets,
     )
 
-  it("--reseal keeps a value's edge whitespace, and boot() returns it unchanged", () => {
+  it("--reseal keeps a value's edge whitespace, and boot() returns it unchanged", async () => {
     expect(run(["seal", "-c", configPath, "--edit", "ENVPKT_WS_PEM"], {}, `${PEM}\n`).status).toBe(0)
     expect(run(["seal", "-c", configPath, "--edit", "ENVPKT_WS_TOKEN"], {}, "  padded\t\n").status).toBe(0)
-    expect(booted()).toEqual({ ENVPKT_WS_PEM: PEM, ENVPKT_WS_TOKEN: "  padded\t" })
+    expect(await booted()).toEqual({ ENVPKT_WS_PEM: PEM, ENVPKT_WS_TOKEN: "  padded\t" })
 
     const before = readFileSync(configPath, "utf-8")
     expect(run(["seal", "-c", configPath, "--reseal"]).status).toBe(0)
     expect(readFileSync(configPath, "utf-8")).not.toBe(before)
-    expect(booted()).toEqual({ ENVPKT_WS_PEM: PEM, ENVPKT_WS_TOKEN: "  padded\t" })
+    expect(await booted()).toEqual({ ENVPKT_WS_PEM: PEM, ENVPKT_WS_TOKEN: "  padded\t" })
   })
 
-  it("seals from env vars, stripping one trailing newline, and boot() returns the value", () => {
+  it("seals from env vars, stripping one trailing newline, and boot() returns the value", async () => {
     const { status } = run(["seal", "-c", configPath], { ENVPKT_WS_PEM: `${PEM}\n`, ENVPKT_WS_TOKEN: "tok\n" })
     expect(status).toBe(0)
-    expect(booted()).toEqual({ ENVPKT_WS_PEM: PEM, ENVPKT_WS_TOKEN: "tok" })
+    expect(await booted()).toEqual({ ENVPKT_WS_PEM: PEM, ENVPKT_WS_TOKEN: "tok" })
   })
 
-  it("skips a whitespace-only env var instead of sealing it", () => {
+  it("skips a whitespace-only env var instead of sealing it", async () => {
     const { status, stdout } = run(["seal", "-c", configPath], { ENVPKT_WS_PEM: `${PEM}\n`, ENVPKT_WS_TOKEN: "   \n" })
     expect(status).toBe(0)
     expect(stdout).toContain("Skipped")
     expect(stdout).toContain("key(s) with no value: ENVPKT_WS_TOKEN")
-    expect(booted()).toEqual({ ENVPKT_WS_PEM: PEM })
+    expect(await booted()).toEqual({ ENVPKT_WS_PEM: PEM })
   })
 })

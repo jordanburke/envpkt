@@ -10,7 +10,7 @@ import { resolveKeyPath } from "../../core/keygen.js"
 import { resolveValues } from "../../core/resolve-values.js"
 import type { SecretMeta } from "../../core/schema.js"
 import { sealSecrets, unsealSecrets } from "../../core/seal.js"
-import { unwrapAgentKey } from "../../fnox/identity.js"
+import { describeIdentityError, unwrapAgentKey } from "../../fnox/identity.js"
 import { BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 import { validateOrExit } from "../write-gate.js"
 
@@ -323,16 +323,15 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
     process.exit(2)
   }
 
-  // Resolve identity key if key_file is configured
+  // Resolve identity key if key_file is configured (fnox takes one key: the first)
   const identityKey: Option<string> = Option(config.identity.key_file).flatMap((keyFile) => {
     const identityPath = resolve(configDir, expandPath(keyFile))
     return unwrapAgentKey(identityPath).fold(
       (err) => {
-        const msg = err._tag === "IdentityNotFound" ? `not found: ${err.path}` : err.message
-        console.error(`${YELLOW}Warning:${RESET} Could not unwrap agent key: ${msg}`)
+        console.error(`${YELLOW}Warning:${RESET} Could not unwrap agent key: ${describeIdentityError(err)}`)
         return Option.none<string>()
       },
-      (k) => Option(k),
+      (keys) => Option(keys[0]),
     )
   })
 
@@ -404,7 +403,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
       process.exit(2)
     }
 
-    const sealResult = sealSecrets(secretEntries, values, recipient)
+    const sealResult = await sealSecrets(secretEntries, values, recipient)
     sealResult.fold(
       (err) => {
         console.error(`${RED}Error:${RESET} Seal failed: ${err.message}`)
@@ -487,8 +486,16 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
         process.exit(2)
       }
 
+      const keys = unwrapAgentKey(identityPath).fold(
+        (err) => {
+          console.error(`${RED}Error:${RESET} ${describeIdentityError(err)}`)
+          process.exit(2)
+          return [] as ReadonlyArray<string> // unreachable
+        },
+        (k) => k,
+      )
       const sealedEntries = Object.fromEntries(alreadySealed.map((k) => [k, allSecretEntries[k]!]))
-      const decrypted = unsealSecrets(sealedEntries, identityPath).fold(
+      const decrypted = (await unsealSecrets(sealedEntries, keys)).fold(
         (err) => {
           console.error(`${RED}Error:${RESET} Failed to decrypt existing secrets: ${err.message}`)
           process.exit(2)
@@ -520,7 +527,7 @@ export const runSeal = async (options: SealOptions): Promise<void> => {
   }
 
   // Encrypt
-  const sealResult = sealSecrets(secretEntries, values, recipient)
+  const sealResult = await sealSecrets(secretEntries, values, recipient)
 
   sealResult.fold(
     (err) => {

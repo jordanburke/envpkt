@@ -1,5 +1,9 @@
+import { readFileSync } from "node:fs"
+import { createRequire } from "node:module"
+import { dirname, join } from "node:path"
+
 import { armor, Decrypter, Encrypter, generateX25519Identity, identityToRecipient } from "age-encryption"
-import { type Either, Left, Right, tryCatch, tryCatchAsync } from "functype"
+import { type Either, Left, type Option, Right, Try, tryCatch, tryCatchAsync } from "functype"
 
 import type { IdentityFileError, KeygenError, SealError } from "./types.js"
 
@@ -77,6 +81,14 @@ export const generateAgeKeypair = (): Promise<
     },
     (err): KeygenError => ({ _tag: "KeygenFailed", message: `age keygen failed: ${String(err)}` }),
   )
+
+/** The installed `age-encryption` version, for `envpkt doctor`. Its `exports` hide package.json, so read it beside the entry point. */
+export const ageEncryptionVersion = (): Option<string> =>
+  Try(() => {
+    const entry = createRequire(import.meta.url).resolve("age-encryption")
+    const pkg = JSON.parse(readFileSync(join(dirname(entry), "..", "package.json"), "utf-8")) as { version: string }
+    return pkg.version
+  }).toOption()
 
 const SECRET_KEY_PREFIX = "AGE-SECRET-KEY-"
 

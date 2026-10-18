@@ -68,8 +68,8 @@ program
   .option("-c, --config <path>", "Path to envpkt.toml (updates identity.recipient if found)")
   .option("-o, --output <path>", "Output path for identity file (default: ~/.envpkt/<project>-key.txt)")
   .option("--global", "Write key to the shared default path (~/.envpkt/age-key.txt) instead of a project-specific one")
-  .action((options) => {
-    runKeygen(options)
+  .action(async (options) => {
+    await runKeygen(options)
   })
 
 program
@@ -123,8 +123,8 @@ program
   .option("--secrets", "Show secret values from environment (masked by default)")
   .option("--plaintext", "Show secret values in plaintext (requires --secrets)")
   .option("--sort", "Display secrets and env entries in alphabetical order (no file mutation)")
-  .action((options) => {
-    runInspect(options)
+  .action(async (options) => {
+    await runInspect(options)
   })
 
 program
@@ -137,8 +137,8 @@ program
   .option("--no-check", "Skip the pre-flight audit")
   .option("--warn-only", "Warn on critical audit but do not abort")
   .option("--strict", "Abort on any non-healthy secret")
-  .action((args: string[], options) => {
-    runExec(args, options)
+  .action(async (args: string[], options) => {
+    await runExec(args, options)
   })
 
 program
@@ -147,8 +147,8 @@ program
   .argument("[server]", "MCP server name (default: $CLAUDE_CODE_MCP_SERVER_NAME)")
   .option("-c, --config <path>", "Path to envpkt.toml")
   .option("--profile <profile>", "fnox profile to use")
-  .action((server: string | undefined, options) => {
-    runHeaders(server, options)
+  .action(async (server: string | undefined, options) => {
+    await runHeaders(server, options)
   })
 
 program
@@ -216,8 +216,8 @@ program
   .option("--as <newKey>", "Copy under a different key name in the destination")
   .option("--force", "Overwrite the entry if it already exists in the destination")
   .option("--dry-run", "Preview the change without writing")
-  .action((key: string, options) => {
-    runCopy(key, options)
+  .action(async (key: string, options) => {
+    await runCopy(key, options)
   })
 
 program
@@ -235,8 +235,8 @@ program
   .command("doctor")
   .description("Check that age is installed and that the resolved config's sealed secrets can be decrypted")
   .option("-c, --config <path>", "Path to envpkt.toml")
-  .action((options) => {
-    runDoctor(options)
+  .action(async (options) => {
+    await runDoctor(options)
   })
 
 program
@@ -258,4 +258,4 @@ program
     runShellHook(shell, options)
   })
 
-program.parse()
+await program.parseAsync()

@@ -9,6 +9,7 @@ import { copyableSecretMeta, serializeEnvBlock, serializeSecretBlock } from "../
 import { ageEncrypt, unsealSecrets } from "../../core/seal.js"
 import { appendSection, replaceSection } from "../../core/toml-edit.js"
 import type { EnvpktConfig } from "../../core/types.js"
+import { describeIdentityError } from "../../fnox/identity.js"
 import { BOLD, CYAN, DIM, formatError, GREEN, RED, RESET, YELLOW } from "../output.js"
 import { previewIfValid, writeIfValid } from "../write-gate.js"
 
@@ -38,13 +39,13 @@ const todayIso = (): string => new Date().toISOString().split("T")[0]!
  * value are copied as metadata only (with a warning) — there's nothing to reseal.
  * Overwriting an existing destination entry keeps its `created`; a new entry gets today.
  */
-const sealedSecretBlock = (
+const sealedSecretBlock = async (
   key: string,
   destName: string,
   srcConfig: EnvpktConfig,
   srcPath: string,
   destConfig: EnvpktConfig,
-): string => {
+): Promise<string> => {
   const meta = srcConfig.secret![key]!
   const created = destConfig.secret?.[destName]?.created ?? todayIso()
 
@@ -53,28 +54,32 @@ const sealedSecretBlock = (
     return serializeSecretBlock(destName, copyableSecretMeta(meta, { created, encryptedValue: Option.none<string>() }))
   }
 
-  const identity = resolveSealIdentity(srcConfig, dirname(srcPath)).fold(
+  const sealKeys = orExit(
+    resolveSealIdentity(srcConfig, dirname(srcPath)),
+    (err) => `${RED}Error:${RESET} cannot unseal "${key}" from source — ${describeIdentityError(err)}`,
+    2,
+  )
+  const keys = sealKeys.fold(
     () => {
       console.error(`${RED}Error:${RESET} cannot unseal "${key}" from source — no age key found.`)
       describeSealKeySearch(srcConfig, dirname(srcPath)).forEach((line) => console.error(`${DIM}  ${line}${RESET}`))
       return process.exit(2)
     },
-    (id) => id,
+    (k) => k,
   )
 
   const recipient = destConfig.identity?.recipient
   if (recipient === undefined) {
-    identity.dispose()
     console.error(`${RED}Error:${RESET} destination needs identity.recipient to reseal "${destName}".`)
     console.error(`${DIM}  Run ${CYAN}envpkt keygen${DIM} in the destination, or add an [identity] recipient.${RESET}`)
     return process.exit(1)
   }
 
-  // unsealSecrets returns Either (never throws), so disposing the temp key right after
-  // is safe and clears it before the value is resealed/written.
-  const unsealed = unsealSecrets({ [key]: meta }, identity.path)
-  identity.dispose()
-  const values = orExit(unsealed, (err) => `${RED}Error:${RESET} decrypt failed for "${key}": ${err.message}`, 2)
+  const values = orExit(
+    await unsealSecrets({ [key]: meta }, keys),
+    (err) => `${RED}Error:${RESET} decrypt failed for "${key}": ${err.message}`,
+    2,
+  )
   const plaintext = values[key]
   if (plaintext === undefined) {
     console.error(`${RED}Error:${RESET} "${key}" produced no plaintext on unseal.`)
@@ -82,7 +87,7 @@ const sealedSecretBlock = (
   }
 
   const cipher = orExit(
-    ageEncrypt(plaintext, recipient),
+    await ageEncrypt(plaintext, recipient),
     (err) => `${RED}Error:${RESET} reseal failed for "${destName}": ${err.message}`,
     2,
   )
@@ -114,7 +119,7 @@ const writeBlock = (
  * (secret vs env) is detected from where the key lives in the source. `--from`/`--to`
  * default to the resolved config for the current directory.
  */
-export const runCopy = (key: string, options: CopyOptions): void => {
+export const runCopy = async (key: string, options: CopyOptions): Promise<void> => {
   const src = orExit(resolveConfigPath(options.from), formatError, 2)
   const dest = orExit(resolveConfigPath(options.to), formatError, 2)
   const srcConfig = orExit(loadConfig(src.path), formatError, 2)
@@ -151,7 +156,7 @@ export const runCopy = (key: string, options: CopyOptions): void => {
   }
 
   const block = inSecret
-    ? sealedSecretBlock(key, destName, srcConfig, src.path, destConfig)
+    ? await sealedSecretBlock(key, destName, srcConfig, src.path, destConfig)
     : serializeEnvBlock(destName, srcConfig.env![key]!)
 
   const renamed = destName !== key ? ` → ${BOLD}${destName}${RESET}` : ""

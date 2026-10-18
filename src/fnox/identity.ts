@@ -1,72 +1,52 @@
-import { execFileSync } from "node:child_process"
 import { existsSync, readFileSync } from "node:fs"
 
-import type { Either, Option } from "functype"
-import { Left, Right, Try } from "functype"
+import type { Either } from "functype"
+import { Left, Try } from "functype"
 
+import { parseIdentityFile } from "../core/age.js"
 import type { IdentityError } from "../core/types.js"
 
-/** Check if the age CLI is available on PATH */
-export const ageAvailable = (): boolean =>
-  Try(() => {
-    execFileSync("age", ["--version"], { stdio: "pipe" })
-    return true
-  }).fold(
-    () => false,
-    (v) => v,
-  )
-
-/** The age CLI version string (e.g. "v1.2.0"), or None if age isn't on PATH. */
-export const ageVersion = (): Option<string> =>
-  Try(() =>
-    execFileSync("age", ["--version"], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" }).trim(),
-  ).toOption()
-
-/** Platform-aware instructions for installing the age CLI. */
-export const ageInstallHint = (): string => {
-  const byPlatform: Record<string, string> = {
-    darwin: "brew install age",
-    linux: "apt install age   (or: apk add age · dnf install age · nix-env -iA nixpkgs.age)",
-    win32: "scoop install age   (or: winget install FiloSottile.age)",
-  }
-  const cmd = byPlatform[process.platform] ?? "see the install guide"
-  return `Install age:\n    ${cmd}\n    https://github.com/FiloSottile/age#installation`
-}
+/** The `source` name for the inline key in identity errors. */
+export const INLINE_KEY_SOURCE = "ENVPKT_AGE_KEY"
 
 /**
- * Extract the secret key from an age identity file (plain or encrypted).
- * - Plain identity files (from `age-keygen`) contain `AGE-SECRET-KEY-*` lines directly
- * - Encrypted identity files need `age --decrypt` to unwrap
+ * Read the age secret keys (`AGE-SECRET-KEY-…`) from identity text, such as a key file's content
+ * or the inline `ENVPKT_AGE_KEY`. `source` names it in errors.
  */
+export const parseIdentityKeys = (content: string, source: string): Either<IdentityError, ReadonlyArray<string>> =>
+  parseIdentityFile(content).mapLeft((err): IdentityError => ({ ...err, source }))
 
-export const unwrapAgentKey = (identityPath: string): Either<IdentityError, string> => {
+/**
+ * Read every secret key from a plain age identity file (as written by `envpkt keygen` or
+ * `age-keygen`). Passphrase-protected, plugin and SSH key files are rejected with a typed error.
+ */
+export const unwrapAgentKey = (identityPath: string): Either<IdentityError, ReadonlyArray<string>> => {
   if (!existsSync(identityPath)) {
     return Left({ _tag: "IdentityNotFound", path: identityPath } as const)
   }
 
-  return Try(() => readFileSync(identityPath, "utf-8")).fold<Either<IdentityError, string>>(
+  return Try(() => readFileSync(identityPath, "utf-8")).fold<Either<IdentityError, ReadonlyArray<string>>>(
     (err) => Left({ _tag: "DecryptFailed", message: `Failed to read identity file: ${err}` } as const),
-    (content) => {
-      // Plain age identity file: extract the AGE-SECRET-KEY-* line directly
-      const secretKeyLine = content.split("\n").find((l) => l.startsWith("AGE-SECRET-KEY-"))
-      if (secretKeyLine) {
-        return Right(secretKeyLine.trim())
-      }
-
-      // Encrypted identity file: decrypt with age
-      if (!ageAvailable()) {
-        return Left({ _tag: "AgeNotFound", message: "age CLI not found on PATH" } as const)
-      }
-
-      return Try(() =>
-        execFileSync("age", ["--decrypt", identityPath], {
-          stdio: ["pipe", "pipe", "pipe"],
-          encoding: "utf-8",
-        }),
-      ).fold<Either<IdentityError, string>>(
-        (err) => Left({ _tag: "DecryptFailed", message: `age decrypt failed: ${err}` } as const),
-        (output) => Right(output.trim()),
-      )
-    },
+    (content) => parseIdentityKeys(content, identityPath),
   )
+}
+
+const UNSUPPORTED_KIND = { plugin: "an age plugin key", ssh: "an SSH key", unknown: "not an age secret key" } as const
+
+/** Explain an identity error. Never includes key material. */
+export const describeIdentityError = (err: IdentityError): string => {
+  switch (err._tag) {
+    case "DecryptFailed":
+      return err.message
+    case "IdentityNotFound":
+      return `Identity file not found: ${err.path}`
+    case "NoIdentityKey":
+      return `${err.source} has no age secret key (AGE-SECRET-KEY-…)`
+    case "PassphraseProtectedIdentity":
+      return err.source === INLINE_KEY_SOURCE
+        ? `${INLINE_KEY_SOURCE} holds a passphrase-protected key, which envpkt can't read. Set it to the plain key file's content (its AGE-SECRET-KEY-… line).`
+        : `${err.source} is a passphrase-protected key file, which envpkt can't read. Unwrap it once with \`age -d -o <plain-key-file> ${err.source}\` and point envpkt at the plain file.`
+    case "UnsupportedIdentity":
+      return `${err.source} line ${err.line} is ${UNSUPPORTED_KIND[err.kind]}; envpkt reads plain age secret keys (AGE-SECRET-KEY-…) only`
+  }
 }

@@ -10,6 +10,7 @@ import { maskValue } from "../../core/format.js"
 import { resolveKeyPath } from "../../core/keygen.js"
 import { unsealSecrets } from "../../core/seal.js"
 import type { EnvpktConfig, ResolveResult, SecretMeta } from "../../core/types.js"
+import { describeIdentityError, unwrapAgentKey } from "../../fnox/identity.js"
 import { BLUE, BOLD, CYAN, DIM, formatConfigSource, formatError, GREEN, MAGENTA, RESET, YELLOW } from "../output.js"
 
 type InspectOptions = {
@@ -146,89 +147,64 @@ const printConfig = (config: EnvpktConfig, path: string, resolveResult?: Resolve
   }
 }
 
-export const runInspect = (options: InspectOptions): void => {
-  const configPath = resolveConfigPath(options.config)
+/** Print a formatted error and exit 2. */
+const exitWithError = (err: Parameters<typeof formatError>[0]): never => {
+  console.error(formatError(err))
+  return process.exit(2)
+}
 
-  configPath.fold(
-    (err) => {
-      console.error(formatError(err))
-      process.exit(2)
-    },
-    ({ path, source }) => {
-      const sourceMsg = formatConfigSource(path, source)
-      if (sourceMsg) console.error(sourceMsg)
-      const result = loadConfig(path)
-
-      result.fold(
-        (err) => {
-          console.error(formatError(err))
-          process.exit(2)
-        },
-        (config) => {
-          const configDir = dirname(path)
-          const resolved = resolveConfig(config, configDir)
-
-          resolved.fold(
-            (err) => {
-              console.error(formatError(err))
-              process.exit(2)
-            },
-            (resolveResult) => {
-              const showResolved = options.resolved ?? !!resolveResult.catalogPath
-              const showConfig = showResolved ? resolveResult.config : config
-
-              if (options.format === "json") {
-                console.log(JSON.stringify(showConfig, null, 2))
-                return
-              }
-
-              const showSecrets = showConfig.secret ?? {}
-              const printOpts: PrintOptions | undefined = options.secrets
-                ? (() => {
-                    // Decrypt sealed values from the toml
-                    const sealedEntries = Object.fromEntries(
-                      Object.entries(showSecrets).filter(([, meta]) => meta.encrypted_value),
-                    )
-
-                    const secrets: Record<string, string> =
-                      Object.keys(sealedEntries).length > 0
-                        ? (() => {
-                            const identityPath = showConfig.identity?.key_file
-                              ? resolve(configDir, expandPath(showConfig.identity.key_file))
-                              : (() => {
-                                  const defaultPath = resolveKeyPath()
-                                  return existsSync(defaultPath) ? defaultPath : undefined
-                                })()
-
-                            if (!identityPath) return {}
-
-                            return unsealSecrets(sealedEntries, identityPath).fold(
-                              (err) => {
-                                console.error(
-                                  `${YELLOW}Warning:${RESET} Could not decrypt sealed secrets: ${err.message}`,
-                                )
-                                return {} as Record<string, string>
-                              },
-                              (d) => d,
-                            )
-                          })()
-                        : {}
-
-                    return {
-                      secrets,
-                      secretDisplay: options.plaintext ? "plaintext" : "encrypted",
-                    } satisfies PrintOptions
-                  })()
-                : undefined
-
-              printConfig(showConfig, path, showResolved ? resolveResult : undefined, {
-                ...(printOpts ?? {}),
-                sort: options.sort,
-              })
-            },
-          )
-        },
-      )
-    },
+/** Decrypt sealed values for `--secrets`. A failure is a warning: inspect still prints the rest. */
+const decryptForDisplay = async (config: EnvpktConfig, configDir: string): Promise<Record<string, string>> => {
+  const sealedEntries = Object.fromEntries(
+    Object.entries(config.secret ?? {}).filter(([, meta]) => meta.encrypted_value),
   )
+  if (Object.keys(sealedEntries).length === 0) return {}
+
+  const identityPath = config.identity?.key_file
+    ? resolve(configDir, expandPath(config.identity.key_file))
+    : (() => {
+        const defaultPath = resolveKeyPath()
+        return existsSync(defaultPath) ? defaultPath : undefined
+      })()
+  if (!identityPath) return {}
+
+  const warnUndecrypted = (message: string): Record<string, string> => {
+    console.error(`${YELLOW}Warning:${RESET} Could not decrypt sealed secrets: ${message}`)
+    return {}
+  }
+  return unwrapAgentKey(identityPath).fold(
+    (err) => Promise.resolve(warnUndecrypted(describeIdentityError(err))),
+    async (keys) =>
+      (await unsealSecrets(sealedEntries, keys)).fold(
+        (err) => warnUndecrypted(err.message),
+        (d) => d,
+      ),
+  )
+}
+
+export const runInspect = async (options: InspectOptions): Promise<void> => {
+  const { path, source } = resolveConfigPath(options.config).fold(exitWithError, (r) => r)
+  const sourceMsg = formatConfigSource(path, source)
+  if (sourceMsg) console.error(sourceMsg)
+
+  const config = loadConfig(path).fold(exitWithError, (c) => c)
+  const configDir = dirname(path)
+  const resolveResult = resolveConfig(config, configDir).fold(exitWithError, (r) => r)
+
+  const showResolved = options.resolved ?? !!resolveResult.catalogPath
+  const showConfig = showResolved ? resolveResult.config : config
+
+  if (options.format === "json") {
+    console.log(JSON.stringify(showConfig, null, 2))
+    return
+  }
+
+  const secretOpts: PrintOptions = options.secrets
+    ? {
+        secrets: await decryptForDisplay(showConfig, configDir),
+        secretDisplay: options.plaintext ? "plaintext" : "encrypted",
+      }
+    : {}
+
+  printConfig(showConfig, path, showResolved ? resolveResult : undefined, { ...secretOpts, sort: options.sort })
 }

@@ -266,9 +266,10 @@ export type BootError =
   | IdentityError
 
 export type IdentityError =
-  | { readonly _tag: "AgeNotFound"; readonly message: string }
   | { readonly _tag: "DecryptFailed"; readonly message: string }
   | { readonly _tag: "IdentityNotFound"; readonly path: string }
+  // A key was found but can't be used. `source` is the key file's path, or ENVPKT_AGE_KEY.
+  | (IdentityFileError & { readonly source: string })
 
 /** Why an age identity (key) file can't be used for in-process decryption. Never carries key material. */
 export type IdentityFileError =
@@ -277,7 +278,6 @@ export type IdentityFileError =
   | { readonly _tag: "UnsupportedIdentity"; readonly kind: "plugin" | "ssh" | "unknown"; readonly line: number }
 
 export type SealError =
-  | { readonly _tag: "AgeNotFound"; readonly message: string }
   | { readonly _tag: "EncryptFailed"; readonly key: string; readonly message: string }
   | { readonly _tag: "DecryptFailed"; readonly key: string; readonly message: string }
   | { readonly _tag: "NoRecipient"; readonly message: string }
@@ -285,7 +285,6 @@ export type SealError =
 // --- Keygen types ---
 
 export type KeygenError =
-  | { readonly _tag: "AgeNotFound"; readonly message: string }
   | { readonly _tag: "KeygenFailed"; readonly message: string }
   | { readonly _tag: "KeyExists"; readonly path: string }
   | { readonly _tag: "WriteError"; readonly message: string }

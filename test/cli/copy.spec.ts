@@ -8,6 +8,7 @@ import { parse } from "smol-toml"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { ageEncrypt, unsealSecrets } from "../../src/core/seal.js"
+import { unwrapAgentKey } from "../../src/fnox/identity.js"
 import type { SecretMeta } from "../../src/core/types.js"
 
 const __testDir = dirname(fileURLToPath(import.meta.url))
@@ -64,7 +65,7 @@ const parseSecret = (path: string, key: string): SecretMeta =>
   (parse(readFileSync(path, "utf-8")) as { secret: Record<string, SecretMeta> }).secret[key]!
 
 describe("envpkt copy", () => {
-  it("copies an env entry between configs (no crypto)", () => {
+  it("copies an env entry between configs (no crypto)", async () => {
     const a = write("a.toml", `version = 1\n\n[env.PORT]\nvalue = "3000"\npurpose = "app port"\n`)
     const b = write("b.toml", `version = 1\n`)
     const { status } = cli(["copy", "PORT", "--from", a, "--to", b])
@@ -74,7 +75,7 @@ describe("envpkt copy", () => {
     expect(parsed.env.PORT!.purpose).toBe("app port")
   })
 
-  it("renames with --as", () => {
+  it("renames with --as", async () => {
     const a = write("a.toml", `version = 1\n\n[env.PORT]\nvalue = "3000"\n`)
     const b = write("b.toml", `version = 1\n`)
     const { status } = cli(["copy", "PORT", "--from", a, "--to", b, "--as", "PORT2"])
@@ -83,7 +84,7 @@ describe("envpkt copy", () => {
     expect(parsed.env.PORT2!.value).toBe("3000")
   })
 
-  it("errors when the entry already exists in the destination without --force", () => {
+  it("errors when the entry already exists in the destination without --force", async () => {
     const a = write("a.toml", `version = 1\n\n[env.PORT]\nvalue = "3000"\n`)
     const b = write("b.toml", `version = 1\n\n[env.PORT]\nvalue = "9999"\n`)
     const { status, stderr } = cli(["copy", "PORT", "--from", a, "--to", b])
@@ -91,7 +92,7 @@ describe("envpkt copy", () => {
     expect(stderr).toContain("already exists")
   })
 
-  it("overwrites an existing entry with --force", () => {
+  it("overwrites an existing entry with --force", async () => {
     const a = write("a.toml", `version = 1\n\n[env.PORT]\nvalue = "3000"\n`)
     const b = write("b.toml", `version = 1\n\n[env.PORT]\nvalue = "9999"\n`)
     const { status } = cli(["copy", "PORT", "--from", a, "--to", b, "--force"])
@@ -100,7 +101,7 @@ describe("envpkt copy", () => {
     expect(parsed.env.PORT!.value).toBe("3000")
   })
 
-  it("--force replaces an existing entry in place, leaving every other line alone", () => {
+  it("--force replaces an existing entry in place, leaving every other line alone", async () => {
     const a = write("a.toml", `version = 1\n\n[env.PORT]\nvalue = "3000"\n`)
     const before = `version = 1
 
@@ -119,7 +120,7 @@ value = "b"
     expect(readFileSync(b, "utf-8")).toBe(before.replace(`value = "9999"`, `value = "3000"`))
   })
 
-  it("--force keeps the destination's created on an existing secret", () => {
+  it("--force keeps the destination's created on an existing secret", async () => {
     const a = write(
       "a.toml",
       `version = 1\n\n[secret.TOKEN]\nservice = "todoist"\npurpose = "oauth"\ncreated = "2026-01-01"\n`,
@@ -144,7 +145,7 @@ service = "b"
     )
   }, 60_000)
 
-  it("stamps today's created on a secret new to the destination", () => {
+  it("stamps today's created on a secret new to the destination", async () => {
     const a = write("a.toml", `version = 1\n\n[secret.TOKEN]\nservice = "todoist"\ncreated = "2026-01-01"\n`)
     const b = write("b.toml", `version = 1\n`)
     const { status } = cli(["copy", "TOKEN", "--from", a, "--to", b])
@@ -152,7 +153,7 @@ service = "b"
     expect(parseSecret(b, "TOKEN").created).toBe(new Date().toISOString().split("T")[0])
   }, 60_000)
 
-  it("errors when the key is not found in the source", () => {
+  it("errors when the key is not found in the source", async () => {
     const a = write("a.toml", `version = 1\n\n[env.PORT]\nvalue = "3000"\n`)
     const b = write("b.toml", `version = 1\n`)
     const { status, stderr } = cli(["copy", "MISSING", "--from", a, "--to", b])
@@ -160,7 +161,7 @@ service = "b"
     expect(stderr).toContain("not found")
   })
 
-  it("does not write on --dry-run", () => {
+  it("does not write on --dry-run", async () => {
     const a = write("a.toml", `version = 1\n\n[env.PORT]\nvalue = "3000"\n`)
     const b = write("b.toml", `version = 1\n`)
     const { status } = cli(["copy", "PORT", "--from", a, "--to", b, "--dry-run"])
@@ -170,7 +171,7 @@ service = "b"
 
   it.skipIf(!ageInstalled)(
     "unseals from the source and reseals for the destination recipient",
-    () => {
+    async () => {
       const aKey = join(tmpDir, "a-key.txt")
       const bKey = join(tmpDir, "b-key.txt")
       const aRec = ageKeygen(aKey)
@@ -195,7 +196,7 @@ service = "b"
       // The resealed value must decrypt with the DESTINATION's key, not the source's.
       const destMeta = parseSecret(b, "API_KEY")
       expect(destMeta.encrypted_value).toBeTruthy()
-      const decrypted = unsealSecrets({ API_KEY: destMeta }, bKey)
+      const decrypted = await unsealSecrets({ API_KEY: destMeta }, unwrapAgentKey(bKey).orThrow())
       decrypted.fold(
         (err) => expect.fail(`expected decrypt to succeed, got ${err.message}`),
         (values) => expect(values.API_KEY).toBe("sk-test-123"),
@@ -206,7 +207,7 @@ service = "b"
 
   it.skipIf(!ageInstalled)(
     "keeps a sealed value's edge whitespace when it reseals for the destination",
-    () => {
+    async () => {
       const aKey = join(tmpDir, "a-key.txt")
       const bKey = join(tmpDir, "b-key.txt")
       const aRec = ageKeygen(aKey)
@@ -215,7 +216,7 @@ service = "b"
       // Sealed by hand, as `age -r` would: the PEM keeps its final newline.
       const pem =
         "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEA\n-----END PRIVATE KEY-----\n"
-      const ciphertext = ageEncrypt(pem, aRec).orThrow()
+      const ciphertext = (await ageEncrypt(pem, aRec)).orThrow()
       const a = write(
         "a.toml",
         `version = 1\n\n[identity]\nname = "src"\nrecipient = "${aRec}"\nkey_file = "${aKey}"\n\n[secret.TLS_KEY]\nservice = "tls"\ncreated = "2025-01-01"\nencrypted_value = """\n${ciphertext}\n"""\n`,
@@ -226,12 +227,13 @@ service = "b"
       )
       expect(cli(["copy", "TLS_KEY", "--from", a, "--to", b]).status).toBe(0)
 
-      expect(unsealSecrets({ TLS_KEY: parseSecret(b, "TLS_KEY") }, bKey).orThrow()).toEqual({ TLS_KEY: pem })
+      const unsealed = await unsealSecrets({ TLS_KEY: parseSecret(b, "TLS_KEY") }, unwrapAgentKey(bKey).orThrow())
+      expect(unsealed.orThrow()).toEqual({ TLS_KEY: pem })
     },
     60_000,
   )
 
-  it("copies metadata only (no value) for a secret with no sealed value", () => {
+  it("copies metadata only (no value) for a secret with no sealed value", async () => {
     const a = write("a.toml", `version = 1\n\n[secret.API_KEY]\nservice = "stripe"\ncreated = "2025-01-01"\n`)
     const b = write("b.toml", `version = 1\n`)
     const { status } = cli(["copy", "API_KEY", "--from", a, "--to", b])

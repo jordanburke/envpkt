@@ -1,7 +1,8 @@
+import { ageEncryptionVersion } from "../../core/age.js"
 import { bootSafe } from "../../core/boot.js"
 import { resolveConfigPath } from "../../core/config.js"
 import type { BootError } from "../../core/types.js"
-import { ageInstallHint, ageVersion } from "../../fnox/identity.js"
+import { describeIdentityError } from "../../fnox/identity.js"
 import { BOLD, CYAN, DIM, GREEN, RED, RESET, YELLOW } from "../output.js"
 
 type DoctorOptions = {
@@ -13,12 +14,18 @@ const warn = (label: string, detail: string): void => console.log(`  ${YELLOW}�
 const bad = (label: string, detail: string): void => console.log(`  ${RED}✗${RESET} ${label}  ${detail}`)
 
 /** Print the resolution/key check, returning whether it passed. */
-const reportResolution = (configPath: string): boolean =>
-  bootSafe({ configPath, inject: false, warnOnly: true }).fold(
+const reportResolution = async (configPath: string): Promise<boolean> =>
+  (await bootSafe({ configPath, inject: false, warnOnly: true })).fold(
     (err: BootError) => {
       if (err._tag === "SealKeyUnavailable") {
         bad("key   ", `${err.sealedKeys.length} sealed secret(s) but no decryption key`)
         err.searched.forEach((line) => console.log(`${DIM}        ${line}${RESET}`))
+      } else if (
+        err._tag === "NoIdentityKey" ||
+        err._tag === "PassphraseProtectedIdentity" ||
+        err._tag === "UnsupportedIdentity"
+      ) {
+        bad("key   ", describeIdentityError(err))
       } else {
         bad("config", `${err._tag}`)
       }
@@ -34,28 +41,19 @@ const reportResolution = (configPath: string): boolean =>
   )
 
 /**
- * One-shot environment check: is age installed, is a config resolvable, and do its sealed
- * secrets decrypt with an available key? Read-only; exits non-zero if any check fails.
+ * One-shot environment check: is a config resolvable, and do its sealed secrets decrypt with an
+ * available key? Also reports the built-in age version. Read-only; exits non-zero if a check fails.
  */
-export const runDoctor = (options: DoctorOptions): void => {
+export const runDoctor = async (options: DoctorOptions): Promise<void> => {
   console.log(`${BOLD}envpkt doctor${RESET}\n`)
 
-  const ageOk = ageVersion().fold(
-    () => {
-      bad("age   ", "not found on PATH")
-      console.log(`${DIM}        ${ageInstallHint().split("\n").join("\n        ")}${RESET}`)
-      return false
-    },
-    (version) => {
-      ok("age   ", version)
-      return true
-    },
-  )
+  // age is built in (age-encryption), so there is nothing to install; report which version.
+  ok("age   ", `built in (age-encryption ${ageEncryptionVersion().orElse("version unknown")})`)
 
-  const resolveOk = resolveConfigPath(options.config).fold(
+  const resolveOk = await resolveConfigPath(options.config).fold(
     () => {
       warn("config", "no envpkt.toml found for this directory")
-      return true // not an error — envpkt works without a config present
+      return Promise.resolve(true) // not an error — envpkt works without a config present
     },
     ({ path }) => {
       ok("config", path)
@@ -64,12 +62,10 @@ export const runDoctor = (options: DoctorOptions): void => {
   )
 
   console.log("")
-  if (ageOk && resolveOk) {
+  if (resolveOk) {
     console.log(`${GREEN}✓ no issues${RESET}`)
   } else {
-    console.log(
-      `${RED}✗ ${[!ageOk, !resolveOk].filter(Boolean).length} issue(s) found${RESET} ${CYAN}(see above)${RESET}`,
-    )
+    console.log(`${RED}✗ issue found${RESET} ${CYAN}(see above)${RESET}`)
     process.exit(1)
   }
 }

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process"
 import { describe, expect, it, beforeEach, afterEach } from "vitest"
-import { mkdirSync, mkdtempSync, readdirSync, writeFileSync, rmSync } from "node:fs"
+import { chmodSync, mkdirSync, mkdtempSync, writeFileSync, rmSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
@@ -33,9 +33,9 @@ const writeConfig = (content: string): string => {
 }
 
 describe("bootSafe", () => {
-  it("returns Right for valid config", () => {
+  it("returns Right for valid config", async () => {
     const configPath = writeConfig(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -47,8 +47,8 @@ describe("bootSafe", () => {
     )
   })
 
-  it("returns Left for missing config", () => {
-    const result = bootSafe({ configPath: "/nonexistent/envpkt.toml", inject: false })
+  it("returns Left for missing config", async () => {
+    const result = await bootSafe({ configPath: "/nonexistent/envpkt.toml", inject: false })
 
     result.fold(
       (err) => expect(err._tag).toBe("FileNotFound"),
@@ -56,9 +56,9 @@ describe("bootSafe", () => {
     )
   })
 
-  it("returns Left for invalid config", () => {
+  it("returns Left for invalid config", async () => {
     const configPath = writeConfig("not valid toml [[[")
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
 
     result.fold(
       (err) => expect(err._tag).toBe("ParseError"),
@@ -66,11 +66,11 @@ describe("bootSafe", () => {
     )
   })
 
-  it("returns Left AuditFailed when failOnExpired + expired secrets", () => {
+  it("returns Left AuditFailed when failOnExpired + expired secrets", async () => {
     const configPath = writeConfig(
       `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
     )
-    const result = bootSafe({ configPath, inject: false, failOnExpired: true })
+    const result = await bootSafe({ configPath, inject: false, failOnExpired: true })
 
     result.fold(
       (err) => {
@@ -83,11 +83,11 @@ describe("bootSafe", () => {
     )
   })
 
-  it("succeeds with failOnExpired=false even with expired secrets", () => {
+  it("succeeds with failOnExpired=false even with expired secrets", async () => {
     const configPath = writeConfig(
       `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
     )
-    const result = bootSafe({ configPath, inject: false, failOnExpired: false })
+    const result = await bootSafe({ configPath, inject: false, failOnExpired: false })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -97,11 +97,11 @@ describe("bootSafe", () => {
     )
   })
 
-  it("succeeds with warnOnly=true even with expired secrets", () => {
+  it("succeeds with warnOnly=true even with expired secrets", async () => {
     const configPath = writeConfig(
       `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
     )
-    const result = bootSafe({ configPath, inject: false, warnOnly: true })
+    const result = await bootSafe({ configPath, inject: false, warnOnly: true })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -112,13 +112,13 @@ describe("bootSafe", () => {
     )
   })
 
-  it("injects secrets into process.env when inject=true", () => {
+  it("injects secrets into process.env when inject=true", async () => {
     const configPath = writeConfig(`version = 1\n[secret.BOOT_TEST_KEY]\nservice = "svc"\n`)
 
     // Clean up env before test
     delete process.env["BOOT_TEST_KEY"]
 
-    const result = bootSafe({ configPath, inject: true })
+    const result = await bootSafe({ configPath, inject: true })
 
     result.fold(
       () => {
@@ -134,20 +134,20 @@ describe("bootSafe", () => {
     delete process.env["BOOT_TEST_KEY"]
   })
 
-  it("does not inject when inject=false", () => {
+  it("does not inject when inject=false", async () => {
     const configPath = writeConfig(`version = 1\n[secret.NO_INJECT_KEY]\nservice = "svc"\n`)
 
     delete process.env["NO_INJECT_KEY"]
 
-    bootSafe({ configPath, inject: false })
+    await bootSafe({ configPath, inject: false })
 
     // Key should not be in process.env
     expect(process.env["NO_INJECT_KEY"]).toBeUndefined()
   })
 
-  it("reports fnox unavailable as warning", () => {
+  it("reports fnox unavailable as warning", async () => {
     const configPath = writeConfig(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -160,12 +160,12 @@ describe("bootSafe", () => {
 })
 
 describe("bootSafe with env defaults", () => {
-  it("applies env defaults when env var is not set", () => {
+  it("applies env defaults when env var is not set", async () => {
     const configPath = writeConfig(`version = 1\n[env.MY_PORT]\nvalue = "3000"\npurpose = "App port"\n`)
 
     delete process.env["MY_PORT"]
 
-    const result = bootSafe({ configPath, inject: true })
+    const result = await bootSafe({ configPath, inject: true })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -179,12 +179,12 @@ describe("bootSafe with env defaults", () => {
     delete process.env["MY_PORT"]
   })
 
-  it("does not override existing env var", () => {
+  it("does not override existing env var", async () => {
     const configPath = writeConfig(`version = 1\n[env.MY_PORT]\nvalue = "3000"\n`)
 
     process.env["MY_PORT"] = "8080"
 
-    const result = bootSafe({ configPath, inject: true })
+    const result = await bootSafe({ configPath, inject: true })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -198,12 +198,12 @@ describe("bootSafe with env defaults", () => {
     delete process.env["MY_PORT"]
   })
 
-  it("does not inject env defaults when inject=false", () => {
+  it("does not inject env defaults when inject=false", async () => {
     const configPath = writeConfig(`version = 1\n[env.NO_INJECT_PORT]\nvalue = "4000"\n`)
 
     delete process.env["NO_INJECT_PORT"]
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -214,7 +214,7 @@ describe("bootSafe with env defaults", () => {
     )
   })
 
-  it("secrets always override env defaults", () => {
+  it("secrets always override env defaults", async () => {
     const configPath = writeConfig(
       [`version = 1`, `[env.SHARED_KEY]`, `value = "default-value"`, `[secret.SHARED_KEY]`, `service = "svc"`].join(
         "\n",
@@ -223,7 +223,7 @@ describe("bootSafe with env defaults", () => {
 
     delete process.env["SHARED_KEY"]
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -238,39 +238,35 @@ describe("bootSafe with env defaults", () => {
 })
 
 describe("boot", () => {
-  it("returns BootResult for valid config", () => {
+  it("returns BootResult for valid config", async () => {
     const configPath = writeConfig(`version = 1\n[secret.KEY]\nservice = "svc"\n`)
-    const result = boot({ configPath, inject: false })
+    const result = await boot({ configPath, inject: false })
 
     expect(result.audit.status).toBe("healthy")
   })
 
-  it("throws EnvpktBootError for missing config", () => {
-    expect(() => boot({ configPath: "/nonexistent/envpkt.toml", inject: false })).toThrow(EnvpktBootError)
+  it("throws EnvpktBootError for missing config", async () => {
+    await expect(boot({ configPath: "/nonexistent/envpkt.toml", inject: false })).rejects.toThrow(EnvpktBootError)
   })
 
-  it("throws EnvpktBootError for expired secrets with failOnExpired", () => {
+  it("throws EnvpktBootError for expired secrets with failOnExpired", async () => {
     const configPath = writeConfig(
       `version = 1\n[secret.OLD]\nservice = "x"\ncreated = "2020-01-01"\nexpires = "2021-01-01"\n`,
     )
-    expect(() => boot({ configPath, inject: false, failOnExpired: true })).toThrow(EnvpktBootError)
-
-    try {
-      boot({ configPath, inject: false, failOnExpired: true })
-    } catch (err) {
-      const bootErr = err as EnvpktBootError
-      expect(bootErr.error._tag).toBe("AuditFailed")
-    }
+    await expect(boot({ configPath, inject: false, failOnExpired: true })).rejects.toThrow(EnvpktBootError)
+    await expect(boot({ configPath, inject: false, failOnExpired: true })).rejects.toMatchObject({
+      error: { _tag: "AuditFailed" },
+    })
   })
 })
 
 describe("boot with catalog", () => {
-  it("resolves catalog before audit", () => {
+  it("resolves catalog before audit", async () => {
     writeFileSync(join(tmpDir, "catalog.toml"), `version = 1\n[secret.DB]\nservice = "postgres"\n`)
     const configPath = writeConfig(
       `version = 1\ncatalog = "catalog.toml"\n[identity]\nname = "test"\nsecrets = ["DB"]\n`,
     )
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -280,11 +276,11 @@ describe("boot with catalog", () => {
     )
   })
 
-  it("returns error for invalid catalog path", () => {
+  it("returns error for invalid catalog path", async () => {
     const configPath = writeConfig(
       `version = 1\ncatalog = "nonexistent.toml"\n[identity]\nname = "test"\nsecrets = ["DB"]\n`,
     )
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
 
     result.fold(
       (err) => expect(err._tag).toBe("CatalogNotFound"),
@@ -294,7 +290,7 @@ describe("boot with catalog", () => {
 })
 
 describe("boot with sealed values", () => {
-  it.skipIf(!ageInstalled)("decrypts sealed values during boot", () => {
+  it.skipIf(!ageInstalled)("decrypts sealed values during boot", async () => {
     // Generate a test keypair
     const keygenOutput = execFileSync("age-keygen", [], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -308,7 +304,7 @@ describe("boot with sealed values", () => {
     writeFileSync(identityPath, keygenOutput)
 
     // Encrypt a test value
-    const encrypted = ageEncrypt("my-secret-value", recipient)
+    const encrypted = await ageEncrypt("my-secret-value", recipient)
     const ciphertext = encrypted.fold(
       () => "",
       (v) => v,
@@ -333,7 +329,7 @@ describe("boot with sealed values", () => {
 
     delete process.env["SEALED_KEY"]
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -346,7 +342,7 @@ describe("boot with sealed values", () => {
     delete process.env["SEALED_KEY"]
   })
 
-  it.skipIf(!ageInstalled)("decrypts sealed values from an inline ENVPKT_AGE_KEY with no key_file", () => {
+  it.skipIf(!ageInstalled)("decrypts sealed values from an inline ENVPKT_AGE_KEY with no key_file", async () => {
     const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
     const recipient = keygenOutput
       .split("\n")
@@ -358,7 +354,7 @@ describe("boot with sealed values", () => {
       .find((l) => l.startsWith("AGE-SECRET-KEY-"))!
       .trim()
 
-    const ciphertext = ageEncrypt("inline-ci-value", recipient).fold(
+    const ciphertext = (await ageEncrypt("inline-ci-value", recipient)).fold(
       () => "",
       (v) => v,
     )
@@ -384,10 +380,14 @@ describe("boot with sealed values", () => {
     process.env["ENVPKT_AGE_KEY"] = secretKey
     delete process.env["CI_KEY"]
 
-    const tmpBefore = readdirSync(tmpdir()).filter((d) => d.startsWith("envpkt-age-")).length
+    // Point os.tmpdir() at a read-only directory: writing the key to a temp file would fail boot.
+    const isolatedTmp = mkdtempSync(join(tmpDir, "tmp-"))
+    chmodSync(isolatedTmp, 0o500)
+    const origTmp = process.env["TMPDIR"]
+    process.env["TMPDIR"] = isolatedTmp
 
     try {
-      const result = bootSafe({ configPath, inject: false })
+      const result = await bootSafe({ configPath, inject: false })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         (boot) => {
@@ -395,10 +395,9 @@ describe("boot with sealed values", () => {
           expect(boot.injected).toContain("CI_KEY")
         },
       )
-      // temp identity file must be cleaned up
-      const tmpAfter = readdirSync(tmpdir()).filter((d) => d.startsWith("envpkt-age-")).length
-      expect(tmpAfter).toBe(tmpBefore)
     } finally {
+      if (origTmp === undefined) delete process.env["TMPDIR"]
+      else process.env["TMPDIR"] = origTmp
       if (origKey === undefined) delete process.env["ENVPKT_AGE_KEY"]
       else process.env["ENVPKT_AGE_KEY"] = origKey
       if (origFile === undefined) delete process.env["ENVPKT_AGE_KEY_FILE"]
@@ -407,7 +406,7 @@ describe("boot with sealed values", () => {
     }
   })
 
-  it.skipIf(!ageInstalled)("decrypts sealed values using default key path when key_file is unset", () => {
+  it.skipIf(!ageInstalled)("decrypts sealed values using default key path when key_file is unset", async () => {
     const keygenOutput = execFileSync("age-keygen", [], {
       stdio: ["pipe", "pipe", "pipe"],
       encoding: "utf-8",
@@ -419,7 +418,7 @@ describe("boot with sealed values", () => {
     const identityPath = join(tmpDir, "default-key.txt")
     writeFileSync(identityPath, keygenOutput)
 
-    const encrypted = ageEncrypt("fallback-secret", recipient)
+    const encrypted = await ageEncrypt("fallback-secret", recipient)
     const ciphertext = encrypted.fold(
       () => "",
       (v) => v,
@@ -446,7 +445,7 @@ describe("boot with sealed values", () => {
     delete process.env["FALLBACK_KEY"]
 
     try {
-      const result = bootSafe({ configPath, inject: false })
+      const result = await bootSafe({ configPath, inject: false })
 
       result.fold(
         (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -465,7 +464,7 @@ describe("boot with sealed values", () => {
     }
   })
 
-  it.skipIf(!ageInstalled)("falls back to fnox for keys without encrypted_value", () => {
+  it.skipIf(!ageInstalled)("falls back to fnox for keys without encrypted_value", async () => {
     const keygenOutput = execFileSync("age-keygen", [], {
       stdio: ["pipe", "pipe", "pipe"],
       encoding: "utf-8",
@@ -477,7 +476,7 @@ describe("boot with sealed values", () => {
     writeFileSync(identityPath, keygenOutput)
 
     // Encrypt one value, leave other unsealed
-    const encrypted = ageEncrypt("sealed-value", recipient)
+    const encrypted = await ageEncrypt("sealed-value", recipient)
     const ciphertext = encrypted.fold(
       () => "",
       (v) => v,
@@ -500,7 +499,7 @@ describe("boot with sealed values", () => {
       ].join("\n"),
     )
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
 
     result.fold(
       (err) => expect.unreachable(`Expected Right, got: ${err._tag}`),
@@ -563,16 +562,16 @@ describe("bootSafe fail-fast on missing seal key (B1)", () => {
       ].join("\n"),
     )
 
-  it("returns SealKeyUnavailable when sealed values exist and no key resolves", () => {
-    const result = bootSafe({ configPath: sealedConfig(), inject: false })
+  it("returns SealKeyUnavailable when sealed values exist and no key resolves", async () => {
+    const result = await bootSafe({ configPath: sealedConfig(), inject: false })
     result.fold(
       (err) => expect(err._tag).toBe("SealKeyUnavailable"),
       () => expect.unreachable("Expected Left(SealKeyUnavailable)"),
     )
   })
 
-  it("fails fast even under warnOnly (the export/exec path)", () => {
-    const result = bootSafe({ configPath: sealedConfig(), inject: false, warnOnly: true })
+  it("fails fast even under warnOnly (the export/exec path)", async () => {
+    const result = await bootSafe({ configPath: sealedConfig(), inject: false, warnOnly: true })
     expect(result.isLeft()).toBe(true)
     result.fold(
       (err) => expect(err._tag).toBe("SealKeyUnavailable"),
@@ -580,8 +579,8 @@ describe("bootSafe fail-fast on missing seal key (B1)", () => {
     )
   })
 
-  it("treats a configured-but-missing key_file as no key, and lists searched paths", () => {
-    const result = bootSafe({ configPath: sealedConfig([`key_file = "missing-key.txt"`]), inject: false })
+  it("treats a configured-but-missing key_file as no key, and lists searched paths", async () => {
+    const result = await bootSafe({ configPath: sealedConfig([`key_file = "missing-key.txt"`]), inject: false })
     result.fold(
       (err) => {
         expect(err._tag).toBe("SealKeyUnavailable")
@@ -594,7 +593,42 @@ describe("bootSafe fail-fast on missing seal key (B1)", () => {
     )
   })
 
-  it("with an explicit but missing key_file, does NOT fall back to ~/.envpkt/age-key.txt", () => {
+  it("refuses a passphrase-protected key_file with a clear error, even under warnOnly", async () => {
+    const keyFile = join(tmpDir, "wrapped-key.age")
+    writeFileSync(
+      keyFile,
+      `-----BEGIN AGE ENCRYPTED FILE-----\nYWdlLWVuY3J5cHRpb24ub3JnL3YxCg==\n-----END AGE ENCRYPTED FILE-----\n`,
+    )
+
+    const result = await bootSafe({
+      configPath: sealedConfig([`key_file = "${keyFile}"`]),
+      inject: false,
+      warnOnly: true,
+    })
+    result.fold(
+      (err) => expect(err).toEqual({ _tag: "PassphraseProtectedIdentity", source: keyFile }),
+      () => expect.unreachable("Expected Left(PassphraseProtectedIdentity)"),
+    )
+    await expect(boot({ configPath: sealedConfig([`key_file = "${keyFile}"`]), inject: false })).rejects.toThrow(
+      /wrapped-key\.age is a passphrase-protected key file/,
+    )
+  })
+
+  it("refuses an inline ENVPKT_AGE_KEY that holds no age secret key, without echoing it", async () => {
+    process.env["ENVPKT_AGE_KEY"] = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6"
+
+    const result = await bootSafe({ configPath: sealedConfig(), inject: false })
+    result.fold(
+      (err) => expect(err).toEqual({ _tag: "UnsupportedIdentity", kind: "ssh", line: 1, source: "ENVPKT_AGE_KEY" }),
+      () => expect.unreachable("Expected Left(UnsupportedIdentity)"),
+    )
+    const thrown = await boot({ configPath: sealedConfig(), inject: false }).catch((e: unknown) => e)
+    expect(thrown).toBeInstanceOf(EnvpktBootError)
+    expect((thrown as Error).message).toMatch(/^ENVPKT_AGE_KEY line 1 is an SSH key/)
+    expect((thrown as Error).message).not.toContain("AAAAC3Nza")
+  })
+
+  it("with an explicit but missing key_file, does NOT fall back to ~/.envpkt/age-key.txt", async () => {
     // A default key exists in HOME, but it belongs to a different recipient. An explicit
     // key_file that is absent must NOT resolve to that default (which only yields a
     // "no identity matched any of the recipients" decrypt failure and masks the real
@@ -602,7 +636,7 @@ describe("bootSafe fail-fast on missing seal key (B1)", () => {
     mkdirSync(join(isolatedHome, ".envpkt"), { recursive: true })
     writeFileSync(join(isolatedHome, ".envpkt", "age-key.txt"), "AGE-SECRET-KEY-1UNRELATEDKEY\n", { mode: 0o600 })
 
-    const result = bootSafe({ configPath: sealedConfig([`key_file = "missing-key.txt"`]), inject: false })
+    const result = await bootSafe({ configPath: sealedConfig([`key_file = "missing-key.txt"`]), inject: false })
     result.fold(
       (err) => {
         expect(err._tag).toBe("SealKeyUnavailable")
@@ -615,14 +649,14 @@ describe("bootSafe fail-fast on missing seal key (B1)", () => {
     )
   })
 
-  it("does not fail when there are no sealed values (no key needed)", () => {
+  it("does not fail when there are no sealed values (no key needed)", async () => {
     const configPath = writeConfig([`version = 1`, `[secret.PLAIN]`, `service = "test"`].join("\n"))
-    expect(bootSafe({ configPath, inject: false }).isRight()).toBe(true)
+    expect((await bootSafe({ configPath, inject: false })).isRight()).toBe(true)
   })
 })
 
 describe("bootSafe with aliases", () => {
-  it.skipIf(!ageInstalled)("secret alias inherits target's sealed value", () => {
+  it.skipIf(!ageInstalled)("secret alias inherits target's sealed value", async () => {
     const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
     const recipient = keygenOutput
       .split("\n")
@@ -632,7 +666,7 @@ describe("bootSafe with aliases", () => {
     const identityPath = join(tmpDir, "identity.txt")
     writeFileSync(identityPath, keygenOutput)
 
-    const ciphertext = ageEncrypt("canonical-value", recipient).fold(
+    const ciphertext = (await ageEncrypt("canonical-value", recipient)).fold(
       () => "",
       (v) => v,
     )
@@ -658,7 +692,7 @@ describe("bootSafe with aliases", () => {
     delete process.env["API_KEY"]
     delete process.env["LEGACY_API_KEY"]
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
       (boot) => {
@@ -670,7 +704,7 @@ describe("bootSafe with aliases", () => {
     )
   })
 
-  it("env alias copies target's declared value", () => {
+  it("env alias copies target's declared value", async () => {
     const configPath = writeConfig(
       [
         `version = 1`,
@@ -684,7 +718,7 @@ describe("bootSafe with aliases", () => {
     delete process.env["SERVICE_URL"]
     delete process.env["LEGACY_URL"]
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
       (boot) => {
@@ -694,12 +728,12 @@ describe("bootSafe with aliases", () => {
     )
   })
 
-  it("secret alias reports skipped when target is unresolved", () => {
+  it("secret alias reports skipped when target is unresolved", async () => {
     const configPath = writeConfig(
       `version = 1\n[secret.TARGET]\nservice = "svc"\n\n[secret.ALIAS]\nfrom_key = "secret.TARGET"\n`,
     )
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
       (boot) => {
@@ -709,38 +743,38 @@ describe("bootSafe with aliases", () => {
     )
   })
 
-  it("rejects invalid alias config at boot", () => {
+  it("rejects invalid alias config at boot", async () => {
     const configPath = writeConfig(`version = 1\n[secret.ALIAS]\nfrom_key = "secret.NONEXISTENT"\n`)
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect(err._tag).toBe("AliasTargetMissing"),
       () => expect.unreachable("Expected Left"),
     )
   })
 
-  it("rejects cross-type alias at boot", () => {
+  it("rejects cross-type alias at boot", async () => {
     const configPath = writeConfig(
       `version = 1\n[secret.API_KEY]\nservice = "x"\n\n[env.BAD]\nfrom_key = "secret.API_KEY"\n`,
     )
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect(err._tag).toBe("AliasCrossType"),
       () => expect.unreachable("Expected Left"),
     )
   })
 
-  it("rejects chained aliases at boot", () => {
+  it("rejects chained aliases at boot", async () => {
     const configPath = writeConfig(
       `version = 1\n[secret.A]\nservice = "x"\n\n[secret.B]\nfrom_key = "secret.A"\n\n[secret.C]\nfrom_key = "secret.B"\n`,
     )
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect(err._tag).toBe("AliasChained"),
       () => expect.unreachable("Expected Left"),
     )
   })
 
-  it("env alias does not inject if canonical name is already set", () => {
+  it("env alias does not inject if canonical name is already set", async () => {
     const configPath = writeConfig(
       [
         `version = 1`,
@@ -755,7 +789,7 @@ describe("bootSafe with aliases", () => {
     process.env["LEGACY_URL"] = "https://preset.example.com"
 
     try {
-      const result = bootSafe({ configPath, inject: false })
+      const result = await bootSafe({ configPath, inject: false })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         (boot) => {
@@ -770,7 +804,7 @@ describe("bootSafe with aliases", () => {
 })
 
 describe("bootSafe with namespace", () => {
-  it("injects an env default under the namespaced wire name, keeping BootResult logical", () => {
+  it("injects an env default under the namespaced wire name, keeping BootResult logical", async () => {
     const configPath = writeConfig(
       [`version = 1`, `[namespace]`, `prefix = "CIV"`, `[env.NS_LOG_LEVEL]`, `value = "info"`].join("\n"),
     )
@@ -779,7 +813,7 @@ describe("bootSafe with namespace", () => {
     delete process.env["NS_LOG_LEVEL"]
 
     try {
-      const result = bootSafe({ configPath, inject: true })
+      const result = await bootSafe({ configPath, inject: true })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         (boot) => {
@@ -795,7 +829,7 @@ describe("bootSafe with namespace", () => {
     }
   })
 
-  it("opts an entry out of the namespace with an empty per-entry namespace", () => {
+  it("opts an entry out of the namespace with an empty per-entry namespace", async () => {
     const configPath = writeConfig(
       [
         `version = 1`,
@@ -811,7 +845,7 @@ describe("bootSafe with namespace", () => {
     delete process.env["NS_SHARED"]
 
     try {
-      const result = bootSafe({ configPath, inject: true })
+      const result = await bootSafe({ configPath, inject: true })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         (boot) => {
@@ -826,7 +860,7 @@ describe("bootSafe with namespace", () => {
     }
   })
 
-  it("uses a per-entry namespace override for the wire name", () => {
+  it("uses a per-entry namespace override for the wire name", async () => {
     const configPath = writeConfig(
       [
         `version = 1`,
@@ -842,7 +876,7 @@ describe("bootSafe with namespace", () => {
     delete process.env["CIV__NS_LEGACY"]
 
     try {
-      const result = bootSafe({ configPath, inject: true })
+      const result = await bootSafe({ configPath, inject: true })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         (boot) => {
@@ -857,7 +891,7 @@ describe("bootSafe with namespace", () => {
     }
   })
 
-  it("detects an override against the namespaced wire name", () => {
+  it("detects an override against the namespaced wire name", async () => {
     const configPath = writeConfig(
       [`version = 1`, `[namespace]`, `prefix = "CIV"`, `[env.NS_PORT]`, `value = "3000"`].join("\n"),
     )
@@ -866,7 +900,7 @@ describe("bootSafe with namespace", () => {
     process.env["CIV__NS_PORT"] = "8080"
 
     try {
-      const result = bootSafe({ configPath, inject: true })
+      const result = await bootSafe({ configPath, inject: true })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         (boot) => {
@@ -881,12 +915,12 @@ describe("bootSafe with namespace", () => {
     }
   })
 
-  it("warns when the namespace separator is not shell-safe", () => {
+  it("warns when the namespace separator is not shell-safe", async () => {
     const configPath = writeConfig(
       [`version = 1`, `[namespace]`, `prefix = "CIV"`, `separator = "."`, `[env.NS_DOT]`, `value = "v"`].join("\n"),
     )
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
       (boot) => {
@@ -895,12 +929,12 @@ describe("bootSafe with namespace", () => {
     )
   })
 
-  it("does not warn for the default shell-safe separator", () => {
+  it("does not warn for the default shell-safe separator", async () => {
     const configPath = writeConfig(
       [`version = 1`, `[namespace]`, `prefix = "CIV"`, `[env.NS_OK]`, `value = "v"`].join("\n"),
     )
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
       (boot) => {
@@ -909,7 +943,7 @@ describe("bootSafe with namespace", () => {
     )
   })
 
-  it("exposes a logical→wire name map in BootResult.envNames", () => {
+  it("exposes a logical→wire name map in BootResult.envNames", async () => {
     const configPath = writeConfig(
       [
         `version = 1`,
@@ -925,7 +959,7 @@ describe("bootSafe with namespace", () => {
       ].join("\n"),
     )
 
-    const result = bootSafe({ configPath, inject: false })
+    const result = await bootSafe({ configPath, inject: false })
     result.fold(
       (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
       (boot) => {
@@ -936,7 +970,7 @@ describe("bootSafe with namespace", () => {
     )
   })
 
-  it("an env alias inherits the file namespace for its own wire name", () => {
+  it("an env alias inherits the file namespace for its own wire name", async () => {
     const configPath = writeConfig(
       [
         `version = 1`,
@@ -953,7 +987,7 @@ describe("bootSafe with namespace", () => {
     delete process.env["CIV__LEGACY_URL"]
 
     try {
-      const result = bootSafe({ configPath, inject: true })
+      const result = await bootSafe({ configPath, inject: true })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         () => {
@@ -968,7 +1002,7 @@ describe("bootSafe with namespace", () => {
     }
   })
 
-  it("an env alias can opt out to bridge a legacy un-prefixed name to a namespaced canonical value", () => {
+  it("an env alias can opt out to bridge a legacy un-prefixed name to a namespaced canonical value", async () => {
     const configPath = writeConfig(
       [
         `version = 1`,
@@ -986,7 +1020,7 @@ describe("bootSafe with namespace", () => {
     delete process.env["LEGACY_URL"]
 
     try {
-      const result = bootSafe({ configPath, inject: true })
+      const result = await bootSafe({ configPath, inject: true })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         () => {
@@ -1002,7 +1036,7 @@ describe("bootSafe with namespace", () => {
     }
   })
 
-  it.skipIf(!ageInstalled)("a sealed secret alias bridges to a namespaced canonical value when opted out", () => {
+  it.skipIf(!ageInstalled)("a sealed secret alias bridges to a namespaced canonical value when opted out", async () => {
     const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
     const recipient = keygenOutput
       .split("\n")
@@ -1012,7 +1046,7 @@ describe("bootSafe with namespace", () => {
     const identityPath = join(tmpDir, "identity.txt")
     writeFileSync(identityPath, keygenOutput)
 
-    const ciphertext = ageEncrypt("canonical-value", recipient).fold(
+    const ciphertext = (await ageEncrypt("canonical-value", recipient)).fold(
       () => "",
       (v) => v,
     )
@@ -1041,7 +1075,7 @@ describe("bootSafe with namespace", () => {
     delete process.env["LEGACY_API_KEY"]
 
     try {
-      const result = bootSafe({ configPath, inject: true })
+      const result = await bootSafe({ configPath, inject: true })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         (boot) => {
@@ -1058,7 +1092,7 @@ describe("bootSafe with namespace", () => {
     }
   })
 
-  it.skipIf(!ageInstalled)("injects a sealed secret under the namespaced wire name", () => {
+  it.skipIf(!ageInstalled)("injects a sealed secret under the namespaced wire name", async () => {
     const keygenOutput = execFileSync("age-keygen", [], { stdio: ["pipe", "pipe", "pipe"], encoding: "utf-8" })
     const recipient = keygenOutput
       .split("\n")
@@ -1068,7 +1102,7 @@ describe("bootSafe with namespace", () => {
     const identityPath = join(tmpDir, "identity.txt")
     writeFileSync(identityPath, keygenOutput)
 
-    const ciphertext = ageEncrypt("sealed-ns-value", recipient).fold(
+    const ciphertext = (await ageEncrypt("sealed-ns-value", recipient)).fold(
       () => "",
       (v) => v,
     )
@@ -1094,7 +1128,7 @@ describe("bootSafe with namespace", () => {
     delete process.env["SEALED_NS"]
 
     try {
-      const result = bootSafe({ configPath, inject: true })
+      const result = await bootSafe({ configPath, inject: true })
       result.fold(
         (err) => expect.unreachable(`Expected Right, got ${err._tag}`),
         (boot) => {
@@ -1113,13 +1147,13 @@ describe("bootSafe with namespace", () => {
 })
 
 describe("EnvpktBootError", () => {
-  it("has descriptive message for FileNotFound", () => {
+  it("has descriptive message for FileNotFound", async () => {
     const err = new EnvpktBootError({ _tag: "FileNotFound", path: "/missing" })
     expect(err.message).toContain("/missing")
     expect(err.name).toBe("EnvpktBootError")
   })
 
-  it("has descriptive message for AuditFailed", () => {
+  it("has descriptive message for AuditFailed", async () => {
     const err = new EnvpktBootError({
       _tag: "AuditFailed",
       audit: {} as never,
@@ -1128,7 +1162,7 @@ describe("EnvpktBootError", () => {
     expect(err.message).toContain("expired")
   })
 
-  it("has descriptive message for AliasTargetMissing", () => {
+  it("has descriptive message for AliasTargetMissing", async () => {
     const err = new EnvpktBootError({ _tag: "AliasTargetMissing", key: "secret.X", target: "secret.Y" })
     expect(err.message).toContain("secret.Y")
   })

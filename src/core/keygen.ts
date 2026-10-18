@@ -1,11 +1,10 @@
-import { execFileSync } from "node:child_process"
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { type Either, Left, None, type Option, Right, Some, Try } from "functype"
 
-import { ageAvailable } from "../fnox/identity.js"
+import { generateAgeKeypair } from "./age.js"
 import type { KeygenError, KeygenResult } from "./types.js"
 
 /** Resolve the age identity file path: ENVPKT_AGE_KEY_FILE env var > ~/.envpkt/age-key.txt */
@@ -18,64 +17,37 @@ export const resolveInlineKey = (): Option<string> => {
   return key ? Some(key) : None()
 }
 
-/** Generate an age keypair and write to disk. Refuses to overwrite if the file already exists. */
-export const generateKeypair = (options?: { readonly outputPath?: string }): Either<KeygenError, KeygenResult> => {
-  if (!ageAvailable()) {
-    return Left({
-      _tag: "AgeNotFound",
-      message: "age-keygen CLI not found on PATH. Install age: https://github.com/FiloSottile/age",
-    } as const)
-  }
+/** The identity file `age-keygen` writes: creation time, public key, secret key. */
+const identityFileContent = (identity: string, recipient: string): string =>
+  `# created: ${new Date().toISOString().replace(/\.\d{3}Z$/, "Z")}\n# public key: ${recipient}\n${identity}\n`
 
+/** Write the identity file (0600), creating its directory if needed. Never overwrites a file. */
+const writeIdentityFile = (outputPath: string, content: string): Either<KeygenError, void> =>
+  Try(() => {
+    mkdirSync(dirname(outputPath), { recursive: true })
+    writeFileSync(outputPath, content, { mode: 0o600, flag: "wx" })
+    chmodSync(outputPath, 0o600)
+  }).fold<Either<KeygenError, void>>(
+    (err) => Left({ _tag: "WriteError", message: `Failed to write identity file: ${err}` }),
+    () => Right(undefined),
+  )
+
+/** Generate an age keypair and write to disk. Refuses to overwrite if the file already exists. */
+export const generateKeypair = async (options?: {
+  readonly outputPath?: string
+}): Promise<Either<KeygenError, KeygenResult>> => {
   const outputPath = options?.outputPath ?? resolveKeyPath()
 
   if (existsSync(outputPath)) {
     return Left({ _tag: "KeyExists", path: outputPath } as const)
   }
 
-  const keygenResult = Try(() =>
-    execFileSync("age-keygen", [], {
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    }),
-  )
-
-  return keygenResult.fold<Either<KeygenError, KeygenResult>>(
-    (err) => Left({ _tag: "KeygenFailed", message: `age-keygen failed: ${err}` } as const),
-    (output) => {
-      // Parse recipient from keygen output: "# public key: age1..."
-      const recipientLine = output.split("\n").find((l) => l.startsWith("# public key:"))
-      if (!recipientLine) {
-        return Left({ _tag: "KeygenFailed", message: "Could not parse public key from age-keygen output" } as const)
-      }
-      const recipient = recipientLine.replace("# public key: ", "").trim()
-
-      // Ensure parent directory exists
-      const dir = dirname(outputPath)
-      const mkdirResult = Try(() => {
-        if (!existsSync(dir)) {
-          mkdirSync(dir, { recursive: true })
-        }
-      })
-
-      const mkdirFailed = mkdirResult.fold(
-        (err) => ({ _tag: "WriteError" as const, message: `Failed to create directory ${dir}: ${err}` }),
-        () => undefined,
-      )
-      if (mkdirFailed) return Left(mkdirFailed)
-
-      // Write identity file
-      const writeResult = Try(() => {
-        writeFileSync(outputPath, output, { mode: 0o600 })
-        chmodSync(outputPath, 0o600)
-      })
-
-      return writeResult.fold<Either<KeygenError, KeygenResult>>(
-        (err) => Left({ _tag: "WriteError", message: `Failed to write identity file: ${err}` } as const),
-        (): Either<KeygenError, KeygenResult> =>
-          Right({ recipient, identityPath: outputPath, configUpdated: false as boolean }),
-      )
-    },
+  return (await generateAgeKeypair()).flatMap(({ identity, recipient }) =>
+    writeIdentityFile(outputPath, identityFileContent(identity, recipient)).map((): KeygenResult => ({
+      recipient,
+      identityPath: outputPath,
+      configUpdated: false,
+    })),
   )
 }
 

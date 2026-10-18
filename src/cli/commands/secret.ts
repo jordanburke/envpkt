@@ -548,7 +548,7 @@ const runSecretRotate = async (name: string, options: RotateOptions): Promise<vo
     process.exit(1)
   }
 
-  const ciphertext = ageEncrypt(value, recipient).fold(
+  const ciphertext = (await ageEncrypt(value, recipient)).fold(
     (err) => {
       console.error(`${RED}Error:${RESET} Encryption failed: ${err.message}`)
       process.exit(2)

@@ -14,7 +14,7 @@ type ExecOptions = {
   readonly strict?: boolean
 }
 
-export const runExec = (args: ReadonlyArray<string>, options: ExecOptions): void => {
+export const runExec = async (args: ReadonlyArray<string>, options: ExecOptions): Promise<void> => {
   if (args.length === 0) {
     console.error(`${RED}Error:${RESET} No command specified`)
     process.exit(2)
@@ -23,7 +23,7 @@ export const runExec = (args: ReadonlyArray<string>, options: ExecOptions): void
 
   const skipAudit = options.skipAudit ?? options.check === false
 
-  const result = bootSafe({
+  const result = await bootSafe({
     inject: false,
     configPath: options.config,
     profile: options.profile,

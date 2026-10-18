@@ -18,14 +18,15 @@ const SERVER_ENV = "CLAUDE_CODE_MCP_SERVER_NAME"
  * JSON object. stdout carries the JSON and nothing else; every diagnostic goes to stderr,
  * because Claude parses stdout verbatim.
  */
-export const runHeaders = (serverArg: string | undefined, options: HeadersOptions): void => {
+export const runHeaders = async (serverArg: string | undefined, options: HeadersOptions): Promise<void> => {
   const server = serverArg ?? process.env[SERVER_ENV]
   if (!server) {
     console.error(`${RED}Error:${RESET} No MCP server named. Pass [server] or set ${SERVER_ENV}.`)
     process.exit(2)
   }
 
-  resolveForEmit(options).fold(
+  const resolved = await resolveForEmit(options)
+  resolved.fold(
     (err) => {
       console.error(`MCP server "${server}":\n${formatError(err)}`)
       process.exit(2)

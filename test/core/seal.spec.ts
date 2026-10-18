@@ -2,9 +2,17 @@ import { execFileSync } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { tmpdir } from "node:os"
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it } from "vitest"
 
 import { ageDecrypt, ageEncrypt, sealSecrets, unsealSecrets } from "../../src/core/seal.js"
+import { unwrapAgentKey } from "../../src/fnox/identity.js"
+
+/** The secret keys in an identity file. */
+const keysOf = (identityPath: string): ReadonlyArray<string> =>
+  unwrapAgentKey(identityPath).fold(
+    (err) => expect.unreachable(`Could not read keys: ${err._tag}`),
+    (keys) => keys,
+  )
 
 // Check if age is available for integration tests
 const ageInstalled = (() => {
@@ -27,7 +35,7 @@ afterEach(() => {
 })
 
 describe("ageEncrypt / ageDecrypt", () => {
-  it.skipIf(!ageInstalled)("round-trips encrypt then decrypt", () => {
+  it.skipIf(!ageInstalled)("round-trips encrypt then decrypt", async () => {
     // Generate a test keypair
     const keygenOutput = execFileSync("age-keygen", [], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -44,26 +52,24 @@ describe("ageEncrypt / ageDecrypt", () => {
 
     const plaintext = "super-secret-api-key-12345"
 
-    const encryptResult = ageEncrypt(plaintext, recipient)
-    encryptResult.fold(
+    const ciphertext = (await ageEncrypt(plaintext, recipient)).fold(
       (err) => expect.unreachable(`Encrypt failed: ${err.message}`),
-      (ciphertext) => {
-        expect(ciphertext).toContain("-----BEGIN AGE ENCRYPTED FILE-----")
+      (ct) => ct,
+    )
+    expect(ciphertext).toContain("-----BEGIN AGE ENCRYPTED FILE-----")
 
-        const decryptResult = ageDecrypt(ciphertext, identityPath)
-        decryptResult.fold(
-          (err) => expect.unreachable(`Decrypt failed: ${err.message}`),
-          (decrypted) => {
-            expect(decrypted).toBe(plaintext)
-          },
-        )
+    const decryptResult = await ageDecrypt(ciphertext, keysOf(identityPath))
+    decryptResult.fold(
+      (err) => expect.unreachable(`Decrypt failed: ${err.message}`),
+      (decrypted) => {
+        expect(decrypted).toBe(plaintext)
       },
     )
   })
 })
 
 describe("ageDecrypt edge whitespace", () => {
-  it.skipIf(!ageInstalled)("returns the plaintext byte for byte, including edge whitespace", () => {
+  it.skipIf(!ageInstalled)("returns the plaintext byte for byte, including edge whitespace", async () => {
     const keygenOutput = execFileSync("age-keygen", [], {
       stdio: ["pipe", "pipe", "pipe"],
       encoding: "utf-8",
@@ -77,18 +83,22 @@ describe("ageDecrypt edge whitespace", () => {
       "-----BEGIN PRIVATE KEY-----\nMIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEA\n-----END PRIVATE KEY-----\n"
     const padded = "  padded value\t"
 
-    ;[pem, padded].forEach((plaintext) => {
-      const roundTripped = ageEncrypt(plaintext, recipient).flatMap((ct) => ageDecrypt(ct, identityPath))
-      roundTripped.fold(
-        (err) => expect.unreachable(`Round trip failed: ${err.message}`),
-        (decrypted) => expect(decrypted).toBe(plaintext),
-      )
-    })
+    await Promise.all(
+      [pem, padded].map(async (plaintext) => {
+        const roundTripped = await (
+          await ageEncrypt(plaintext, recipient)
+        ).flatMapAsync((ct) => ageDecrypt(ct, keysOf(identityPath)))
+        roundTripped.fold(
+          (err) => expect.unreachable(`Round trip failed: ${err.message}`),
+          (decrypted) => expect(decrypted).toBe(plaintext),
+        )
+      }),
+    )
   })
 })
 
 describe("sealSecrets", () => {
-  it.skipIf(!ageInstalled)("seals all provided values and preserves meta without values", () => {
+  it.skipIf(!ageInstalled)("seals all provided values and preserves meta without values", async () => {
     const keygenOutput = execFileSync("age-keygen", [], {
       stdio: ["pipe", "pipe", "pipe"],
       encoding: "utf-8",
@@ -107,7 +117,7 @@ describe("sealSecrets", () => {
       DB_URL: "postgres://user:pass@host/db",
     }
 
-    const result = sealSecrets(meta, values, recipient)
+    const result = await sealSecrets(meta, values, recipient)
 
     result.fold(
       (err) => expect.unreachable(`Seal failed: ${err.message}`),
@@ -124,7 +134,7 @@ describe("sealSecrets", () => {
 })
 
 describe("unsealSecrets", () => {
-  it.skipIf(!ageInstalled)("decrypts all sealed entries", () => {
+  it.skipIf(!ageInstalled)("decrypts all sealed entries", async () => {
     const keygenOutput = execFileSync("age-keygen", [], {
       stdio: ["pipe", "pipe", "pipe"],
       encoding: "utf-8",
@@ -141,7 +151,7 @@ describe("unsealSecrets", () => {
     }
     const values = { KEY_A: "value-a", KEY_B: "value-b" }
 
-    const sealResult = sealSecrets(meta, values, recipient)
+    const sealResult = await sealSecrets(meta, values, recipient)
     const sealedMeta = sealResult.fold(
       (err) => {
         expect.unreachable(`Seal failed: ${err.message}`)
@@ -151,7 +161,7 @@ describe("unsealSecrets", () => {
     )
 
     // Then unseal
-    const unsealResult = unsealSecrets(sealedMeta, identityPath)
+    const unsealResult = await unsealSecrets(sealedMeta, keysOf(identityPath))
 
     unsealResult.fold(
       (err) => expect.unreachable(`Unseal failed: ${err.message}`),
@@ -162,7 +172,7 @@ describe("unsealSecrets", () => {
     )
   })
 
-  it.skipIf(!ageInstalled)("returns empty record when no encrypted_value present", () => {
+  it.skipIf(!ageInstalled)("returns empty record when no encrypted_value present", async () => {
     const keygenOutput = execFileSync("age-keygen", [], {
       stdio: ["pipe", "pipe", "pipe"],
       encoding: "utf-8",
@@ -174,7 +184,7 @@ describe("unsealSecrets", () => {
       KEY: { service: "svc" },
     }
 
-    const result = unsealSecrets(meta, identityPath)
+    const result = await unsealSecrets(meta, keysOf(identityPath))
     result.fold(
       (err) => expect.unreachable(`Unseal failed: ${err.message}`),
       (unsealed) => {
@@ -185,102 +195,90 @@ describe("unsealSecrets", () => {
 })
 
 describe("reseal round-trip (key rotation)", () => {
-  it.skipIf(!ageInstalled)("seal with key A, unseal+reseal with key B, unseal with key B preserves values", () => {
-    // Generate key A
-    const keygenA = execFileSync("age-keygen", [], {
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    })
-    const recipientA = keygenA
-      .split("\n")
-      .find((l) => l.startsWith("# public key:"))!
-      .replace("# public key: ", "")
-      .trim()
-    const identityPathA = join(tmpDir, "identity-a.txt")
-    writeFileSync(identityPathA, keygenA)
+  it.skipIf(!ageInstalled)(
+    "seal with key A, unseal+reseal with key B, unseal with key B preserves values",
+    async () => {
+      // Generate key A
+      const keygenA = execFileSync("age-keygen", [], {
+        stdio: ["pipe", "pipe", "pipe"],
+        encoding: "utf-8",
+      })
+      const recipientA = keygenA
+        .split("\n")
+        .find((l) => l.startsWith("# public key:"))!
+        .replace("# public key: ", "")
+        .trim()
+      const identityPathA = join(tmpDir, "identity-a.txt")
+      writeFileSync(identityPathA, keygenA)
 
-    // Generate key B
-    const keygenB = execFileSync("age-keygen", [], {
-      stdio: ["pipe", "pipe", "pipe"],
-      encoding: "utf-8",
-    })
-    const recipientB = keygenB
-      .split("\n")
-      .find((l) => l.startsWith("# public key:"))!
-      .replace("# public key: ", "")
-      .trim()
-    const identityPathB = join(tmpDir, "identity-b.txt")
-    writeFileSync(identityPathB, keygenB)
+      // Generate key B
+      const keygenB = execFileSync("age-keygen", [], {
+        stdio: ["pipe", "pipe", "pipe"],
+        encoding: "utf-8",
+      })
+      const recipientB = keygenB
+        .split("\n")
+        .find((l) => l.startsWith("# public key:"))!
+        .replace("# public key: ", "")
+        .trim()
+      const identityPathB = join(tmpDir, "identity-b.txt")
+      writeFileSync(identityPathB, keygenB)
 
-    const meta = {
-      SECRET_1: { service: "svc-1" },
-      SECRET_2: { service: "svc-2" },
-    }
-    const originalValues = { SECRET_1: "original-value-1", SECRET_2: "original-value-2" }
+      const meta = {
+        SECRET_1: { service: "svc-1" },
+        SECRET_2: { service: "svc-2" },
+      }
+      const originalValues = { SECRET_1: "original-value-1", SECRET_2: "original-value-2" }
 
-    // Step 1: Seal with key A
-    const sealResultA = sealSecrets(meta, originalValues, recipientA)
-    const sealedA = sealResultA.fold(
-      (err) => {
-        expect.unreachable(`Seal with key A failed: ${err.message}`)
-        return meta
-      },
-      (s) => s,
-    )
+      // Step 1: Seal with key A
+      const sealResultA = await sealSecrets(meta, originalValues, recipientA)
+      const sealedA = sealResultA.fold(
+        (err) => {
+          expect.unreachable(`Seal with key A failed: ${err.message}`)
+          return meta
+        },
+        (s) => s,
+      )
 
-    // Step 2: Unseal with key A (simulating the reseal decrypt step)
-    const unsealResultA = unsealSecrets(sealedA, identityPathA)
-    const decrypted = unsealResultA.fold(
-      (err) => {
-        expect.unreachable(`Unseal with key A failed: ${err.message}`)
-        return {} as Record<string, string>
-      },
-      (d) => d,
-    )
+      // Step 2: Unseal with key A (simulating the reseal decrypt step)
+      const unsealResultA = await unsealSecrets(sealedA, keysOf(identityPathA))
+      const decrypted = unsealResultA.fold(
+        (err) => {
+          expect.unreachable(`Unseal with key A failed: ${err.message}`)
+          return {} as Record<string, string>
+        },
+        (d) => d,
+      )
 
-    // Step 3: Re-seal with key B using decrypted values
-    const sealResultB = sealSecrets(sealedA, decrypted, recipientB)
-    const sealedB = sealResultB.fold(
-      (err) => {
-        expect.unreachable(`Reseal with key B failed: ${err.message}`)
-        return sealedA
-      },
-      (s) => s,
-    )
+      // Step 3: Re-seal with key B using decrypted values
+      const sealResultB = await sealSecrets(sealedA, decrypted, recipientB)
+      const sealedB = sealResultB.fold(
+        (err) => {
+          expect.unreachable(`Reseal with key B failed: ${err.message}`)
+          return sealedA
+        },
+        (s) => s,
+      )
 
-    // Step 4: Unseal with key B — values should match originals
-    const unsealResultB = unsealSecrets(sealedB, identityPathB)
-    unsealResultB.fold(
-      (err) => expect.unreachable(`Unseal with key B failed: ${err.message}`),
-      (unsealed) => {
-        expect(unsealed["SECRET_1"]).toBe("original-value-1")
-        expect(unsealed["SECRET_2"]).toBe("original-value-2")
-      },
-    )
-  })
+      // Step 4: Unseal with key B — values should match originals
+      const unsealResultB = await unsealSecrets(sealedB, keysOf(identityPathB))
+      unsealResultB.fold(
+        (err) => expect.unreachable(`Unseal with key B failed: ${err.message}`),
+        (unsealed) => {
+          expect(unsealed["SECRET_1"]).toBe("original-value-1")
+          expect(unsealed["SECRET_2"]).toBe("original-value-2")
+        },
+      )
+    },
+  )
 })
 
-describe("seal without age", () => {
-  it("ageEncrypt returns AgeNotFound when age is mocked away", () => {
-    // This test relies on the real age being available but with a bad recipient
-    // If age is not installed, it naturally returns AgeNotFound
-    if (ageInstalled) {
-      // With a bad recipient, encrypt will fail with EncryptFailed
-      const result = ageEncrypt("test", "not-a-valid-recipient")
-      result.fold(
-        (err) => {
-          expect(err._tag).toBe("EncryptFailed")
-        },
-        () => {
-          // Some versions of age may handle this differently
-        },
-      )
-    } else {
-      const result = ageEncrypt("test", "age1test")
-      result.fold(
-        (err) => expect(err._tag).toBe("AgeNotFound"),
-        () => expect.unreachable("Expected Left"),
-      )
-    }
+describe("ageEncrypt errors", () => {
+  it("returns EncryptFailed for an invalid recipient", async () => {
+    const result = await ageEncrypt("test", "not-a-valid-recipient")
+    result.fold(
+      (err) => expect(err._tag).toBe("EncryptFailed"),
+      () => expect.unreachable("Expected Left"),
+    )
   })
 })
