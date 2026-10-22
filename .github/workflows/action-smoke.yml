@@ -14,7 +14,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "envpkt version the published action (@v0) should run via npx"
+        description: "envpkt version (0.18.0 or later) the published job uses for keygen, seal and the action"
         required: false
         default: "latest"
   # Gate changes to the action itself / this workflow.
@@ -67,7 +67,7 @@ jobs:
         run: |
           set -euo pipefail
           # The point of this job: nothing below may need the age CLI.
-          if command -v age; then echo "::error::age is installed; this job must run without it"; exit 1; fi
+          if command -v age >/dev/null; then echo "::error::age is installed; this job must run without it"; exit 1; fi
           envpkt="node $GITHUB_WORKSPACE/dist/cli.js"
           cfg="$RUNNER_TEMP/envpkt.toml"
           key="$RUNNER_TEMP/smoke-key.txt"
@@ -118,29 +118,25 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      # envpkt 0.17.0 and earlier decrypt with the `age` CLI, which is not preinstalled, and this
-      # step also makes the test key. Drop it once @v0 and npm `latest` are 0.18.0 or later.
-      - name: Install age
-        run: sudo apt-get update && sudo apt-get install -y age
+      # The action doesn't set up Node, and envpkt needs 22.12 or later: consumers add this step too.
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
 
       - name: Create an ephemeral sealed config
         shell: bash
         run: |
           set -euo pipefail
-          keys="$(age-keygen 2>/dev/null)"
-          recipient="$(echo "$keys" | sed -n 's/# public key: //p')"
-          secret="$(echo "$keys" | grep '^AGE-SECRET-KEY-')"
-          ciphertext="$(printf 'smoke-value' | age -r "$recipient" -a)"
-
+          # Like the smoke job, but with the published CLI: nothing here may need the age CLI.
+          if command -v age >/dev/null; then echo "::error::age is installed; this job must run without it"; exit 1; fi
+          envpkt="npx --yes envpkt@${{ inputs.version || 'latest' }}"
           cfg="$RUNNER_TEMP/envpkt.toml"
-          {
-            echo 'version = 1'
-            echo '[namespace]'
-            echo 'prefix = "CIV"'
-            echo '[secret.SMOKE_KEY]'
-            echo 'service = "smoke"'
-            printf 'encrypted_value = """\n%s"""\n' "$ciphertext"
-          } > "$cfg"
+          key="$RUNNER_TEMP/smoke-key.txt"
+          printf 'version = 1\n[namespace]\nprefix = "CIV"\n[secret.SMOKE_KEY]\nservice = "smoke"\n' > "$cfg"
+          $envpkt keygen -c "$cfg" -o "$key"
+          printf 'smoke-value' | $envpkt seal -c "$cfg" --edit SMOKE_KEY --stdin
+          secret="$(grep '^AGE-SECRET-KEY-' "$key")"
+          rm "$key"
 
           # Throwaway key — mask it and hand it to the action via the job env.
           echo "::add-mask::$secret"
