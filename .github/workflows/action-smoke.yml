@@ -118,10 +118,11 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      # The action doesn't set up Node, and envpkt needs 22.12 or later: consumers add this step too.
+      # Pin the oldest Node line envpkt supports (engines: >=22.12.0). Consumers who skip setup-node
+      # get the runner's own Node, which is 22.x on ubuntu-latest today.
       - uses: actions/setup-node@v5
         with:
-          node-version: "24"
+          node-version: "22"
 
       - name: Create an ephemeral sealed config
         shell: bash
