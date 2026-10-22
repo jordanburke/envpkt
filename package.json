@@ -44,8 +44,8 @@
     "age-encryption": "^0.3.1",
     "commander": "^15.0.0",
     "functype": "^1.18.0",
-    "functype-log": "^1.15.0",
-    "functype-os": "^1.15.0",
+    "functype-log": "^1.18.0",
+    "functype-os": "^1.18.0",
     "smol-toml": "^1.9.1"
   },
   "devDependencies": {
