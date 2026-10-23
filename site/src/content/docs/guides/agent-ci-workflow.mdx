@@ -194,7 +194,7 @@ jobs:
   audit-gate:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
@@ -217,20 +217,22 @@ jobs:
     needs: audit-gate
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
       - run: npm install -g envpkt
 
       - name: Deploy with credential injection
+        env:
+          ENVPKT_AGE_KEY: ${{ secrets.ENVPKT_AGE_KEY }}
         run: envpkt exec --strict -c agents/api-gateway/envpkt.toml -- ./deploy.sh
 
   fleet-report:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: actions/setup-node@v5
         with:
           node-version: 22
