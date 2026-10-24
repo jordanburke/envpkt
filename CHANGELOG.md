@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Docs: the site's canonical URLs and sitemap, and two README links, pointed at an unregistered
+  domain. They now use `envpkt.com`, where the site is served. A test fails on any return of it.
+
 ## [0.18.0] - 2026-10-18
 
 envpkt no longer needs the `age` command. Sealing, unsealing and `envpkt keygen` run in-process

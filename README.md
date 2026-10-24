@@ -132,7 +132,7 @@ from_key = "secret.API_KEY"
 Both names are injected at boot, both appear in audit output, and expiration
 tracking lives on the target — an alias is healthy iff its target is. Same
 pattern works for `[env.*]`. Cross-type aliasing (secret → env) is rejected
-at load time. See [TOML Schema → Aliases](https://envpkt.dev/reference/toml-schema/#aliases)
+at load time. See [TOML Schema → Aliases](https://envpkt.com/reference/toml-schema/#aliases)
 for the full rules.
 
 See [`examples/`](./examples/) for more configurations.
@@ -192,7 +192,7 @@ Whether envpkt can replace a cloud secret store depends on one thing: **do you c
 - **You launch it** (server, container, VM, k8s, systemd) → `envpkt exec -- yourapp` or `boot()` injects the decrypted values straight into the process environment. No cloud secret store needed: the sealed `envpkt.toml` ships with the app, and only the age key has to reach the runtime (N secrets collapse to 1 key).
 - **A platform launches it** (Cloudflare Workers, AWS Lambda, Vercel) → you don't own the launch, so the platform's secret store is unavoidable. envpkt becomes the source of truth that populates and audits that store — not the injector.
 
-> Rule of thumb: **own the launch → `exec`/`boot`, no store. Platform owns the launch → store required, envpkt feeds and audits it.** Full details: [Runtime injection guide](https://envpkt.dev/guides/runtime-injection/).
+> Rule of thumb: **own the launch → `exec`/`boot`, no store. Platform owns the launch → store required, envpkt feeds and audits it.** Full details: [Runtime injection guide](https://envpkt.com/guides/runtime-injection/).
 
 ## GitHub Actions
 

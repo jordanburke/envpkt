@@ -4,7 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 import { defineConfig } from "astro/config"
 
 export default defineConfig({
-  site: "https://envpkt.dev",
+  site: "https://envpkt.com",
   integrations: [
     starlight({
       title: "envpacket / envpkt",
