@@ -124,7 +124,21 @@ const walkUpForConfig = (dir: string): Option<string> => {
   return parent === dir ? Option<string>(undefined) : walkUpForConfig(parent)
 }
 
-/** Discover config by walking up from CWD, then ENVPKT_SEARCH_PATH, then dynamic Platform paths */
+/**
+ * `ENVPKT_NO_GLOBAL` set to anything but "" / "0" / "false" turns off the global package:
+ * discovery stops after the walk-up and ENVPKT_SEARCH_PATH, and never looks in home or
+ * cloud-storage folders. Explicit paths (`-c`, ENVPKT_CONFIG, ENVPKT_SEARCH_PATH) still work.
+ */
+const globalSearchDisabled = (): boolean =>
+  Env.get("ENVPKT_NO_GLOBAL").fold(
+    () => false,
+    (v) => !["", "0", "false"].includes(v.trim().toLowerCase()),
+  )
+
+/**
+ * Discover config by walking up from CWD, then ENVPKT_SEARCH_PATH, then the global package
+ * (Platform homes + cloud storage, then env-var fallback paths) unless ENVPKT_NO_GLOBAL is set.
+ */
 export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
   const dir = cwd ?? process.cwd()
   const walked = walkUpForConfig(dir).orUndefined()
@@ -148,6 +162,8 @@ export const discoverConfig = (cwd?: string): Option<DiscoveredConfig> => {
     const found: DiscoveredConfig = { path: customMatch[0]!, source: "search" }
     return Option(found)
   }
+
+  if (globalSearchDisabled()) return Option<DiscoveredConfig>(undefined)
 
   // Dynamic Platform-detected paths (homes + cloud storage, no globs needed)
   const platformMatch = buildSearchPaths().find((p) => Fs.existsSync(p))

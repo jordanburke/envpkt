@@ -94,8 +94,12 @@ Claude's MCP log shows which server failed.
 
 `envpkt headers` finds `envpkt.toml` the same way every command does: `-c`, then `ENVPKT_CONFIG`, then the
 working directory and its parents, then the global package (`~/.envpkt/envpkt.toml` and cloud-storage
-copies). If the project has no `envpkt.toml`, the global package answers. Pass `-c` in `.mcp.json` to pin
-the file: `"headersHelper": "envpkt headers -c ./envpkt.toml"`.
+copies). If the project has no `envpkt.toml`, the global package answers.
+
+To stop that in `.mcp.json`, pin the file with `-c`: `"headersHelper": "envpkt headers -c ./envpkt.toml"`.
+That works however Claude was launched. `ENVPKT_NO_GLOBAL=1` also turns the fallback off, but only where
+you control the environment the helper inherits; a launcher that strips the environment drops it. See
+[Config Resolution](/cli/#config-resolution).
 
 ## How Claude Code runs it
 

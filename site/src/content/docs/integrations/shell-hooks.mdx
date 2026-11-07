@@ -77,6 +77,9 @@ export ENVPKT_SEARCH_PATH="$HOME/OneDrive - Corp/.envpkt/envpkt.toml"
 
 Colon-separated paths are searched after CWD but before built-in candidates.
 
+To keep the hook from loading the global package (`~/.envpkt/` and cloud-storage copies) in folders
+with no `envpkt.toml`, set `ENVPKT_NO_GLOBAL=1`. Custom search paths still apply.
+
 ## Use Cases
 
 - **Daily development** — see credential health at a glance

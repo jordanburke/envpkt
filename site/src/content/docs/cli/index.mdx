@@ -47,6 +47,9 @@ Commands that read `envpkt.toml` (audit, inspect, resolve, exec, env check, env 
 
 When a config is loaded from outside CWD, envpkt prints the resolved path to stderr for transparency.
 
+Set `ENVPKT_NO_GLOBAL=1` to skip step 5 entirely. Steps 1–4 still apply. Any value except empty, `0` or
+`false` turns it on. Use it when a missing project config should mean "no config", not "use the global package".
+
 If a `catalog` field is present, it's resolved relative to the config file's directory.
 
 ## Exit Codes

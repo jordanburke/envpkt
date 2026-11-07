@@ -646,6 +646,14 @@ export ENVPKT_SEARCH_PATH="$HOME/OneDrive/.envpkt/envpkt.toml:/custom/path/envpk
 
 These are searched after CWD but before the built-in candidate paths. Useful for corporate OneDrive names, Google Drive with email in the path, or any non-standard location.
 
+### `ENVPKT_NO_GLOBAL`
+
+Turn off the global package. With `ENVPKT_NO_GLOBAL=1`, discovery stops after `./envpkt.toml` (and its parent folders) and `ENVPKT_SEARCH_PATH`. It never looks in `~/.envpkt/` or cloud-storage folders, including the Windows home and OneDrive that envpkt finds on WSL. `-c`, `ENVPKT_CONFIG` and `ENVPKT_SEARCH_PATH` still work. Any value except empty, `0` or `false` turns it on.
+
+```bash
+ENVPKT_NO_GLOBAL=1 envpkt headers civala-github   # fail rather than fall back to the global package
+```
+
 ## Library API
 
 envpkt is also available as a TypeScript library with a functional programming API built on [functype](https://github.com/jordanburke/functype). Fallible functions return `Either<Error, Result>` or `Option<T>` instead of throwing; `boot()` is the one throwing convenience wrapper. Functions that encrypt or decrypt (`boot`, `bootSafe`, `ageEncrypt`, `ageDecrypt`, `sealSecrets`, `unsealSecrets`, `generateKeypair`) return Promises, so `await` them. Without `await`, `boot()` returns before it injects anything.
