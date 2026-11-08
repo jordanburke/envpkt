@@ -84,6 +84,9 @@ export default defineConfig({
     react(),
   ],
   vite: {
+    // Vite 8 otherwise also reads the repo-root tsconfig.json, whose `extends: "ts-builds/tsconfig"`
+    // does not resolve where only site/ is installed (the Cloudflare Pages build).
+    tsconfig: "./tsconfig.json",
     plugins: [tailwindcss()],
     ssr: {
       noExternal: ["postcss", "nanoid"],
