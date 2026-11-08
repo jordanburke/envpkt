@@ -69,10 +69,8 @@ export type EnvDriftStatus = "default" | "overridden" | "missing"
 export type EnvDriftEntry = {
   readonly key: string
   readonly defaultValue: string
-  // eslint-disable-next-line functype/prefer-option
   readonly currentValue: string | undefined
   readonly status: EnvDriftStatus
-  // eslint-disable-next-line functype/prefer-option
   readonly purpose: string | undefined
   /** If this entry is an alias (from_key), the reference it points at (e.g. "env.X") */
   readonly alias_of: Option<string>
