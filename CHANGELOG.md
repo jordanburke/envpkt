@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `ENVPKT_SEARCH_PATH` still work. Useful for `envpkt headers`, where a project with no
   `envpkt.toml` otherwise falls back to the global package.
 
+### Changed
+
+- Runtime dependencies: functype, functype-log and functype-os are now `^1.26.0`,
+  `@modelcontextprotocol/sdk` `^1.32.2`, and commander `^15.1.0`. The repo builds with pnpm 12.
+
 ### Fixed
 
 - Docs: the site's canonical URLs and sitemap, and two README links, pointed at an unregistered

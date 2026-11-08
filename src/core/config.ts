@@ -227,7 +227,6 @@ export const validateConfig = (data: unknown): Either<ConfigError, EnvpktConfig>
 
 /** Load and validate an envpkt.toml from a file path */
 export const loadConfig = (path: string): Either<ConfigError, EnvpktConfig> =>
-  // eslint-disable-next-line functype/prefer-do-notation -- simple linear flatMap chain is clearer than Do notation here
   readConfigFile(path).flatMap(parseToml).flatMap(validateConfig)
 
 /** Load config from CWD or discovery chain, returning path, source, and parsed config */
