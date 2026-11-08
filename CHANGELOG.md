@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `ENVPKT_NO_GLOBAL=1` turns off the global package. Config discovery stops after the project
+  folder walk and `ENVPKT_SEARCH_PATH`, and never looks in `~/.envpkt/` or cloud-storage folders
+  (including the Windows home and OneDrive found on WSL). `-c`, `ENVPKT_CONFIG` and
+  `ENVPKT_SEARCH_PATH` still work. Useful for `envpkt headers`, where a project with no
+  `envpkt.toml` otherwise falls back to the global package.
+
 ### Changed
 
 - The MCP server (`envpkt mcp`) is built on [somamcp](https://github.com/sapientsai/SomaMCP) and
@@ -17,16 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `Server`. `toolDefinitions` entries gain a TypeBox `parameters` field. The `ToolDef` and
   `CallToolResult` types are exported.
 
-### Added
-
-- `ENVPKT_NO_GLOBAL=1` turns off the global package. Config discovery stops after the project
-  folder walk and `ENVPKT_SEARCH_PATH`, and never looks in `~/.envpkt/` or cloud-storage folders
-  (including the Windows home and OneDrive found on WSL). `-c`, `ENVPKT_CONFIG` and
-  `ENVPKT_SEARCH_PATH` still work. Useful for `envpkt headers`, where a project with no
-  `envpkt.toml` otherwise falls back to the global package.
-
 ### Fixed
 
+- `envpkt mcp -c <path>` ignored the path, so the server still resolved a config from its working
+  directory or `ENVPKT_CONFIG`. Tools and resources now read the file `-c` names; a tool call that
+  passes its own `configPath` still overrides it. `createServer()` and `startServer()` take
+  `{ configPath }` for the same.
 - Docs: the site's canonical URLs and sitemap, and two README links, pointed at an unregistered
   domain. They now use `envpkt.com`, where the site is served. A test fails on any return of it.
 - `test/cli/config-path.spec.ts` "prints nothing when no config is found" no longer fails on WSL

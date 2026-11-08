@@ -8,11 +8,21 @@ import { typeboxStandardSchema } from "./typebox-schema.js"
 const INSTRUCTIONS =
   "envpkt provides credential lifecycle awareness for AI agents. Use tools to check health, capabilities, and secret metadata. No secret values are ever exposed."
 
+export type McpServerOptions = {
+  /**
+   * The envpkt.toml every tool and resource reads (`envpkt mcp -c`). A tool call that passes
+   * its own `configPath` still uses that one. Without it, the usual resolution applies.
+   */
+  readonly configPath?: string
+}
+
 /**
  * The envpkt MCP server, built on somamcp. Every tool and resource reads `envpkt.toml`
  * metadata only, so all of them are read-only and none returns a secret value.
  */
-export const createServer = (): SomaServerInstance => {
+export const createServer = (options: McpServerOptions = {}): SomaServerInstance => {
+  const defaults: Record<string, unknown> = options.configPath ? { configPath: options.configPath } : {}
+
   const server = createSomaServer({
     name: "envpkt",
     version: packageVersion() as `${number}.${number}.${number}`,
@@ -25,7 +35,7 @@ export const createServer = (): SomaServerInstance => {
       description: def.description,
       parameters: typeboxStandardSchema(def.parameters),
       annotations: { readOnlyHint: true, openWorldHint: false },
-      execute: (args) => Promise.resolve(callTool(def.name, args as Record<string, unknown>)),
+      execute: (args) => Promise.resolve(callTool(def.name, { ...defaults, ...(args as Record<string, unknown>) })),
     })
   })
 
@@ -34,7 +44,7 @@ export const createServer = (): SomaServerInstance => {
       ...def,
       load: () =>
         Promise.resolve(
-          readResource(def.uri).fold(
+          readResource(def.uri, options.configPath).fold(
             () => [{ uri: def.uri, mimeType: "text/plain", text: `Resource not found: ${def.uri}` }],
             (result) => result.contents,
           ),
@@ -46,6 +56,6 @@ export const createServer = (): SomaServerInstance => {
 }
 
 /** Serve the envpkt MCP server over stdio. */
-export const startServer = async (): Promise<void> => {
-  await createServer().start({ transportType: "stdio" })
+export const startServer = async (options: McpServerOptions = {}): Promise<void> => {
+  await createServer(options).start({ transportType: "stdio" })
 }

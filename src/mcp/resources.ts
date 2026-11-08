@@ -15,8 +15,8 @@ export type ReadResourceResult = {
   contents: Array<{ uri: string; mimeType: string; text: string }>
 }
 
-const loadConfigSafe = (): Option<{ config: EnvpktConfig; path: string }> => {
-  const resolved = resolveConfigPath()
+const loadConfigSafe = (configPath?: string): Option<{ config: EnvpktConfig; path: string }> => {
+  const resolved = resolveConfigPath(configPath)
   return resolved.fold(
     () => Option.none<{ config: EnvpktConfig; path: string }>(),
     ({ path }) =>
@@ -42,8 +42,8 @@ export const resourceDefinitions: readonly Resource[] = [
   },
 ]
 
-const readHealth = (): ReadResourceResult =>
-  loadConfigSafe().fold(
+const readHealth = (configPath?: string): ReadResourceResult =>
+  loadConfigSafe(configPath).fold(
     () => ({
       contents: [
         {
@@ -80,8 +80,8 @@ const readHealth = (): ReadResourceResult =>
     },
   )
 
-const readCapabilities = (): ReadResourceResult =>
-  loadConfigSafe().fold(
+const readCapabilities = (configPath?: string): ReadResourceResult =>
+  loadConfigSafe(configPath).fold(
     () => ({
       contents: [
         {
@@ -127,10 +127,11 @@ const readCapabilities = (): ReadResourceResult =>
     },
   )
 
-const resourceHandlers: Record<string, () => ReadResourceResult> = {
+const resourceHandlers: Record<string, (configPath?: string) => ReadResourceResult> = {
   "envpkt://health": readHealth,
   "envpkt://capabilities": readCapabilities,
 }
 
-export const readResource = (uri: string): Option<ReadResourceResult> =>
-  Option(resourceHandlers[uri]).map((handler) => handler())
+/** Read a resource by URI. `configPath` pins the envpkt.toml; without it the usual resolution applies. */
+export const readResource = (uri: string, configPath?: string): Option<ReadResourceResult> =>
+  Option(resourceHandlers[uri]).map((handler) => handler(configPath))

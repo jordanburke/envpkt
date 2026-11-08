@@ -7,7 +7,7 @@ import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { packageVersion } from "../../src/core/version.js"
-import { createServer } from "../../src/mcp/server.js"
+import { createServer, type McpServerOptions } from "../../src/mcp/server.js"
 
 const config = `
 version = 1
@@ -45,8 +45,8 @@ afterEach(() => {
 })
 
 /** A real SDK 2.x client wired straight into the server's fetch handler, no port. */
-const connect = async (): Promise<Client> => {
-  const server = createServer()
+const connect = async (options: McpServerOptions = {}): Promise<Client> => {
+  const server = createServer(options)
   const client = new Client({ name: "envpkt-test", version: "1.0.0" })
   await client.connect(
     new StreamableHTTPClientTransport(new URL("http://envpkt.test/mcp"), {
@@ -117,18 +117,56 @@ describe("MCP server (somamcp)", () => {
   })
 })
 
+describe("a pinned config path (envpkt mcp -c)", () => {
+  it("is the default for tools", async () => {
+    const client = await connect({ configPath })
+    const result = await client.callTool({ name: "getSecretMeta", arguments: { key: "API_KEY" } })
+
+    expect(JSON.parse(text(result))).toMatchObject({ key: "API_KEY", service: "stripe" })
+    await client.close()
+  })
+
+  it("gives way to a configPath the tool call names", async () => {
+    const otherPath = join(tmpDir, "other.toml")
+    writeFileSync(otherPath, 'version = 1\n\n[secret.OTHER]\nservice = "other"\n')
+    const client = await connect({ configPath })
+    const result = await client.callTool({ name: "getPacketHealth", arguments: { configPath: otherPath } })
+
+    expect(JSON.parse(text(result))).toMatchObject({ path: otherPath, total: 1 })
+    await client.close()
+  })
+
+  it("is the config resources read", async () => {
+    vi.stubEnv("ENVPKT_CONFIG", join(tmpDir, "missing.toml"))
+    const client = await connect({ configPath })
+    const { contents } = await client.readResource({ uri: "envpkt://health" })
+
+    expect(JSON.parse((contents[0] as { text: string }).text)).toMatchObject({ path: configPath })
+    await client.close()
+  })
+})
+
 describe("envpkt mcp (stdio)", () => {
-  it("serves MCP over stdio with nothing else on stdout", async () => {
+  it("serves MCP over stdio with nothing else on stdout, reading the config -c names", async () => {
+    const { ENVPKT_CONFIG: _, ...env } = process.env
     const client = new Client({ name: "envpkt-stdio-test", version: "1.0.0" })
     await client.connect(
       new StdioClientTransport({
         command: process.execPath,
-        args: ["--import", "tsx", join(import.meta.dirname, "../../src/cli/index.ts"), "mcp"],
-        env: { ...process.env, ENVPKT_CONFIG: configPath } as Record<string, string>,
+        args: [
+          "--import",
+          import.meta.resolve("tsx"),
+          join(import.meta.dirname, "../../src/cli/index.ts"),
+          "mcp",
+          "-c",
+          configPath,
+        ],
+        env: { ...env, ENVPKT_NO_GLOBAL: "1" } as Record<string, string>,
+        cwd: tmpDir,
         stderr: "ignore",
       }),
     )
-    const result = await client.callTool({ name: "getPacketHealth", arguments: { configPath } })
+    const result = await client.callTool({ name: "getPacketHealth", arguments: {} })
 
     expect(JSON.parse(text(result))).toMatchObject({ path: configPath })
     await client.close()
