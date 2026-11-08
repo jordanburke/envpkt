@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- The MCP server (`envpkt mcp`) is built on [somamcp](https://github.com/sapientsai/SomaMCP) and
+  the MCP SDK 2.x, in place of `@modelcontextprotocol/sdk` 1.x. It serves 2026-07-28 and 2025
+  clients, reports envpkt's real version (it said `0.1.0`), marks every tool read-only, and adds
+  somamcp's `info` tool. Tool arguments are now validated against their schemas before a tool runs.
+- **Breaking (library):** `createServer()` returns a somamcp `SomaServerInstance`, not an SDK
+  `Server`. `toolDefinitions` entries gain a TypeBox `parameters` field. The `ToolDef` and
+  `CallToolResult` types are exported.
+
 ### Added
 
 - `ENVPKT_NO_GLOBAL=1` turns off the global package. Config discovery stops after the project

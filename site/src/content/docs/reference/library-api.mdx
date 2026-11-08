@@ -465,12 +465,12 @@ without printing key material.
 
 ### `createServer()` / `startServer()`
 
-Create and start the MCP server programmatically.
+`createServer()` returns a [somamcp](https://github.com/sapientsai/SomaMCP) `SomaServerInstance` with the envpkt tools and resources registered. `startServer()` serves it over stdio.
 
-### `toolDefinitions` / `callTool(name, args, config, audit)`
+### `toolDefinitions` / `callTool(name, args)`
 
-MCP tool definitions and invocation.
+The tool definitions (name, description, TypeBox `parameters`, JSON Schema `inputSchema`), and a call that runs one by name. `callTool` returns `{ content, isError? }`.
 
-### `resourceDefinitions` / `readResource(uri, config, audit)`
+### `resourceDefinitions` / `readResource(uri)`
 
-MCP resource definitions and reading.
+The resource definitions, and a read that returns `Option<{ contents }>`, `None` for an unknown URI.

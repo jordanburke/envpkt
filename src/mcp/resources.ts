@@ -1,9 +1,19 @@
-import type { ReadResourceResult, Resource } from "@modelcontextprotocol/sdk/types.js"
 import { Option } from "functype"
 
 import { computeAudit } from "../core/audit.js"
 import { loadConfig, resolveConfigPath } from "../core/config.js"
 import type { EnvpktConfig } from "../core/types.js"
+
+export type Resource = {
+  readonly uri: string
+  readonly name: string
+  readonly description: string
+  readonly mimeType: string
+}
+
+export type ReadResourceResult = {
+  contents: Array<{ uri: string; mimeType: string; text: string }>
+}
 
 const loadConfigSafe = (): Option<{ config: EnvpktConfig; path: string }> => {
   const resolved = resolveConfigPath()

@@ -39,16 +39,17 @@
     "prepublishOnly": "pnpm validate"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.32.1",
     "@sinclair/typebox": "^0.34.52",
     "age-encryption": "^0.3.1",
     "commander": "^15.0.0",
     "functype": "^1.18.0",
     "functype-log": "^1.18.0",
     "functype-os": "^1.18.0",
-    "smol-toml": "^1.9.1"
+    "smol-toml": "^1.9.1",
+    "somamcp": "^2.6.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/client": "~2.4.0",
     "@types/node": "^24.19.2",
     "ts-builds": "^3.4.3",
     "tsdown": "^0.22.14",
