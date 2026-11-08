@@ -140,7 +140,7 @@ type ResolvedPath = { readonly path: string; readonly source: ConfigSource }
 
 ### `discoverConfig(cwd?)`
 
-Discover config by checking CWD, then `ENVPKT_SEARCH_PATH`, then built-in candidate paths (`~/.envpkt/`, cloud storage, etc.). Returns `Option<{ path: string; source: "cwd" | "search" }>`.
+Discover config by checking CWD and its parents, then `ENVPKT_SEARCH_PATH`, then built-in candidate paths (`~/.envpkt/`, cloud storage, etc.). `ENVPKT_NO_GLOBAL=1` skips the built-in paths. Returns `Option<{ path: string; source: "cwd" | "search" }>`.
 
 ### `loadConfigFromCwd(cwd?)`
 

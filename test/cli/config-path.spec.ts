@@ -24,8 +24,8 @@ afterEach(() => {
   rmSync(home, { recursive: true, force: true })
 })
 
-const run = (cwd: string): { stdout: string; status: number } => {
-  const env = { ...process.env, HOME: home, ENVPKT_SEARCH_PATH: "" }
+const run = (cwd: string, extraEnv: Record<string, string> = {}): { stdout: string; status: number } => {
+  const env = { ...process.env, HOME: home, ENVPKT_SEARCH_PATH: "", ...extraEnv }
   delete (env as Record<string, string | undefined>)["ENVPKT_CONFIG"]
   try {
     const stdout = execFileSync(TSX, [CLI_SRC, "config-path"], { cwd, env, encoding: "utf-8" })
@@ -53,9 +53,32 @@ describe("envpkt config-path", () => {
     expect(run(deep).stdout).toBe(cfg)
   })
 
+  // ENVPKT_NO_GLOBAL keeps this hermetic: on WSL, functype-os also finds the Windows home
+  // (/mnt/c/Users/<you>), which no HOME override can hide.
   it("prints nothing and exits 0 when no config is found", () => {
-    const result = run(tmpDir)
+    const result = run(tmpDir, { ENVPKT_NO_GLOBAL: "1" })
     expect(result.status).toBe(0)
     expect(result.stdout).toBe("")
+  })
+
+  it("falls back to the global package in the home folder", () => {
+    const global = join(home, ".envpkt", "envpkt.toml")
+    mkdirSync(dirname(global), { recursive: true })
+    writeFileSync(global, "version = 1\n")
+    expect(run(tmpDir).stdout).toBe(global)
+  })
+
+  it("skips the global package when ENVPKT_NO_GLOBAL is set", () => {
+    const global = join(home, ".envpkt", "envpkt.toml")
+    mkdirSync(dirname(global), { recursive: true })
+    writeFileSync(global, "version = 1\n")
+    expect(run(tmpDir, { ENVPKT_NO_GLOBAL: "1" }).stdout).toBe("")
+  })
+
+  it("still honors ENVPKT_SEARCH_PATH when ENVPKT_NO_GLOBAL is set", () => {
+    const custom = join(home, "custom", "envpkt.toml")
+    mkdirSync(dirname(custom), { recursive: true })
+    writeFileSync(custom, "version = 1\n")
+    expect(run(tmpDir, { ENVPKT_NO_GLOBAL: "1", ENVPKT_SEARCH_PATH: custom }).stdout).toBe(custom)
   })
 })

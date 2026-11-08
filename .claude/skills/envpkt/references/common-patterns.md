@@ -218,6 +218,7 @@ eval "$(envpkt shell-hook bash)"
 # Now when you `cd` into any directory, envpkt automatically
 # discovers the nearest envpkt.toml (CWD, ~/.envpkt/, cloud
 # storage, or ENVPKT_SEARCH_PATH) and shows credential health.
+# Set ENVPKT_NO_GLOBAL=1 to skip ~/.envpkt/ and cloud storage.
 # No envpkt.toml file check needed in the hook — envpkt handles
 # discovery internally and silently exits if no config is found.
 ```

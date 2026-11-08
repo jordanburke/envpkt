@@ -442,7 +442,7 @@ resolved.fold(
   ({ path, source }) => console.log(`Loaded from ${source}: ${path}`),
 )
 
-// Discover config (CWD → ENVPKT_SEARCH_PATH → built-in paths)
+// Discover config (CWD → ENVPKT_SEARCH_PATH → built-in paths; ENVPKT_NO_GLOBAL=1 skips built-in)
 // Returns Option<{ path, source: "cwd" | "search" }>
 const found = discoverConfig()
 
