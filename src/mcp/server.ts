@@ -42,13 +42,8 @@ export const createServer = (options: McpServerOptions = {}): SomaServerInstance
   resourceDefinitions.forEach((def) => {
     server.addResource({
       ...def,
-      load: () =>
-        Promise.resolve(
-          readResource(def.uri, options.configPath).fold(
-            () => [{ uri: def.uri, mimeType: "text/plain", text: `Resource not found: ${def.uri}` }],
-            (result) => result.contents,
-          ),
-        ),
+      // somamcp calls load only for a registered URI, and every definition has a handler.
+      load: () => Promise.resolve(readResource(def.uri, options.configPath).orThrow().contents),
     })
   })
 

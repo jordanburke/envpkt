@@ -22,8 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   clients, reports envpkt's real version (it said `0.1.0`), marks every tool read-only, and adds
   somamcp's `info` tool. Tool arguments are now validated against their schemas before a tool runs.
 - **Breaking (library):** `createServer()` returns a somamcp `SomaServerInstance`, not an SDK
-  `Server`. `toolDefinitions` entries gain a TypeBox `parameters` field. The `ToolDef` and
-  `CallToolResult` types are exported.
+  `Server`. Served through its `fetch()`, it also answers somamcp's `/health` and `/info` routes and
+  dashboard, without auth; stdio serves none of them. `toolDefinitions` entries gain a TypeBox
+  `parameters` field. The `ToolDef`, `CallToolResult` and `McpServerOptions` types are exported.
+- Reading an unknown resource URI is a JSON-RPC error (`-32602`), as the MCP spec has it. It
+  returned a text body saying `Resource not found`.
 - Runtime dependencies: functype, functype-log and functype-os are now `^1.26.0`, and
   commander `^15.1.0`. The repo builds with pnpm 12.
 

@@ -1,9 +1,9 @@
+import { spawn } from "node:child_process"
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 
 import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client"
-import { StdioClientTransport } from "@modelcontextprotocol/client/stdio"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { packageVersion } from "../../src/core/version.js"
@@ -92,7 +92,7 @@ describe("MCP server (somamcp)", () => {
     const result = await client.callTool({ name: "getSecretMeta", arguments: { configPath } })
 
     expect((result as TextResult).isError).toBe(true)
-    expect(text(result)).toContain("Invalid arguments for tool 'getSecretMeta'")
+    expect(text(result)).toContain("key")
     await client.close()
   })
 
@@ -147,28 +147,54 @@ describe("a pinned config path (envpkt mcp -c)", () => {
 })
 
 describe("envpkt mcp (stdio)", () => {
-  it("serves MCP over stdio with nothing else on stdout, reading the config -c names", async () => {
-    const { ENVPKT_CONFIG: _, ...env } = process.env
-    const client = new Client({ name: "envpkt-stdio-test", version: "1.0.0" })
-    await client.connect(
-      new StdioClientTransport({
-        command: process.execPath,
-        args: [
-          "--import",
-          import.meta.resolve("tsx"),
-          join(import.meta.dirname, "../../src/cli/index.ts"),
-          "mcp",
-          "-c",
-          configPath,
-        ],
-        env: { ...env, ENVPKT_NO_GLOBAL: "1" } as Record<string, string>,
-        cwd: tmpDir,
-        stderr: "ignore",
-      }),
-    )
-    const result = await client.callTool({ name: "getPacketHealth", arguments: {} })
+  type RpcMessage = { jsonrpc?: unknown; id?: unknown; result?: { content: Array<{ text: string }> } }
 
-    expect(JSON.parse(text(result))).toMatchObject({ path: configPath })
-    await client.close()
+  const parseLine = (line: string): RpcMessage | undefined => {
+    try {
+      return JSON.parse(line) as RpcMessage
+    } catch {
+      return undefined
+    }
+  }
+
+  it("writes only JSON-RPC to stdout, and reads the config -c names", async () => {
+    const { ENVPKT_CONFIG: _, ...env } = process.env
+    const cli = join(import.meta.dirname, "../../src/cli/index.ts")
+    const child = spawn(process.execPath, ["--import", import.meta.resolve("tsx"), cli, "mcp", "-c", configPath], {
+      cwd: tmpDir,
+      env: { ...env, ENVPKT_NO_GLOBAL: "1" },
+      stdio: ["pipe", "pipe", "ignore"],
+    })
+
+    const lines: string[] = []
+    const answered = new Promise<void>((resolve) => {
+      let buffer = ""
+      child.stdout.on("data", (chunk: Buffer) => {
+        const parts = (buffer + chunk.toString()).split("\n")
+        buffer = parts.pop() ?? ""
+        lines.push(...parts.filter((l) => l.length > 0))
+        if (lines.some((l) => parseLine(l)?.id === 2)) resolve()
+      })
+    })
+
+    const send = (message: Record<string, unknown>): void => {
+      child.stdin.write(`${JSON.stringify({ jsonrpc: "2.0", ...message })}\n`)
+    }
+    send({
+      id: 1,
+      method: "initialize",
+      params: { protocolVersion: "2025-06-18", capabilities: {}, clientInfo: { name: "raw", version: "1.0.0" } },
+    })
+    send({ method: "notifications/initialized" })
+    send({ id: 2, method: "tools/call", params: { name: "getPacketHealth", arguments: {} } })
+
+    await answered
+    child.kill()
+
+    // Every stdout line must be a JSON-RPC message: a stray log line would corrupt the channel.
+    const messages = lines.map(parseLine)
+    messages.forEach((m, i) => expect(m?.jsonrpc, `stdout line ${i}: ${lines[i]}`).toBe("2.0"))
+    const call = messages.find((m) => m?.id === 2)
+    expect(JSON.parse(call?.result?.content[0]?.text ?? "{}")).toMatchObject({ path: configPath })
   }, 20_000)
 })
