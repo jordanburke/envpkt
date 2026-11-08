@@ -616,7 +616,10 @@ Start the envpkt MCP server (stdio transport) for AI agent integration.
 
 ```bash
 envpkt mcp
+envpkt mcp -c ~/.envpkt/civala.toml   # pin the packet every tool and resource reads
 ```
+
+With `-c`, tools and resources read that file instead of resolving one from the working directory or `ENVPKT_CONFIG`. A tool call that passes its own `configPath` still uses that.
 
 ## Config Resolution
 

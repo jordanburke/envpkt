@@ -1,9 +1,6 @@
-import { existsSync, readFileSync } from "node:fs"
-import { dirname, join } from "node:path"
-import { fileURLToPath } from "node:url"
-
 import { Command } from "commander"
 
+import { packageVersion } from "../core/version.js"
 import { runAudit } from "./commands/audit.js"
 import { runConfigPath } from "./commands/config-path.js"
 import { runCopy } from "./commands/copy.js"
@@ -34,17 +31,7 @@ program
       "  Developer workflow:  env scan → keygen → seal → eval $(envpkt env export)\n" +
       "  Agent / CI workflow: catalog → audit --strict → seal → exec --strict → fleet",
   )
-  .version(
-    (() => {
-      const findPkgJson = (dir: string): string => {
-        if (existsSync(join(dir, "package.json"))) return join(dir, "package.json")
-        const parent = dirname(dir)
-        return parent === dir ? "" : findPkgJson(parent)
-      }
-      const pkgPath = findPkgJson(dirname(fileURLToPath(import.meta.url)))
-      return pkgPath ? (JSON.parse(readFileSync(pkgPath, "utf-8")) as { version: string }).version : "0.0.0"
-    })(),
-  )
+  .version(packageVersion())
 
 program
   .command("init")

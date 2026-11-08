@@ -144,5 +144,7 @@ export { compareFnoxAndEnvpkt } from "./fnox/sync.js"
 
 // MCP server
 export { readResource, resourceDefinitions } from "./mcp/resources.js"
+export type { McpServerOptions } from "./mcp/server.js"
 export { createServer, startServer } from "./mcp/server.js"
+export type { CallToolResult, ToolDef } from "./mcp/tools.js"
 export { callTool, toolDefinitions } from "./mcp/tools.js"

@@ -58,7 +58,7 @@ Commander-based CLI. Each command in `src/cli/commands/` maps 1:1 to a subcomman
 
 ### MCP Layer (`src/mcp/`)
 
-MCP server using `@modelcontextprotocol/sdk` with stdio transport. Exposes 5 tools (`getPacketHealth`, `listCapabilities`, `getSecretMeta`, `checkExpiration`, `getEnvMeta`) and 2 resources (`envpkt://health`, `envpkt://capabilities`). The MCP server does not have access to secret values — it reads `envpkt.toml` which contains metadata only, and `encrypted_value` ciphertext is stripped from responses.
+MCP server built on [somamcp](https://github.com/sapientsai/SomaMCP) (`somamcp/node`, MCP SDK 2.x) with stdio transport. Tool arguments are TypeBox schemas; `typebox-schema.ts` adapts them to the Standard Schema somamcp validates with, since TypeBox 0.34 doesn't implement it. Exposes 5 read-only tools (`getPacketHealth`, `listCapabilities`, `getSecretMeta`, `checkExpiration`, `getEnvMeta`) and 2 resources (`envpkt://health`, `envpkt://capabilities`), plus somamcp's `info` tool (name, version, build, runtime). The MCP server does not have access to secret values — it reads `envpkt.toml` which contains metadata only, and `encrypted_value` ciphertext is stripped from responses.
 
 ### fnox Integration (`src/fnox/`)
 
@@ -77,7 +77,7 @@ Bridge to the `fnox` credential store: detection, CLI invocation, TOML parsing, 
 - **@sinclair/typebox** — Runtime schema validation + TypeScript type derivation
 - **smol-toml** — TOML parser
 - **commander** — CLI framework
-- **@modelcontextprotocol/sdk** — MCP server implementation
+- **somamcp** — MCP server framework (MCP SDK 2.x underneath)
 - **age-encryption** (typage) — In-process age encryption, used only by `src/core/age.ts`. The `age` CLI is not needed at runtime; CI installs it only for the interop spec (`test/core/age-interop.spec.ts`).
 
 ## Test Structure

@@ -17,11 +17,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Runtime dependencies: functype, functype-log and functype-os are now `^1.26.0`,
-  `@modelcontextprotocol/sdk` `^1.32.2`, and commander `^15.1.0`. The repo builds with pnpm 12.
+- The MCP server (`envpkt mcp`) is built on [somamcp](https://github.com/sapientsai/SomaMCP) and
+  the MCP SDK 2.x, in place of `@modelcontextprotocol/sdk` 1.x. It serves 2026-07-28 and 2025
+  clients, reports envpkt's real version (it said `0.1.0`), marks every tool read-only, and adds
+  somamcp's `info` tool. Tool arguments are now validated against their schemas before a tool runs.
+- **Breaking (library):** `createServer()` returns a somamcp `SomaServerInstance`, not an SDK
+  `Server`. Served through its `fetch()`, it also answers somamcp's `/health` and `/info` routes and
+  dashboard, without auth; stdio serves none of them. `toolDefinitions` entries gain a TypeBox
+  `parameters` field. The `ToolDef`, `CallToolResult` and `McpServerOptions` types are exported.
+- Reading an unknown resource URI is a JSON-RPC error (`-32602`), as the MCP spec has it. It
+  returned a text body saying `Resource not found`.
+- Runtime dependencies: functype, functype-log and functype-os are now `^1.26.0`, and
+  commander `^15.1.0`. The repo builds with pnpm 12.
 
 ### Fixed
 
+- `envpkt mcp -c <path>` ignored the path, so the server still resolved a config from its working
+  directory or `ENVPKT_CONFIG`. Tools and resources now read the file `-c` names; a tool call that
+  passes its own `configPath` still overrides it. `createServer()` and `startServer()` take
+  `{ configPath }` for the same.
 - Docs: the site's canonical URLs and sitemap, and two README links, pointed at an unregistered
   domain. They now use `envpkt.com`, where the site is served. A test fails on any return of it.
 - `test/cli/config-path.spec.ts` "prints nothing when no config is found" no longer fails on WSL

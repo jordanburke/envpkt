@@ -1,13 +1,23 @@
-import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js"
+import { type TObject, Type } from "@sinclair/typebox"
 import { Option } from "functype"
 
 import { computeAudit, computeEnvAudit } from "../core/audit.js"
 import { loadConfig, resolveConfigPath } from "../core/config.js"
 import type { EnvpktConfig } from "../core/types.js"
+import { plainJsonSchema } from "./typebox-schema.js"
 
-type ToolDef = {
+/** A tool's result: text content, flagged as an error when the tool failed. */
+export type CallToolResult = {
+  content: Array<{ type: "text"; text: string }>
+  isError?: boolean
+}
+
+export type ToolDef = {
   readonly name: string
   readonly description: string
+  /** TypeBox schema for the arguments; the source `inputSchema` is generated from. */
+  readonly parameters: TObject
+  /** The arguments as plain JSON Schema. */
   readonly inputSchema: {
     readonly type: "object"
     readonly properties?: Record<string, unknown>
@@ -54,65 +64,42 @@ const loadConfigForTool = (configPath: Option<string>): LoadedConfig | LoadError
 
 // --- Tool definitions ---
 
+const ConfigPath = Type.Optional(Type.String({ description: "Optional path to envpkt.toml" }))
+
+const ConfigOnlyParams = Type.Object({ configPath: ConfigPath })
+
+const keyParams = (description: string) => Type.Object({ key: Type.String({ description }), configPath: ConfigPath })
+
+const tool = (name: string, description: string, parameters: TObject): ToolDef => ({
+  name,
+  description,
+  parameters,
+  inputSchema: plainJsonSchema(parameters) as ToolDef["inputSchema"],
+})
+
 export const toolDefinitions: readonly ToolDef[] = [
-  {
-    name: "getPacketHealth",
-    description:
-      "Get overall health status of the envpkt credential packet — returns audit results including secret statuses, expiration info, and issues",
-    inputSchema: {
-      type: "object",
-      properties: {
-        configPath: { type: "string", description: "Optional path to envpkt.toml" },
-      },
-    },
-  },
-  {
-    name: "listCapabilities",
-    description: "List capabilities declared by the agent and per-secret capabilities",
-    inputSchema: {
-      type: "object",
-      properties: {
-        configPath: { type: "string", description: "Optional path to envpkt.toml" },
-      },
-    },
-  },
-  {
-    name: "getSecretMeta",
-    description:
-      "Get metadata for a specific secret by key name — returns service, purpose, expiration, provisioner, and other five-W details",
-    inputSchema: {
-      type: "object",
-      properties: {
-        key: { type: "string", description: "Secret key name to look up" },
-        configPath: { type: "string", description: "Optional path to envpkt.toml" },
-      },
-      required: ["key"],
-    },
-  },
-  {
-    name: "checkExpiration",
-    description: "Check expiration status of a specific secret — returns days remaining and whether it needs rotation",
-    inputSchema: {
-      type: "object",
-      properties: {
-        key: { type: "string", description: "Secret key name to check" },
-        configPath: { type: "string", description: "Optional path to envpkt.toml" },
-      },
-      required: ["key"],
-    },
-  },
-  {
-    name: "getEnvMeta",
-    description:
-      "Get metadata for environment defaults — returns configured default values, purposes, and current drift status",
-    inputSchema: {
-      type: "object",
-      properties: {
-        configPath: { type: "string", description: "Optional path to envpkt.toml" },
-      },
-    },
-  },
-] as const
+  tool(
+    "getPacketHealth",
+    "Get overall health status of the envpkt credential packet — returns audit results including secret statuses, expiration info, and issues",
+    ConfigOnlyParams,
+  ),
+  tool("listCapabilities", "List capabilities declared by the agent and per-secret capabilities", ConfigOnlyParams),
+  tool(
+    "getSecretMeta",
+    "Get metadata for a specific secret by key name — returns service, purpose, expiration, provisioner, and other five-W details",
+    keyParams("Secret key name to look up"),
+  ),
+  tool(
+    "checkExpiration",
+    "Check expiration status of a specific secret — returns days remaining and whether it needs rotation",
+    keyParams("Secret key name to check"),
+  ),
+  tool(
+    "getEnvMeta",
+    "Get metadata for environment defaults — returns configured default values, purposes, and current drift status",
+    ConfigOnlyParams,
+  ),
+]
 
 const configPathArg = (args: Record<string, unknown>): Option<string> =>
   Option(typeof args.configPath === "string" ? args.configPath : null)

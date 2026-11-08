@@ -37,6 +37,9 @@ Uses stdio transport. The server reads `envpkt.toml` from the current directory 
 | `getSecretMeta`    | Get metadata for a specific secret by key               |
 | `checkExpiration`  | Check expiration status and days remaining              |
 | `getEnvMeta`       | Get metadata for environment defaults and drift status  |
+| `info`             | Server name, version, build and runtime                 |
+
+Every envpkt tool is marked read-only (`readOnlyHint`). The server is built on [somamcp](https://github.com/sapientsai/SomaMCP) and the MCP SDK 2.x, so it serves both 2026-07-28 and 2025 clients.
 
 ### `getPacketHealth`
 
@@ -100,15 +103,17 @@ The helper runs outside the model's context. Claude Code reads the headers from 
 ```typescript
 import { createServer, startServer, toolDefinitions, callTool, resourceDefinitions, readResource } from "envpkt"
 
-// Tool definitions for MCP registration
+// A somamcp server with the envpkt tools and resources registered
+const server = createServer()
+await server.start({ transportType: "stdio" }) // or: await startServer()
+
+// Tool definitions: name, description, TypeBox `parameters`, JSON Schema `inputSchema`
 const tools = toolDefinitions
 
-// Call a tool
-const result = callTool("getPacketHealth", {}, config, audit)
+// Call a tool directly, without MCP
+const result = callTool("getPacketHealth", { configPath: "./envpkt.toml" })
 
-// Resource definitions
+// Resource definitions, and reading one (an Option)
 const resources = resourceDefinitions
-
-// Read a resource
-const data = readResource("envpkt://health", config, audit)
+const data = readResource("envpkt://health")
 ```
