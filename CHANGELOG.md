@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Breaking (library):** `createServer()` returns a somamcp `SomaServerInstance`, not an SDK
   `Server`. `toolDefinitions` entries gain a TypeBox `parameters` field. The `ToolDef` and
   `CallToolResult` types are exported.
+- Runtime dependencies: functype, functype-log and functype-os are now `^1.26.0`, and
+  commander `^15.1.0`. The repo builds with pnpm 12.
 
 ### Fixed
 

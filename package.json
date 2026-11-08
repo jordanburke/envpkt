@@ -41,18 +41,18 @@
   "dependencies": {
     "@sinclair/typebox": "^0.34.52",
     "age-encryption": "^0.3.1",
-    "commander": "^15.0.0",
-    "functype": "^1.18.0",
-    "functype-log": "^1.18.0",
-    "functype-os": "^1.18.0",
+    "commander": "^15.1.0",
+    "functype": "^1.26.0",
+    "functype-log": "^1.26.0",
+    "functype-os": "^1.26.0",
     "smol-toml": "^1.9.1",
     "somamcp": "^2.6.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "~2.4.0",
     "@types/node": "^24.19.2",
-    "ts-builds": "^3.4.3",
-    "tsdown": "^0.22.14",
+    "ts-builds": "^4.2.0",
+    "tsdown": "^0.23.7",
     "tsx": "^4.23.15"
   },
   "type": "module",
@@ -76,5 +76,5 @@
     "schemas"
   ],
   "prettier": "ts-builds/prettier",
-  "packageManager": "pnpm@11.27.0+sha512.ad12821463bb143295f1fa3ecde77a6b9b97a7990386da800ff57bffc3964dc64b7b1c7559d5dbe5c337aea659ed9c8937d4370bd198ca2009bc6fa0249808e7"
+  "packageManager": "pnpm@12.18.0+sha512.9d7882d5dc82147ecfc4e062aa34834e0ad0296710a1837a1115ae012127d36b7109e321ac1598a1dd0a65597681b1e99917e12ed0d749eae91187943363beb3"
 }
