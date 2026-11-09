@@ -163,6 +163,35 @@ describe("updateConfigIdentity", () => {
     expect(content).not.toContain("age1oldkey")
   })
 
+  it("keeps the final newline when [identity] is the last section", async () => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, `version = 1\n\n[identity]\nname = "test"\n`)
+
+    updateConfigIdentity(configPath, { recipient: "age1recipient" })
+
+    expect(readFileSync(configPath, "utf-8")).toBe(
+      `version = 1\n\n[identity]\nname = "test"\nrecipient = "age1recipient"\n`,
+    )
+  })
+
+  it("keeps the final newline when it appends a new [identity] section", async () => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, `version = 1\n`)
+
+    updateConfigIdentity(configPath, { recipient: "age1recipient" })
+
+    expect(readFileSync(configPath, "utf-8")).toBe(`version = 1\n\n[identity]\nrecipient = "age1recipient"\n`)
+  })
+
+  it("ends the file with a newline even when the original had none", async () => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, `version = 1`)
+
+    updateConfigIdentity(configPath, { recipient: "age1recipient" })
+
+    expect(readFileSync(configPath, "utf-8")).toBe(`version = 1\n\n[identity]\nrecipient = "age1recipient"\n`)
+  })
+
   it("preserves TOML structure", async () => {
     const configPath = join(tmpDir, "envpkt.toml")
     const original = `version = 1\n\n[identity]\nname = "test"\n\n[lifecycle]\nstale_warning_days = 90\n\n[secret.KEY]\nservice = "svc"\n`

@@ -70,7 +70,9 @@ export const updateConfigIdentity = (configPath: string, options: UpdateIdentity
   return readResult.fold<Either<KeygenError, true>>(
     (err) => Left({ _tag: "ConfigUpdateError", message: `Failed to read config: ${err}` } as const),
     (raw) => {
-      const lines = raw.split("\n")
+      // A final newline leaves a trailing "" that new [identity] lines would land after; drop it and add it back on write.
+      const split = raw.split("\n")
+      const lines = split[split.length - 1] === "" ? split.slice(0, -1) : split
       const updatedFields = new Set<string>()
 
       const acc = lines.reduce(
@@ -115,7 +117,7 @@ export const updateConfigIdentity = (configPath: string, options: UpdateIdentity
       const identityLines = fieldUpdaters.map((f) => f.line)
       const output = !acc.hasIdentitySection ? [...afterEof, "", "[identity]", ...identityLines] : afterEof
 
-      const writeResult = Try(() => writeFileSync(configPath, output.join("\n")))
+      const writeResult = Try(() => writeFileSync(configPath, `${output.join("\n")}\n`))
       return writeResult.fold<Either<KeygenError, true>>(
         (err) => Left({ _tag: "ConfigUpdateError", message: `Failed to write config: ${err}` } as const),
         () => Right(true as const),

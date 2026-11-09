@@ -1,5 +1,14 @@
 import { execFileSync } from "node:child_process"
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { basename, dirname, join, resolve } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -100,6 +109,54 @@ describe("envpkt keygen", () => {
     expect(config).not.toContain(`name = "${basename(tmpDir)}"`)
     expect(config).toContain("recipient = ")
     expect(config).toContain('key_file = "key.txt"')
+  })
+
+  it("preserves existing name when the config fails validation", () => {
+    const keyPath = join(tmpDir, "key.txt")
+    writeFileSync(join(tmpDir, "envpkt.toml"), `version = "nope"\n\n[identity]\nname = "my-agent"\n`)
+
+    const result = run(["keygen", "-o", keyPath], { cwd: tmpDir })
+
+    expect(result.status).toBe(0)
+    const config = readFileSync(join(tmpDir, "envpkt.toml"), "utf-8")
+    expect(config).toContain('name = "my-agent"')
+    expect(config).not.toContain(`name = "${basename(tmpDir)}"`)
+  })
+
+  it("does not tilde-shorten a sibling of $HOME that shares its prefix", () => {
+    // Real paths, so the bare-prefix check would have matched on macOS too (/var → /private/var).
+    const home = join(realpathSync(tmpDir), "home")
+    const keyPath = join(realpathSync(tmpDir), "home2", "key.txt")
+    mkdirSync(home)
+    mkdirSync(dirname(keyPath))
+    const agentDir = join(tmpDir, "agent")
+    mkdirSync(agentDir)
+    const configPath = join(agentDir, "envpkt.toml")
+    writeFileSync(configPath, `version = 1\n`)
+
+    const result = run(["keygen", "-c", configPath, "-o", keyPath], { cwd: agentDir, env: { HOME: home } })
+
+    expect(result.status).toBe(0)
+    expect(readFileSync(configPath, "utf-8")).toContain(`key_file = "${keyPath}"`)
+  })
+
+  it("tilde-shortens a key under a symlinked $HOME", () => {
+    const realHome = join(tmpDir, "real-home")
+    const linkHome = join(tmpDir, "link-home")
+    mkdirSync(join(realHome, ".envpkt"), { recursive: true })
+    symlinkSync(realHome, linkHome)
+    const agentDir = join(tmpDir, "agent")
+    mkdirSync(agentDir)
+    const configPath = join(agentDir, "envpkt.toml")
+    writeFileSync(configPath, `version = 1\n`)
+
+    const result = run(["keygen", "-c", configPath, "-o", join(linkHome, ".envpkt", "key.txt")], {
+      cwd: agentDir,
+      env: { HOME: linkHome },
+    })
+
+    expect(result.status).toBe(0)
+    expect(readFileSync(configPath, "utf-8")).toContain('key_file = "~/.envpkt/key.txt"')
   })
 
   it("writes key_file relative to the config's directory, not the cwd", () => {
