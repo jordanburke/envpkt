@@ -37,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   passes its own `configPath` still overrides it. `createServer()` and `startServer()` take
   `{ configPath }` for the same.
 - `envpkt keygen` kept an existing `identity.name` only when the config passed schema validation.
-  It now reads the name from the raw TOML, so an invalid config keeps its name too.
+  It now reads the name from the raw TOML, so a config that fails schema validation keeps its name
+  too. An empty `name = ""` now counts as no name, so keygen writes the derived one.
 - `envpkt keygen` wrote `envpkt.toml` without a final newline when `[identity]` was the last
   section or keygen appended it. The file now always ends with a newline.
 - `envpkt keygen` shortened any path that merely started with `$HOME` to `~`, so with

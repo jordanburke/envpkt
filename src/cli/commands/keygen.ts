@@ -25,7 +25,7 @@ const tildeShorten = (p: string): string => {
 /** Derive a default identity name from the config path's parent directory */
 const deriveIdentityName = (configPath: string): string => basename(dirname(resolve(configPath)))
 
-/** The raw TOML's identity.name, read without schema validation so an invalid config keeps its name */
+/** Read `key` from a plain object */
 const field =
   (key: string) =>
   (value: unknown): Option<unknown> =>
@@ -34,6 +34,7 @@ const field =
 const nonEmptyString = (value: unknown): Option<string> =>
   typeof value === "string" && value !== "" ? Option(value) : Option.none()
 
+/** The raw TOML's identity.name, read without schema validation so a config that fails it keeps its name */
 const rawIdentityName = (data: unknown): Option<string> =>
   field("identity")(data).flatMap(field("name")).flatMap(nonEmptyString)
 
