@@ -2,6 +2,8 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
+import { parse } from "smol-toml"
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigIdentity } from "../../src/core/keygen.js"
@@ -118,6 +120,27 @@ describe("generateKeypair", () => {
 })
 
 describe("updateConfigIdentity", () => {
+  it.each([
+    "version = 1\n",
+    "version = 1\n\n[identity]\n",
+    'version = 1\n\n[identity]\nname = "old"\nrecipient = "old"\nkey_file = "old"\n\n[lifecycle]\nstale_warning_days = 90\n',
+  ])("round-trips escaped identity values while preserving other sections", (original) => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, original)
+    const name = 'Agent "demo"\\line\nnext\t\u0001 café'
+    const recipient = 'synthetic"\\recipient\nvalue'
+    const keyFile = "C:\\Users\\demo\\key.txt"
+
+    expect(updateConfigIdentity(configPath, { name, recipient, keyFile }).isRight()).toBe(true)
+
+    const content = readFileSync(configPath, "utf-8")
+    const parsed = parse(content)
+    expect(parsed["identity"]).toEqual({ name, recipient, key_file: keyFile })
+    expect(parsed["version"]).toBe(1)
+    if (original.includes("[lifecycle]")) expect(parsed["lifecycle"]).toEqual({ stale_warning_days: 90 })
+    expect(content.endsWith("\n")).toBe(true)
+  })
+
   it("adds recipient to existing [identity] section", async () => {
     const configPath = join(tmpDir, "envpkt.toml")
     writeFileSync(configPath, `version = 1\n\n[identity]\nname = "test-agent"\n\n[secret.MY_KEY]\nservice = "test"\n`)
