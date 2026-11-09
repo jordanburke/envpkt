@@ -4,7 +4,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 
 import { Option, Try } from "functype"
 
-import { loadConfig } from "../../core/config.js"
+import { parseToml, readConfigFile } from "../../core/config.js"
 import { generateKeypair, resolveKeyPath, updateConfigIdentity } from "../../core/keygen.js"
 import { BOLD, CYAN, DIM, formatError, GREEN, RESET, YELLOW } from "../output.js"
 
@@ -14,20 +14,35 @@ type KeygenOptions = {
   readonly global?: boolean
 }
 
-/** Shorten a path under $HOME to use ~ prefix */
+/** Shorten a path under $HOME to use ~ prefix. `p` is a real path, so $HOME is compared as given and as a real path. */
 const tildeShorten = (p: string): string => {
   const home = homedir()
-  return p.startsWith(home) ? `~${p.slice(home.length)}` : p
+  const homes = [home, Try(() => realpathSync(home)).orElse(home)]
+  const match = homes.find((h) => p === h || p.startsWith(h + sep))
+  return match === undefined ? p : `~${p.slice(match.length)}`
 }
 
 /** Derive a default identity name from the config path's parent directory */
 const deriveIdentityName = (configPath: string): string => basename(dirname(resolve(configPath)))
 
+/** The raw TOML's identity.name, read without schema validation so an invalid config keeps its name */
+const field =
+  (key: string) =>
+  (value: unknown): Option<unknown> =>
+    typeof value === "object" && value !== null ? Option((value as Record<string, unknown>)[key]) : Option.none()
+
+const nonEmptyString = (value: unknown): Option<string> =>
+  typeof value === "string" && value !== "" ? Option(value) : Option.none()
+
+const rawIdentityName = (data: unknown): Option<string> =>
+  field("identity")(data).flatMap(field("name")).flatMap(nonEmptyString)
+
 /** Keep the config's identity.name if it has one; otherwise derive one */
 const identityName = (configPath: string): string =>
-  loadConfig(configPath)
+  readConfigFile(configPath)
+    .flatMap(parseToml)
     .toOption()
-    .flatMap((config) => Option(config.identity?.name))
+    .flatMap(rawIdentityName)
     .orElse(deriveIdentityName(configPath))
 
 /**

@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   directory or `ENVPKT_CONFIG`. Tools and resources now read the file `-c` names; a tool call that
   passes its own `configPath` still overrides it. `createServer()` and `startServer()` take
   `{ configPath }` for the same.
+- `envpkt keygen` kept an existing `identity.name` only when the config passed schema validation.
+  It now reads the name from the raw TOML, so an invalid config keeps its name too.
+- `envpkt keygen` wrote `envpkt.toml` without a final newline when `[identity]` was the last
+  section or keygen appended it. The file now always ends with a newline.
+- `envpkt keygen` shortened any path that merely started with `$HOME` to `~`, so with
+  `HOME=/Users/me` a key at `/Users/me2/key.txt` became `~2/key.txt`, which boot can't expand. It
+  now shortens only paths inside `$HOME`, and also matches a symlinked `$HOME` by its real path.
 - Docs: the site's canonical URLs and sitemap, and two README links, pointed at an unregistered
   domain. They now use `envpkt.com`, where the site is served. A test fails on any return of it.
 - `test/cli/config-path.spec.ts` "prints nothing when no config is found" no longer fails on WSL
