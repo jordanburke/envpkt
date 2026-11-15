@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-15
+
 ### Added
 
 - `ENVPKT_NO_GLOBAL=1` turns off the global package. Config discovery stops after the project
