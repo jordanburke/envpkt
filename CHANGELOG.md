@@ -27,8 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `parameters` field. The `ToolDef`, `CallToolResult` and `McpServerOptions` types are exported.
 - Reading an unknown resource URI is a JSON-RPC error (`-32602`), as the MCP spec has it. It
   returned a text body saying `Resource not found`.
-- Runtime dependencies: functype, functype-log and functype-os are now `^1.26.0`, and
+- Runtime dependencies: functype, functype-log and functype-os are now `^1.27.0`, and
   commander `^15.1.0`. The repo builds with pnpm 12.
+- functype 1.27.0 freezes its `List`, `Set` and `Map` instances, so the `List` values envpkt
+  returns are frozen too: `AuditResult.secrets` and each `SecretHealth.issues` from
+  `computeAudit`, `ScanResult.discovered`, `CheckResult.entries`, `FleetHealth.agents`,
+  `missing` and `orphaned` from `compareFnoxAndEnvpkt`, and `ValidationError.errors`. They were
+  already typed `readonly`. Writing a property to one, or calling `vi.spyOn` on one, now throws a
+  `TypeError`; mapping, filtering and `toArray()` work as before.
 
 ### Fixed
 
