@@ -6,9 +6,16 @@ on:
   pull_request:
     branches: ["main"]
 
+# A newer push to a pull request cancels the build it supersedes. A push to main gets a group of its own,
+# because GitHub cancels a waiting run when a newer one joins its group, even with cancel-in-progress off.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     # Maintained Node lines only; see the engines field in package.json. pnpm itself needs
     # 22.13+, so the 22.12.0 engines floor is checked by hand, not here.
@@ -20,7 +27,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6.1.0
         name: Install pnpm
 
       - name: Setup Node.js ${{ matrix.node-version }}
@@ -38,4 +45,4 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run CI Pipeline
-        run: pnpm run validate
+        run: pnpm run ci

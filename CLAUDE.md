@@ -12,6 +12,7 @@ Key capabilities: MCP server for agent-facing credential awareness (metadata onl
 
 ```bash
 pnpm validate          # Full pipeline: format → lint → typecheck → test → build:schema → build
+pnpm run ci            # validate's checks without fixing, as CI runs them (type `run`: `pnpm ci` is a clean install)
 pnpm test              # Run tests only
 pnpm test -- test/core/seal.spec.ts           # Single test file
 pnpm test -- --testNamePattern="pattern"      # Filter by test name
@@ -98,4 +99,4 @@ git tag vX.Y.Z && git push origin vX.Y.Z
 
 Push `main` first and tag only after CI passes: the tag triggers the publish, and a failed publish job can't be retried safely.
 
-`.nvmrc` pins an exact Node version (`24.20.0`, npm 11.19.0): a bare major lets the runner pick an npm whose OIDC exchange fails with `E401 ... Failed to generate Web Auth URLs`. The workflow also moves the major action tag (e.g. `v0`). `prepublishOnly` runs `pnpm validate`. The `schemas/` directory and JSON Schema export (`envpkt/schema`) are part of the published package.
+`.nvmrc` pins an exact Node version (`24.20.0`, npm 11.19.0): a bare major lets the runner pick an npm whose OIDC exchange fails with `E401 ... Failed to generate Web Auth URLs`. The workflow also moves the major action tag (e.g. `v0`). `prepublishOnly` runs `pnpm run ci`. The `schemas/` directory and JSON Schema export (`envpkt/schema`) are part of the published package.

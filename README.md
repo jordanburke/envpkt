@@ -888,6 +888,7 @@ envpkt integrates with [fnox](https://github.com/jordanburke/fnox) for secret re
 ```bash
 pnpm install
 pnpm validate    # format + lint + typecheck + test + build:schema + build
+pnpm run ci      # validate's checks without fixing, as CI runs them (type `run`: `pnpm ci` is a clean install)
 pnpm test        # Run tests only
 pnpm dev         # Watch mode
 pnpm demo        # Regenerate demo HTML renders in examples/demo/

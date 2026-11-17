@@ -22,6 +22,7 @@
   },
   "scripts": {
     "validate": "ts-builds validate",
+    "ci": "ts-builds ci",
     "format": "ts-builds format",
     "format:check": "ts-builds format:check",
     "lint": "ts-builds lint",
@@ -36,7 +37,7 @@
     "dev": "ts-builds dev",
     "docs:dev": "pnpm --dir site dev",
     "docs:build": "pnpm --dir site build",
-    "prepublishOnly": "pnpm validate"
+    "prepublishOnly": "pnpm run ci"
   },
   "dependencies": {
     "@sinclair/typebox": "^0.34.52",
@@ -51,7 +52,7 @@
   "devDependencies": {
     "@modelcontextprotocol/client": "~2.4.0",
     "@types/node": "^24.19.2",
-    "ts-builds": "^4.2.0",
+    "ts-builds": "^4.7.0",
     "tsdown": "^0.23.7",
     "tsx": "^4.23.15"
   },
