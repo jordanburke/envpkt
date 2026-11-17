@@ -4,6 +4,8 @@ node_modules
 # Generated / tool-managed files — Prettier must not reformat these.
 # pnpm manages the lockfile; reformatting it churns ~1k lines every validate.
 pnpm-lock.yaml
+# Written by `pnpm build:schema` (scripts/build-schema.ts); the generator owns its layout.
+schemas/envpkt.schema.json
 dist
 coverage
 site/.astro
