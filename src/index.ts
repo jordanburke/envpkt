@@ -82,7 +82,7 @@ export type { FormatPacketOptions, SecretDisplay } from "./core/format.js"
 export { formatPacket, maskValue } from "./core/format.js"
 
 // Audit engine
-export { computeAudit, computeEnvAudit } from "./core/audit.js"
+export { computeAudit, computeEnvAudit, envAuditToJson } from "./core/audit.js"
 
 // Pattern registry
 export type { ConfidenceLevel, CredentialPattern, MatchResult } from "./core/patterns.js"

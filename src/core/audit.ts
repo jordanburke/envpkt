@@ -249,6 +249,18 @@ export const computeAudit = (
   }
 }
 
+/** EnvAuditResult as plain JSON data: `alias_of` is the reference string or null, not an Option */
+export const envAuditToJson = (result: EnvAuditResult): Record<string, unknown> => ({
+  ...result,
+  entries: result.entries.map((entry) => ({
+    ...entry,
+    alias_of: entry.alias_of.fold<string | null>(
+      () => null,
+      (ref) => ref,
+    ),
+  })),
+})
+
 export const computeEnvAudit = (
   config: EnvpktConfig,
   // eslint-disable-next-line functype/prefer-option -- process.env uses string | undefined natively

@@ -1,7 +1,7 @@
 import { type TObject, Type } from "@sinclair/typebox"
 import { Option } from "functype"
 
-import { computeAudit, computeEnvAudit } from "../core/audit.js"
+import { computeAudit, computeEnvAudit, envAuditToJson } from "../core/audit.js"
 import { loadConfig, resolveConfigPath } from "../core/config.js"
 import type { EnvpktConfig } from "../core/types.js"
 import { plainJsonSchema } from "./typebox-schema.js"
@@ -268,7 +268,7 @@ const handleGetEnvMeta = (args: Record<string, unknown>): CallToolResult => {
   const { config } = loaded
   const envAudit = computeEnvAudit(config)
 
-  return textResult(JSON.stringify(envAudit, null, 2))
+  return textResult(JSON.stringify(envAuditToJson(envAudit), null, 2))
 }
 
 const handlers: Record<string, (args: Record<string, unknown>) => CallToolResult> = {

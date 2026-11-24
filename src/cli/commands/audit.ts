@@ -2,7 +2,7 @@ import { dirname } from "node:path"
 
 import { Option } from "functype"
 
-import { computeAudit, computeEnvAudit } from "../../core/audit.js"
+import { computeAudit, computeEnvAudit, envAuditToJson } from "../../core/audit.js"
 import { resolveConfig } from "../../core/catalog.js"
 import { loadConfig, resolveConfigPath } from "../../core/config.js"
 import type { EnvpktConfig, SecretStatus } from "../../core/types.js"
@@ -104,7 +104,7 @@ const formatEnvAuditTable = (config: EnvpktConfig): void => {
 
 const formatEnvAuditJson = (config: EnvpktConfig): string => {
   const envAudit = computeEnvAudit(config)
-  return JSON.stringify(envAudit, null, 2)
+  return JSON.stringify(envAuditToJson(envAudit), null, 2)
 }
 
 const runAuditOnConfig = (config: EnvpktConfig, options: AuditOptions): void => {
