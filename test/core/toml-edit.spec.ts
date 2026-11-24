@@ -24,6 +24,16 @@ service = "gamma"
 `
 
 describe("removeSection", () => {
+  it("finds an indented header to remove", () => {
+    const raw = `[secret.B]\nservice = "x"\n\n  [secret.A]\n  service = "y"\n\n[env.Z]\nvalue = "1"\n`
+    expect(
+      removeSection(raw, "[secret.A]").fold(
+        (err) => expect.unreachable(err._tag),
+        (v) => v,
+      ),
+    ).toBe(`[secret.B]\nservice = "x"\n\n[env.Z]\nvalue = "1"\n`)
+  })
+
   it("treats a header whose quoted key holds `]` as a header", () => {
     const raw = `[secret.A]\nservice = "x"\n\n[secret."a]b"] # note\nservice = "y"\n\n[secret.C]\nservice = "z"\n`
     expect(

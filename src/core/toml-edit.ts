@@ -41,7 +41,7 @@ const findSectionRange = (
   sectionHeader: string,
   // eslint-disable-next-line functype/prefer-option
 ): { start: number; end: number } | undefined => {
-  const start = lines.findIndex((l) => headerOf(l) === sectionHeader)
+  const start = lines.findIndex((l) => headerOf(l.trimStart()) === sectionHeader)
   if (start === -1) return undefined
 
   const initial: ScanState = { end: lines.length, inMultiline: false, done: false }
