@@ -5,7 +5,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { Option, Try } from "functype"
 
 import { parseToml, readConfigFile } from "../../core/config.js"
-import { generateKeypair, resolveKeyPath, updateConfigIdentity } from "../../core/keygen.js"
+import { generateKeypair, identityTomlBlock, resolveKeyPath, updateConfigIdentity } from "../../core/keygen.js"
 import { BOLD, CYAN, DIM, formatError, GREEN, RESET, YELLOW } from "../output.js"
 
 type KeygenOptions = {
@@ -109,10 +109,10 @@ export const runKeygen = async (options: KeygenOptions): Promise<void> => {
               `${YELLOW}Warning:${RESET} Could not update config: ${"message" in err ? err.message : err._tag}`,
             )
             console.log(`${DIM}Manually add to your envpkt.toml:${RESET}`)
-            console.log(`  [identity]`)
-            console.log(`  name = "${name}"`)
-            console.log(`  recipient = "${recipient}"`)
-            console.log(`  key_file = "${keyFile}"`)
+            identityTomlBlock({ recipient, name, keyFile })
+              .trimEnd()
+              .split("\n")
+              .forEach((line) => console.log(`  ${line}`))
           },
           () => {
             console.log(

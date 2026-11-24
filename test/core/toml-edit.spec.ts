@@ -312,6 +312,39 @@ describe("updateSectionFields", () => {
     expect(text).toContain('tags = { env = "prod" }')
   })
 
+  const updated = (raw: string, header: string, updates: Readonly<Record<string, string | null>>): string =>
+    updateSectionFields(raw, header, updates).fold(
+      (err) => expect.unreachable(`Should be Right: ${err._tag}`),
+      (v) => v,
+    )
+
+  it("adds a new field after the section's last field, not after the blank line before the next header", () => {
+    expect(updated(baseToml, "[secret.FIRST]", { rotates: '"90d"' })).toContain(
+      `purpose = "Testing"\nrotates = "90d"\n\n[secret.SECOND]`,
+    )
+  })
+
+  it("finds a header followed by a comment, and stops at the next one", () => {
+    const raw = `[secret.A] # note\nservice = "a"\n\n[secret.B] # other\nservice = "b"\n`
+    expect(updated(raw, "[secret.A]", { service: '"x"' })).toBe(
+      `[secret.A] # note\nservice = "x"\n\n[secret.B] # other\nservice = "b"\n`,
+    )
+  })
+
+  it("matches quoted keys and keeps a key's indentation", () => {
+    const raw = `[secret.A]\n  "service" = "a"\n'purpose' = "p"\n`
+    expect(updated(raw, "[secret.A]", { service: '"x"', purpose: '"q"' })).toBe(
+      `[secret.A]\n  service = "x"\npurpose = "q"\n`,
+    )
+  })
+
+  it("copies a multi-line value it isn't changing, even a line in it that looks like a field", () => {
+    const raw = `[secret.A]\npurpose = """\nservice = "inside"\n"""\nservice = "a"\n`
+    expect(updated(raw, "[secret.A]", { service: '"x"' })).toBe(
+      `[secret.A]\npurpose = """\nservice = "inside"\n"""\nservice = "x"\n`,
+    )
+  })
+
   it("errors on missing section", () => {
     const result = updateSectionFields(baseToml, "[secret.NOPE]", { service: '"x"' })
     expect(result.isLeft()).toBe(true)
