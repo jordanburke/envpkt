@@ -189,7 +189,7 @@ export const computeAudit = (
         () => targetKey.map((k) => `secret.${k}`),
         (v) => Option(v),
       )
-      .orElse("")
+      .getOrElse(() => "")
 
     return targetHealth.fold<SecretHealth>(
       () => ({
@@ -268,7 +268,7 @@ export const computeEnvAudit = (
       const targetEntry = yield* $(Option(envEntries[targetKey]))
       return yield* $(Option(targetEntry.value))
     }) as Option<string>
-    return viaAlias.orElse(entry.value ?? "")
+    return viaAlias.getOrElse(() => entry.value ?? "")
   }
 
   const entries = Object.entries(envEntries).map(([key, entry]) => {

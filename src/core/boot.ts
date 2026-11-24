@@ -3,8 +3,6 @@ import { homedir } from "node:os"
 import { dirname, join, resolve } from "node:path"
 
 import { type Either, Left, Option, Right } from "functype"
-// Import from the /direct subpath, not the barrel — the barrel eagerly loads
-// loglayer via ./layers and ./adapter even if we only want the silent no-op.
 import { directSilentLogger } from "functype-log/direct"
 
 import { fnoxExport } from "../fnox/cli.js"

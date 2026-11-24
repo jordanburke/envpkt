@@ -17,7 +17,7 @@ type KeygenOptions = {
 /** Shorten a path under $HOME to use ~ prefix. `p` is a real path, so $HOME is compared as given and as a real path. */
 const tildeShorten = (p: string): string => {
   const home = homedir()
-  const homes = [home, Try(() => realpathSync(home)).orElse(home)]
+  const homes = [home, Try(() => realpathSync(home)).getOrElse(() => home)]
   const match = homes.find((h) => p === h || p.startsWith(h + sep))
   return match === undefined ? p : `~${p.slice(match.length)}`
 }
@@ -44,7 +44,7 @@ const identityName = (configPath: string): string =>
     .flatMap(parseToml)
     .toOption()
     .flatMap(rawIdentityName)
-    .orElse(deriveIdentityName(configPath))
+    .getOrElse(() => deriveIdentityName(configPath))
 
 /**
  * The key_file value to write. boot resolves key_file against the config's directory, so a key
@@ -53,7 +53,7 @@ const identityName = (configPath: string): string =>
  */
 const keyFileFor = (configPath: string, identityPath: string): string => {
   // Compare real paths: on macOS the cwd can be /private/var/… while a passed path says /var/….
-  const realPath = (p: string): string => Try(() => realpathSync(p)).orElse(resolve(p))
+  const realPath = (p: string): string => Try(() => realpathSync(p)).getOrElse(() => resolve(p))
   const abs = realPath(identityPath)
   const rel = relative(realPath(dirname(configPath)), abs)
   const outside = rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)
