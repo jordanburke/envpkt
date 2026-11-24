@@ -8,8 +8,8 @@ import { plainJsonSchema } from "./typebox-schema.js"
 
 /** A tool's result: text content, flagged as an error when the tool failed. */
 export type CallToolResult = {
-  content: Array<{ type: "text"; text: string }>
-  isError?: boolean
+  readonly content: ReadonlyArray<{ readonly type: "text"; readonly text: string }>
+  readonly isError?: boolean
 }
 
 export type ToolDef = {

@@ -43,7 +43,12 @@ export const createServer = (options: McpServerOptions = {}): SomaServerInstance
     server.addResource({
       ...def,
       // somamcp calls load only for a registered URI, and every definition has a handler.
-      load: () => Promise.resolve(readResource(def.uri, options.configPath).orThrow().contents),
+      load: () =>
+        Promise.resolve(
+          readResource(def.uri, options.configPath).orThrow(
+            () => new Error(`envpkt: no handler for resource ${def.uri}`),
+          ).contents,
+        ),
     })
   })
 

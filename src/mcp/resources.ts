@@ -12,7 +12,7 @@ export type Resource = {
 }
 
 export type ReadResourceResult = {
-  contents: Array<{ uri: string; mimeType: string; text: string }>
+  readonly contents: ReadonlyArray<{ readonly uri: string; readonly mimeType: string; readonly text: string }>
 }
 
 const loadConfigSafe = (configPath?: string): Option<{ config: EnvpktConfig; path: string }> => {
