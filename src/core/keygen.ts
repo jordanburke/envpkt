@@ -3,6 +3,7 @@ import { homedir } from "node:os"
 import { dirname, join } from "node:path"
 
 import { type Either, Left, None, type Option, Right, Some, Try } from "functype"
+import { stringify } from "smol-toml"
 
 import { generateAgeKeypair } from "./age.js"
 import type { KeygenError, KeygenResult } from "./types.js"
@@ -62,9 +63,9 @@ export const updateConfigIdentity = (configPath: string, options: UpdateIdentity
   const readResult = Try(() => readFileSync(configPath, "utf-8"))
 
   const fieldUpdaters: ReadonlyArray<{ readonly re: RegExp; readonly line: string }> = [
-    { re: /^recipient\s*=/, line: `recipient = "${options.recipient}"` },
-    ...(options.name ? [{ re: /^name\s*=/, line: `name = "${options.name}"` }] : []),
-    ...(options.keyFile ? [{ re: /^key_file\s*=/, line: `key_file = "${options.keyFile}"` }] : []),
+    { re: /^recipient\s*=/, line: stringify({ recipient: options.recipient }).trimEnd() },
+    ...(options.name ? [{ re: /^name\s*=/, line: stringify({ name: options.name }).trimEnd() }] : []),
+    ...(options.keyFile ? [{ re: /^key_file\s*=/, line: stringify({ key_file: options.keyFile }).trimEnd() }] : []),
   ]
 
   return readResult.fold<Either<KeygenError, true>>(
