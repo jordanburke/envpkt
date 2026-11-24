@@ -5,6 +5,9 @@ import { defineConfig } from "astro/config"
 
 export default defineConfig({
   site: "https://envpkt.com",
+  // Starlight 0.43 follows Astro's scoped-style strategy instead of forcing "where". Keep "where",
+  // the lower-specificity selectors the site's styles were written against.
+  scopedStyleStrategy: "where",
   integrations: [
     starlight({
       title: "envpacket / envpkt",

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Breaking (library): envpkt now runs on functype 2.** `functype`, `functype-log` and `functype-os` are
+  `^2.2.0`. The functype values envpkt returns, such as `bootSafe()`'s `Either` and the `Option` and
+  `List` fields of `AuditResult`, are functype 2 values, so code that calls their 1.x methods breaks:
+  `orElse(value)` is now `getOrElse(() => value)`, `or(x)` is now `orElse(() => x)`, and a List's
+  `headOption` is a method. See [Upgrading to functype 2.0](https://functype.org/upgrading-to-2).
+- **Library types:** `CallToolResult`'s `content` and `ReadResourceResult`'s `contents` are now
+  `ReadonlyArray`s of readonly objects.
+- Dependencies: ts-builds `^5.0.0`, somamcp `^2.11.0`, and pnpm 12.23.0. The docs site moves to Astro
+  7.4.13, Starlight 0.43.1 and `@astrojs/react` 7.1.9, and keeps Astro's `"where"` scoped-style
+  strategy, which Starlight 0.43 no longer forces.
+- Internal: under ts-builds 5's functype lint preset, `bootSafe()` builds its result without mutating
+  shared arrays, and the CLI's output builders use array literals instead of `push`. Output, warning
+  order and log events are unchanged.
+
+### Added
+
+- `envAuditToJson(result)` turns a `computeEnvAudit()` result into plain JSON data, with `alias_of` as
+  the reference string or `null`.
+
+### Fixed
+
+- `envpkt audit --env-only --format json` and the MCP `getEnvMeta` tool printed each entry's
+  `alias_of` as functype's `{"@functype":"Option","_tag":"Some","value":"env.X"}` envelope instead of
+  `"env.X"`. They now print the string, or `null` for an entry that isn't an alias.
+
 ## [0.19.0] - 2026-11-15
 
 ### Added
