@@ -43,10 +43,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   checks that the edited file parses to the original with only the identity fields changed. If it
   doesn't, or the original doesn't parse, keygen leaves the file alone and prints the `[identity]`
   block to add by hand, now TOML-escaped.
-- `updateSectionFields` (behind `envpkt secret edit` and `secret rotate`) finds a header followed by a comment,
-  matches quoted keys, keeps a key's indentation, copies a multi-line value it isn't changing
-  untouched, and adds a new field after the section's last field instead of after the blank line
-  before the next header.
+- `updateSectionFields` (behind `envpkt secret edit`, `secret rotate` and `env edit`) finds a header
+  followed by a comment, matches quoted keys and writes them back as written, keeps a key's
+  indentation, copies a multi-line value it isn't changing untouched, and adds a new field after the
+  section's last field instead of after the blank line before the next header.
+- `removeSection`, `replaceSection` and `updateSectionFields` stopped at the next header only when
+  it had nothing after it, so a section followed by `[secret.B] # note` ran on into it: removing the
+  first also removed `[secret.B]`. A header followed by a comment, or whose quoted key holds `]`, now
+  ends the section.
 
 ## [0.19.0] - 2026-11-15
 

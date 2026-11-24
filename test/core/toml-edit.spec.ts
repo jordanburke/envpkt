@@ -24,6 +24,16 @@ service = "gamma"
 `
 
 describe("removeSection", () => {
+  it("treats a header whose quoted key holds `]` as a header", () => {
+    const raw = `[secret.A]\nservice = "x"\n\n[secret."a]b"] # note\nservice = "y"\n\n[secret.C]\nservice = "z"\n`
+    expect(
+      removeSection(raw, "[secret.A]").fold(
+        (err) => expect.unreachable(err._tag),
+        (v) => v,
+      ),
+    ).toBe(`[secret."a]b"] # note\nservice = "y"\n\n[secret.C]\nservice = "z"\n`)
+  })
+
   it("removes a middle section", () => {
     const result = removeSection(baseToml, "[secret.SECOND]")
     expect(result.isRight()).toBe(true)
@@ -331,11 +341,24 @@ describe("updateSectionFields", () => {
     )
   })
 
-  it("matches quoted keys and keeps a key's indentation", () => {
+  it("matches quoted keys, writing each back as it was written and with its indentation", () => {
     const raw = `[secret.A]\n  "service" = "a"\n'purpose' = "p"\n`
     expect(updated(raw, "[secret.A]", { service: '"x"', purpose: '"q"' })).toBe(
-      `[secret.A]\n  service = "x"\npurpose = "q"\n`,
+      `[secret.A]\n  "service" = "x"\n'purpose' = "q"\n`,
     )
+  })
+
+  it.each([`description = 'uses """ q'`, `purpose = "d" # """`])(
+    'updates a field in place after a one-line field holding `"""`: %s',
+    (line) => {
+      const raw = `[secret.A]\n${line}\nservice = "x"\n`
+      expect(updated(raw, "[secret.A]", { service: '"s"' })).toBe(`[secret.A]\n${line}\nservice = "s"\n`)
+    },
+  )
+
+  it("does not take a row of a multi-line array for the next header", () => {
+    const raw = `[secret.A]\nm = [\n  [1, 2],\n  [3]\n]\nservice = "x"\n\n[secret.B]\nservice = "y"\n`
+    expect(updated(raw, "[secret.A]", { service: '"s"' })).toBe(raw.replace('service = "x"', 'service = "s"'))
   })
 
   it("copies a multi-line value it isn't changing, even a line in it that looks like a field", () => {

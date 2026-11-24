@@ -2,8 +2,12 @@ import { Either, List, Option, Set } from "functype"
 
 import type { TomlEditError } from "./types.js"
 
-/** A table header line, optionally indented and followed by a comment. Group 1 is the bare header. */
-const HEADER_RE = /^\s*(\[[^\]]*\]\]?)\s*(?:#.*)?$/
+/**
+ * A table header line, optionally followed by a comment. Group 1 is the bare header. A key is bare
+ * characters or a quoted string, which may hold `]`. No leading indent and no `,`, so a row of a
+ * multi-line array (`[1, 2]`) is not a header.
+ */
+const HEADER_RE = /^(\[\[?(?:[^[\]"',#=]|"(?:[^"\\]|\\.)*"|'[^']*')+\]\]?)\s*(?:#.*)?$/
 const MULTILINE_OPEN = '"""'
 
 /** The header a line declares (`[identity] # note` → `[identity]`), or "" when it isn't a header line. */
@@ -181,14 +185,17 @@ export const updateSectionFields = (
 
     const eqIdx = line.indexOf("=")
     const isFieldLine = eqIdx > 0 && !line.trimStart().startsWith("#") && !line.trimStart().startsWith("[")
-    // `"key" = …` and `'key' = …` name the same key as `key = …`.
-    const key = isFieldLine ? unquoteKey(line.slice(0, eqIdx).trim()) : ""
+    // `"key" = …` and `'key' = …` name the same key as `key = …`; an update keeps the key as written.
+    const keyText = isFieldLine ? line.slice(0, eqIdx).trim() : ""
+    const key = unquoteKey(keyText)
     const indent = line.slice(0, line.length - line.trimStart().length)
     const afterEquals = line.slice(eqIdx + 1).trim()
+    // Only a value that starts with `"""` and doesn't close on this line spans lines; a `"""` inside a
+    // literal string or a comment doesn't.
     const opensMultiline =
       isFieldLine &&
-      afterEquals.includes(MULTILINE_OPEN) &&
-      (afterEquals.match(new RegExp('"""', "g")) ?? []).length === 1
+      afterEquals.startsWith(MULTILINE_OPEN) &&
+      !afterEquals.slice(MULTILINE_OPEN.length).includes(MULTILINE_OPEN)
     const valueEnd = opensMultiline ? findClosingMultiline(i) : -1
 
     if (isFieldLine && Object.hasOwn(updates, key)) {
@@ -201,7 +208,7 @@ export const updateSectionFields = (
       }
       return {
         ...state,
-        remaining: [...state.remaining, `${indent}${key} = ${value}`],
+        remaining: [...state.remaining, `${indent}${keyText} = ${value}`],
         updatedKeys,
         skipUntil,
       }
