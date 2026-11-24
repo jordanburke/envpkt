@@ -23,7 +23,7 @@ export const resolveValues = async (
         // fnox export failed — continue to next layer
       },
       (exported) => {
-        const snapshot = [...remaining]
+        const snapshot = Array.from(remaining)
         snapshot.forEach((key) => {
           if (key in exported) {
             result[key] = exported[key]!
@@ -35,7 +35,7 @@ export const resolveValues = async (
   }
 
   // Layer 2: try process.env
-  const envSnapshot = [...remaining]
+  const envSnapshot = Array.from(remaining)
   envSnapshot.forEach((key) => {
     const envValue = stripTrailingNewline(process.env[key] ?? "")
     // A blank value is unset: no credential is all whitespace.

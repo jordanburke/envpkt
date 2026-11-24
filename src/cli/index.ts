@@ -124,7 +124,7 @@ program
   .option("--no-check", "Skip the pre-flight audit")
   .option("--warn-only", "Warn on critical audit but do not abort")
   .option("--strict", "Abort on any non-healthy secret")
-  .action(async (args: string[], options) => {
+  .action(async (args: ReadonlyArray<string>, options) => {
     await runExec(args, options)
   })
 

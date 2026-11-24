@@ -104,14 +104,14 @@ export const updateConfigIdentity = (configPath: string, options: UpdateIdentity
 
           return { ...state, output: [...state.output, line] }
         },
-        { output: [] as string[], inIdentitySection: false, hasIdentitySection: false },
+        { output: [] as ReadonlyArray<string>, inIdentitySection: false, hasIdentitySection: false },
       )
 
       // Still in [identity] at EOF — insert any missing fields
       const missingAtEof = acc.inIdentitySection
         ? fieldUpdaters.filter((f) => !updatedFields.has(f.re.source)).map((f) => f.line)
         : []
-      const afterEof = [...acc.output, ...missingAtEof]
+      const afterEof: ReadonlyArray<string> = [...acc.output, ...missingAtEof]
 
       // No [identity] section at all — append one with all fields
       const identityLines = fieldUpdaters.map((f) => f.line)

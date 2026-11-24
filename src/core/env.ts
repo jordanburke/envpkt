@@ -95,7 +95,7 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
   }
 
   // Direction 1: TOML keys → check if present in env (aliases satisfied by target)
-  const secretDriftEntries: DriftEntry[] = Object.entries(secretEntries).map(([key, meta]) => {
+  const secretDriftEntries: ReadonlyArray<DriftEntry> = Object.entries(secretEntries).map(([key, meta]) => {
     const present = isSecretPresent(key)
     return {
       envVar: key,
@@ -118,7 +118,7 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
   }
 
   // Env defaults excluding any key already tracked as a secret
-  const envDefaultEntries: DriftEntry[] = Object.keys(envDefaults)
+  const envDefaultEntries: ReadonlyArray<DriftEntry> = Object.keys(envDefaults)
     .filter((key) => !metaKeysSet.has(key))
     .map((key) => {
       const present = isEnvPresent(key)
@@ -137,7 +137,7 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
 
   // Direction 2: env vars → find credential-shaped vars not in TOML
   const envMatches = scanEnv(env)
-  const untrackedEntries: DriftEntry[] = envMatches
+  const untrackedEntries: ReadonlyArray<DriftEntry> = envMatches
     .filter((match) => !trackedKeys.has(match.envVar))
     .map((match) => ({
       envVar: match.envVar,
@@ -146,7 +146,7 @@ export const envCheck = (config: EnvpktConfig, env: Readonly<Record<string, stri
       confidence: Option(match.confidence),
     }))
 
-  const entries = [...secretDriftEntries, ...envDefaultEntries, ...untrackedEntries]
+  const entries: ReadonlyArray<DriftEntry> = [...secretDriftEntries, ...envDefaultEntries, ...untrackedEntries]
 
   const tracked_and_present = entries.filter((e) => e.status === "tracked").length
   const missing_from_env = entries.filter((e) => e.status === "missing_from_env").length

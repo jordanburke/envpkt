@@ -59,64 +59,63 @@ name = "${name}"
 }
 
 const generateTemplate = (options: InitOptions, fnoxKeys?: ReadonlyArray<string>): string => {
-  const lines: string[] = []
-
-  lines.push(`#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json`)
-  lines.push(``)
-  lines.push(`version = 1`)
   const scope = resolveInitScope(options)
-  if (scope) {
-    lines.push(`scope = "${scope}"   # shell = secrets load ambiently on cd/eval; exec = only via envpkt exec`)
-  }
-  lines.push(``)
 
-  if (options.catalog) {
-    lines.push(`catalog = "${options.catalog}"`)
-    lines.push(``)
-  }
+  const header: ReadonlyArray<string> = [
+    `#:schema https://raw.githubusercontent.com/jordanburke/envpkt/main/schemas/envpkt.schema.json`,
+    ``,
+    `version = 1`,
+    ...(scope ? [`scope = "${scope}"   # shell = secrets load ambiently on cd/eval; exec = only via envpkt exec`] : []),
+    ``,
+  ]
 
-  if (options.identity && options.name) {
-    lines.push(generateIdentitySection(options.name, options.capabilities, options.expires))
-    if (options.catalog) {
-      lines.push(`secrets = []  # Add catalog secret keys this agent needs`)
-    }
-    lines.push(``)
-  }
+  const catalogLines: ReadonlyArray<string> = options.catalog ? [`catalog = "${options.catalog}"`, ``] : []
 
-  if (!options.catalog) {
-    lines.push(`# Lifecycle policy`)
-    lines.push(`[lifecycle]`)
-    lines.push(`stale_warning_days = 90`)
-    lines.push(`# require_expiration = false`)
-    lines.push(`# require_service = false`)
-    lines.push(``)
+  const identityLines: ReadonlyArray<string> =
+    options.identity && options.name
+      ? [
+          generateIdentitySection(options.name, options.capabilities, options.expires),
+          ...(options.catalog ? [`secrets = []  # Add catalog secret keys this agent needs`] : []),
+          ``,
+        ]
+      : []
 
-    // Environment defaults section
-    lines.push(`# Plaintext environment defaults (non-secret, safe to commit)`)
-    lines.push(`# [env.PORT]`)
-    lines.push(`# value = "3000"`)
-    lines.push(`# purpose = "Application port"`)
-    lines.push(`# [env.NODE_ENV]`)
-    lines.push(`# value = "production"`)
-    lines.push(`# purpose = "Runtime environment"`)
-    lines.push(``)
+  const secretLines: ReadonlyArray<string> =
+    fnoxKeys && fnoxKeys.length > 0
+      ? [`# Secrets detected from fnox.toml`, ...fnoxKeys.map((key) => generateSecretBlock(key))]
+      : [
+          `# Add your secret metadata below.`,
+          `# Each [secret.<key>] describes a secret your agent needs.`,
+          ``,
+          generateSecretBlock("EXAMPLE_API_KEY", "example-service"),
+        ]
 
-    if (fnoxKeys && fnoxKeys.length > 0) {
-      lines.push(`# Secrets detected from fnox.toml`)
-      lines.push(...fnoxKeys.map((key) => generateSecretBlock(key)))
-    } else {
-      lines.push(`# Add your secret metadata below.`)
-      lines.push(`# Each [secret.<key>] describes a secret your agent needs.`)
-      lines.push(``)
-      lines.push(generateSecretBlock("EXAMPLE_API_KEY", "example-service"))
-    }
-  } else {
-    lines.push(`# Optional: override catalog metadata for specific secrets`)
-    lines.push(`# [secret.KEY_NAME]`)
-    lines.push(`# capabilities = ["read"]  # narrows catalog's broader definition`)
-  }
+  const bodyLines: ReadonlyArray<string> = !options.catalog
+    ? [
+        `# Lifecycle policy`,
+        `[lifecycle]`,
+        `stale_warning_days = 90`,
+        `# require_expiration = false`,
+        `# require_service = false`,
+        ``,
+        // Environment defaults section
+        `# Plaintext environment defaults (non-secret, safe to commit)`,
+        `# [env.PORT]`,
+        `# value = "3000"`,
+        `# purpose = "Application port"`,
+        `# [env.NODE_ENV]`,
+        `# value = "production"`,
+        `# purpose = "Runtime environment"`,
+        ``,
+        ...secretLines,
+      ]
+    : [
+        `# Optional: override catalog metadata for specific secrets`,
+        `# [secret.KEY_NAME]`,
+        `# capabilities = ["read"]  # narrows catalog's broader definition`,
+      ]
 
-  return lines.join("\n")
+  return [...header, ...catalogLines, ...identityLines, ...bodyLines].join("\n")
 }
 
 const readFnoxKeys = (fnoxPath: string): Either<ConfigError, ReadonlyArray<string>> =>

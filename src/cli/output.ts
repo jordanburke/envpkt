@@ -386,11 +386,12 @@ export const formatCheckJson = (check: CheckResult): string =>
 export const formatAuditMinimal = (audit: AuditResult): string => {
   if (audit.status === "healthy") return `${GREEN}✓${RESET} ${audit.total} secrets healthy`
 
-  const parts: string[] = []
-  if (audit.expired > 0) parts.push(`${audit.expired} expired`)
-  if (audit.expiring_soon > 0) parts.push(`${audit.expiring_soon} expiring`)
-  if (audit.stale > 0) parts.push(`${audit.stale} stale`)
-  if (audit.missing > 0) parts.push(`${audit.missing} missing`)
+  const parts: ReadonlyArray<string> = [
+    ...(audit.expired > 0 ? [`${audit.expired} expired`] : []),
+    ...(audit.expiring_soon > 0 ? [`${audit.expiring_soon} expiring`] : []),
+    ...(audit.stale > 0 ? [`${audit.stale} stale`] : []),
+    ...(audit.missing > 0 ? [`${audit.missing} missing`] : []),
+  ]
 
   const icon = audit.status === "critical" ? `${RED}✗${RESET}` : `${YELLOW}⚠${RESET}`
   return `${icon} ${parts.join(", ")}`

@@ -543,7 +543,7 @@ export const matchEnvVar = (name: string, value: string): Option<MatchResult> =>
 export const scanEnv = (env: Readonly<Record<string, string | undefined>>): ReadonlyArray<MatchResult> => {
   const results = Object.entries(env).flatMap(([name, value]) => {
     if (value === undefined || value === "") return []
-    return matchEnvVar(name, value).fold<MatchResult[]>(
+    return matchEnvVar(name, value).fold<ReadonlyArray<MatchResult>>(
       () => [],
       (m) => [m],
     )
@@ -551,11 +551,9 @@ export const scanEnv = (env: Readonly<Record<string, string | undefined>>): Read
 
   const confidenceOrder: Record<ConfidenceLevel, number> = { high: 0, medium: 1, low: 2 }
 
-  results.sort((a, b) => {
+  return results.toSorted((a, b) => {
     const conf = confidenceOrder[a.confidence] - confidenceOrder[b.confidence]
     if (conf !== 0) return conf
     return a.envVar.localeCompare(b.envVar)
   })
-
-  return results
 }

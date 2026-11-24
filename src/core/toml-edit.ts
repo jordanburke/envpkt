@@ -302,7 +302,7 @@ const partitionSections = (raw: string): Partitioned => {
   )
 
   type EnvOrSecretHeader = { readonly idx: number; readonly kind: "env" | "secret"; readonly key: string }
-  const envSecretHeaders: EnvOrSecretHeader[] = headers.filter(
+  const envSecretHeaders: ReadonlyArray<EnvOrSecretHeader> = headers.filter(
     (h): h is EnvOrSecretHeader => h.kind === "env" || h.kind === "secret",
   )
 
@@ -320,7 +320,7 @@ const partitionSections = (raw: string): Partitioned => {
     return { start: headerIdx, end: lastContent === -1 ? headerIdx + 1 : headerIdx + lastContent + 1 }
   }
 
-  const sections: SectionBlock[] = envSecretHeaders.map((h) => {
+  const sections: ReadonlyArray<SectionBlock> = envSecretHeaders.map((h) => {
     const headerIdx = h.idx
     const preambleStart = findPreambleStart(lines, headerIdx)
     const body = lines.slice(headerIdx, trueBodyRange(headerIdx).end)
@@ -367,8 +367,8 @@ export const sortConfigToml = (raw: string): string => {
     return raw
   }
 
-  const sortedEnv = [...envSections].sort((a, b) => a.key.localeCompare(b.key))
-  const sortedSecret = [...secretSections].sort((a, b) => a.key.localeCompare(b.key))
+  const sortedEnv = envSections.toSorted((a, b) => a.key.localeCompare(b.key))
+  const sortedSecret = secretSections.toSorted((a, b) => a.key.localeCompare(b.key))
 
   // Normalize preamble: trim trailing blanks; collapse runs of 2+ blank lines
   // into a single blank so removing claimed sections doesn't leave huge gaps.
@@ -377,7 +377,7 @@ export const sortConfigToml = (raw: string): string => {
     return lastNonBlank === -1 ? [] : xs.slice(0, lastNonBlank + 1)
   }
   const collapseBlanks = (xs: ReadonlyArray<string>): ReadonlyArray<string> =>
-    xs.reduce<string[]>((acc, line) => {
+    xs.reduce<ReadonlyArray<string>>((acc, line) => {
       const isBlank = line.trim() === ""
       const prevBlank = acc.length > 0 && acc[acc.length - 1]!.trim() === ""
       if (isBlank && prevBlank) return acc
@@ -385,10 +385,11 @@ export const sortConfigToml = (raw: string): string => {
     }, [])
   const preambleTrimmed = collapseBlanks(trimTrailing(preambleLines))
 
-  const parts: string[] = []
-  if (preambleTrimmed.length > 0) parts.push(preambleTrimmed.join("\n"))
-  if (sortedEnv.length > 0) parts.push(sortedEnv.map(emitSection).join("\n\n"))
-  if (sortedSecret.length > 0) parts.push(sortedSecret.map(emitSection).join("\n\n"))
+  const parts: ReadonlyArray<string> = [
+    ...(preambleTrimmed.length > 0 ? [preambleTrimmed.join("\n")] : []),
+    ...(sortedEnv.length > 0 ? [sortedEnv.map(emitSection).join("\n\n")] : []),
+    ...(sortedSecret.length > 0 ? [sortedSecret.map(emitSection).join("\n\n")] : []),
+  ]
 
   // Join regions with a blank line between, end with a single trailing newline.
   return `${parts.join("\n\n")}\n`

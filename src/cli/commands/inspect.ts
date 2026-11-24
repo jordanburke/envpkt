@@ -30,14 +30,16 @@ const printSecretMeta = (meta: SecretMeta, indent: string): void => {
       `${indent}${DIM}capabilities:${RESET} ${meta.capabilities.map((c) => `${MAGENTA}${c}${RESET}`).join(", ")}`,
     )
 
-  const dateParts: string[] = []
-  if (meta.created) dateParts.push(`${DIM}created:${RESET} ${BLUE}${meta.created}${RESET}`)
-  if (meta.expires) dateParts.push(`${DIM}expires:${RESET} ${YELLOW}${meta.expires}${RESET}`)
+  const dateParts: ReadonlyArray<string> = [
+    ...(meta.created ? [`${DIM}created:${RESET} ${BLUE}${meta.created}${RESET}`] : []),
+    ...(meta.expires ? [`${DIM}expires:${RESET} ${YELLOW}${meta.expires}${RESET}`] : []),
+  ]
   if (dateParts.length > 0) console.log(`${indent}${dateParts.join("  ")}`)
 
-  const opsParts: string[] = []
-  if (meta.rotates) opsParts.push(`${DIM}rotates:${RESET} ${CYAN}${meta.rotates}${RESET}`)
-  if (meta.rate_limit) opsParts.push(`${DIM}rate_limit:${RESET} ${CYAN}${meta.rate_limit}${RESET}`)
+  const opsParts: ReadonlyArray<string> = [
+    ...(meta.rotates ? [`${DIM}rotates:${RESET} ${CYAN}${meta.rotates}${RESET}`] : []),
+    ...(meta.rate_limit ? [`${DIM}rate_limit:${RESET} ${CYAN}${meta.rate_limit}${RESET}`] : []),
+  ]
   if (opsParts.length > 0) console.log(`${indent}${opsParts.join("  ")}`)
 
   if (meta.source) console.log(`${indent}${DIM}source:${RESET} ${BLUE}${meta.source}${RESET}`)
