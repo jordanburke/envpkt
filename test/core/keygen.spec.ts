@@ -2,9 +2,17 @@ import { chmodSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync }
 import { join } from "node:path"
 import { tmpdir } from "node:os"
 
+import { parse } from "smol-toml"
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { generateKeypair, resolveInlineKey, resolveKeyPath, updateConfigIdentity } from "../../src/core/keygen.js"
+import {
+  generateKeypair,
+  identityTomlBlock,
+  resolveInlineKey,
+  resolveKeyPath,
+  updateConfigIdentity,
+} from "../../src/core/keygen.js"
 import { unwrapAgentKey } from "../../src/fnox/identity.js"
 
 let tmpDir: string
@@ -118,6 +126,27 @@ describe("generateKeypair", () => {
 })
 
 describe("updateConfigIdentity", () => {
+  it.each([
+    "version = 1\n",
+    "version = 1\n\n[identity]\n",
+    'version = 1\n\n[identity]\nname = "old"\nrecipient = "old"\nkey_file = "old"\n\n[lifecycle]\nstale_warning_days = 90\n',
+  ])("round-trips escaped identity values while preserving other sections", (original) => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, original)
+    const name = 'Agent "demo"\\line\nnext\t\u0001 café'
+    const recipient = 'synthetic"\\recipient\nvalue'
+    const keyFile = "C:\\Users\\demo\\key.txt"
+
+    expect(updateConfigIdentity(configPath, { name, recipient, keyFile }).isRight()).toBe(true)
+
+    const content = readFileSync(configPath, "utf-8")
+    const parsed = parse(content)
+    expect(parsed["identity"]).toEqual({ name, recipient, key_file: keyFile })
+    expect(parsed["version"]).toBe(1)
+    if (original.includes("[lifecycle]")) expect(parsed["lifecycle"]).toEqual({ stale_warning_days: 90 })
+    expect(content.endsWith("\n")).toBe(true)
+  })
+
   it("adds recipient to existing [identity] section", async () => {
     const configPath = join(tmpDir, "envpkt.toml")
     writeFileSync(configPath, `version = 1\n\n[identity]\nname = "test-agent"\n\n[secret.MY_KEY]\nservice = "test"\n`)
@@ -204,5 +233,86 @@ describe("updateConfigIdentity", () => {
     expect(content).toContain("stale_warning_days = 90")
     expect(content).toContain("[secret.KEY]")
     expect(content).toContain('service = "svc"')
+  })
+})
+
+describe("updateConfigIdentity on other valid TOML layouts", () => {
+  const update = (original: string, options: Parameters<typeof updateConfigIdentity>[1]) => {
+    const configPath = join(tmpDir, "envpkt.toml")
+    writeFileSync(configPath, original)
+    const result = updateConfigIdentity(configPath, options)
+    return { result, content: readFileSync(configPath, "utf-8") }
+  }
+
+  it("replaces a multi-line name in full", () => {
+    const original = `version = 1\n\n[identity]\nname = """\nold\nrecipient = "not a key"\n"""\nrecipient = "age1old"\n`
+    const { result, content } = update(original, { recipient: "age1new", name: "agent" })
+
+    expect(result.isRight()).toBe(true)
+    expect(parse(content)["identity"]).toEqual({ name: "agent", recipient: "age1new" })
+    expect(content).not.toContain('"""')
+  })
+
+  it("leaves a multi-line value it isn't changing alone, even a line in it that looks like a key", () => {
+    const original = `version = 1\n\n[identity]\nname = """\nold\nrecipient = "not a key"\n"""\nrecipient = "age1old"\n`
+    const { result, content } = update(original, { recipient: "age1new" })
+
+    expect(result.isRight()).toBe(true)
+    expect(parse(content)["identity"]).toEqual({ name: 'old\nrecipient = "not a key"\n', recipient: "age1new" })
+  })
+
+  it.each([
+    ["an indented key", `[identity]\n  recipient = "age1old"\n`],
+    ["a double-quoted key", `[identity]\n"recipient" = "age1old"\n`],
+    ["a single-quoted key", `[identity]\n'recipient' = "age1old"\n`],
+  ])("updates %s in place instead of adding a duplicate", (_, section) => {
+    const { result, content } = update(`version = 1\n\n${section}`, { recipient: "age1new" })
+
+    expect(result.isRight()).toBe(true)
+    expect(parse(content)["identity"]).toEqual({ recipient: "age1new" })
+    expect(content.match(/recipient/g)).toHaveLength(1)
+  })
+
+  it("recognises an [identity] header followed by a comment", () => {
+    const { result, content } = update(`version = 1\n\n[identity] # mine\nname = "agent"\n\n[lifecycle]\n`, {
+      recipient: "age1new",
+    })
+
+    expect(result.isRight()).toBe(true)
+    expect(content).toBe(`version = 1\n\n[identity] # mine\nname = "agent"\nrecipient = "age1new"\n\n[lifecycle]\n`)
+  })
+
+  it("keeps CRLF line endings throughout", () => {
+    const { result, content } = update(`version = 1\r\n\r\n[identity]\r\nname = "agent"\r\n`, { recipient: "age1new" })
+
+    expect(result.isRight()).toBe(true)
+    expect(content).toBe(`version = 1\r\n\r\n[identity]\r\nname = "agent"\r\nrecipient = "age1new"\r\n`)
+  })
+
+  it.each([
+    ["a file that doesn't parse", `version = 1\n\n[identity]\nname = "a"\n\n[identity]\nname = "b"\n`],
+    ["identity set with dotted keys", `version = 1\nidentity.name = "agent"\n`],
+    ["identity set as an inline table", `version = 1\nidentity = { name = "agent" }\n`],
+  ])("refuses %s and leaves it unchanged", (_, original) => {
+    const { result, content } = update(original, { recipient: "age1new" })
+
+    expect(result.isLeft()).toBe(true)
+    result.fold(
+      (err) => expect(err._tag).toBe("ConfigUpdateError"),
+      () => expect.unreachable("Should be Left"),
+    )
+    expect(content).toBe(original)
+  })
+})
+
+describe("identityTomlBlock", () => {
+  it("escapes values so the block parses back to them", () => {
+    const options = { recipient: 'age1"x', name: "a\\b\nc", keyFile: "C:\\keys\\k.txt" }
+
+    expect(parse(identityTomlBlock(options))["identity"]).toEqual({
+      recipient: options.recipient,
+      name: options.name,
+      key_file: options.keyFile,
+    })
   })
 })

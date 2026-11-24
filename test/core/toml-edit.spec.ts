@@ -24,6 +24,26 @@ service = "gamma"
 `
 
 describe("removeSection", () => {
+  it("finds an indented header to remove", () => {
+    const raw = `[secret.B]\nservice = "x"\n\n  [secret.A]\n  service = "y"\n\n[env.Z]\nvalue = "1"\n`
+    expect(
+      removeSection(raw, "[secret.A]").fold(
+        (err) => expect.unreachable(err._tag),
+        (v) => v,
+      ),
+    ).toBe(`[secret.B]\nservice = "x"\n\n[env.Z]\nvalue = "1"\n`)
+  })
+
+  it("treats a header whose quoted key holds `]` as a header", () => {
+    const raw = `[secret.A]\nservice = "x"\n\n[secret."a]b"] # note\nservice = "y"\n\n[secret.C]\nservice = "z"\n`
+    expect(
+      removeSection(raw, "[secret.A]").fold(
+        (err) => expect.unreachable(err._tag),
+        (v) => v,
+      ),
+    ).toBe(`[secret."a]b"] # note\nservice = "y"\n\n[secret.C]\nservice = "z"\n`)
+  })
+
   it("removes a middle section", () => {
     const result = removeSection(baseToml, "[secret.SECOND]")
     expect(result.isRight()).toBe(true)
@@ -310,6 +330,52 @@ describe("updateSectionFields", () => {
     )
     expect(text).toContain('capabilities = ["read", "write"]')
     expect(text).toContain('tags = { env = "prod" }')
+  })
+
+  const updated = (raw: string, header: string, updates: Readonly<Record<string, string | null>>): string =>
+    updateSectionFields(raw, header, updates).fold(
+      (err) => expect.unreachable(`Should be Right: ${err._tag}`),
+      (v) => v,
+    )
+
+  it("adds a new field after the section's last field, not after the blank line before the next header", () => {
+    expect(updated(baseToml, "[secret.FIRST]", { rotates: '"90d"' })).toContain(
+      `purpose = "Testing"\nrotates = "90d"\n\n[secret.SECOND]`,
+    )
+  })
+
+  it("finds a header followed by a comment, and stops at the next one", () => {
+    const raw = `[secret.A] # note\nservice = "a"\n\n[secret.B] # other\nservice = "b"\n`
+    expect(updated(raw, "[secret.A]", { service: '"x"' })).toBe(
+      `[secret.A] # note\nservice = "x"\n\n[secret.B] # other\nservice = "b"\n`,
+    )
+  })
+
+  it("matches quoted keys, writing each back as it was written and with its indentation", () => {
+    const raw = `[secret.A]\n  "service" = "a"\n'purpose' = "p"\n`
+    expect(updated(raw, "[secret.A]", { service: '"x"', purpose: '"q"' })).toBe(
+      `[secret.A]\n  "service" = "x"\n'purpose' = "q"\n`,
+    )
+  })
+
+  it.each([`description = 'uses """ q'`, `purpose = "d" # """`])(
+    'updates a field in place after a one-line field holding `"""`: %s',
+    (line) => {
+      const raw = `[secret.A]\n${line}\nservice = "x"\n`
+      expect(updated(raw, "[secret.A]", { service: '"s"' })).toBe(`[secret.A]\n${line}\nservice = "s"\n`)
+    },
+  )
+
+  it("does not take a row of a multi-line array for the next header", () => {
+    const raw = `[secret.A]\nm = [\n  [1, 2],\n  [3]\n]\nservice = "x"\n\n[secret.B]\nservice = "y"\n`
+    expect(updated(raw, "[secret.A]", { service: '"s"' })).toBe(raw.replace('service = "x"', 'service = "s"'))
+  })
+
+  it("copies a multi-line value it isn't changing, even a line in it that looks like a field", () => {
+    const raw = `[secret.A]\npurpose = """\nservice = "inside"\n"""\nservice = "a"\n`
+    expect(updated(raw, "[secret.A]", { service: '"x"' })).toBe(
+      `[secret.A]\npurpose = """\nservice = "inside"\n"""\nservice = "x"\n`,
+    )
   })
 
   it("errors on missing section", () => {

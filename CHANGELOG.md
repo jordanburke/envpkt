@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `orElse(value)` is now `getOrElse(() => value)`, `or(x)` is now `orElse(() => x)`, and a List's
   `headOption` is a method. See [Upgrading to functype 2.0](https://functype.org/upgrading-to-2).
 - **Library types:** `CallToolResult`'s `content` and `ReadResourceResult`'s `contents` are now
-  `ReadonlyArray`s of readonly objects.
+  `ReadonlyArray`s of readonly objects, and `CallToolResult.isError` is readonly.
 - Dependencies: ts-builds `^5.0.0`, somamcp `^2.11.0`, and pnpm 12.23.0. The docs site moves to Astro
   7.4.13, Starlight 0.43.1 and `@astrojs/react` 7.1.9, and keeps Astro's `"where"` scoped-style
   strategy, which Starlight 0.43 no longer forces.
@@ -33,6 +33,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `envpkt audit --env-only --format json` and the MCP `getEnvMeta` tool printed each entry's
   `alias_of` as functype's `{"@functype":"Option","_tag":"Some","value":"env.X"}` envelope instead of
   `"env.X"`. They now print the string, or `null` for an entry that isn't an alias.
+- `envpkt keygen` wrote `identity.name`, `recipient` and `key_file` into `envpkt.toml` without TOML
+  escaping, so a value holding `"`, `\` or a newline, such as a Windows `key_file` path, left a config
+  that no longer parsed. Each value is now written as a TOML string by smol-toml. Thanks to
+  snehaapratap (#72).
+- `envpkt keygen` could write a broken or duplicated `[identity]` while reporting success when the
+  table used a valid layout its line editor didn't expect: a multi-line value, an indented or quoted
+  key, a comment after the `[identity]` header, or CRLF line endings. It now handles those, and it
+  checks that the edited file parses to the original with only the identity fields changed. If it
+  doesn't, or the original doesn't parse, keygen leaves the file alone and prints the `[identity]`
+  block to add by hand, now TOML-escaped.
+- `updateSectionFields` (behind `envpkt secret edit`, `secret rotate` and `env edit`) finds a header
+  followed by a comment, matches quoted keys and writes them back as written, keeps a key's
+  indentation, copies a multi-line value it isn't changing untouched, and adds a new field after the
+  section's last field instead of after the blank line before the next header.
+- `removeSection`, `replaceSection` and `updateSectionFields` stopped at the next header only when
+  it had nothing after it, so a section followed by `[secret.B] # note` ran on into it: removing the
+  first also removed `[secret.B]`. A header followed by a comment, or whose quoted key holds `]`, now
+  ends the section.
 
 ## [0.19.0] - 2026-11-15
 

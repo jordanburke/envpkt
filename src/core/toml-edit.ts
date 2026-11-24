@@ -2,8 +2,16 @@ import { Either, List, Option, Set } from "functype"
 
 import type { TomlEditError } from "./types.js"
 
-const SECTION_RE = /^\[.+\]\s*$/
+/**
+ * A table header line, optionally followed by a comment. Group 1 is the bare header. A key is bare
+ * characters or a quoted string, which may hold `]`. No leading indent and no `,`, so a row of a
+ * multi-line array (`[1, 2]`) is not a header.
+ */
+const HEADER_RE = /^(\[\[?(?:[^[\]"',#=]|"(?:[^"\\]|\\.)*"|'[^']*')+\]\]?)\s*(?:#.*)?$/
 const MULTILINE_OPEN = '"""'
+
+/** The header a line declares (`[identity] # note` → `[identity]`), or "" when it isn't a header line. */
+const headerOf = (line: string): string => line.match(HEADER_RE)?.[1] ?? ""
 
 type ScanState = { readonly end: number; readonly inMultiline: boolean; readonly done: boolean }
 
@@ -20,7 +28,7 @@ const scanSectionBoundary = (state: ScanState, line: string, i: number): ScanSta
     return count === 1 ? { ...state, inMultiline: true } : state
   }
 
-  return SECTION_RE.test(line) ? { ...state, end: i, done: true } : state
+  return headerOf(line) !== "" ? { ...state, end: i, done: true } : state
 }
 
 /**
@@ -33,7 +41,7 @@ const findSectionRange = (
   sectionHeader: string,
   // eslint-disable-next-line functype/prefer-option
 ): { start: number; end: number } | undefined => {
-  const start = lines.findIndex((l) => l.trim() === sectionHeader)
+  const start = lines.findIndex((l) => headerOf(l.trimStart()) === sectionHeader)
   if (start === -1) return undefined
 
   const initial: ScanState = { end: lines.length, inMultiline: false, done: false }
@@ -121,10 +129,17 @@ export const renameSection = (raw: string, oldHeader: string, newHeader: string)
   return Either.right(result)
 }
 
+const unquoteKey = (key: string): string =>
+  key
+    .match(/^"([^"\\]*)"$|^'([^']*)'$/)
+    ?.slice(1)
+    .join("") ?? key
+
 type UpdateState = {
   readonly remaining: readonly string[]
   readonly updatedKeys: Set<string>
   readonly skipUntil: number
+  readonly keepUntil: number
 }
 
 /**
@@ -143,9 +158,11 @@ export const updateSectionFields = (
   const range = findSectionRange(lines, sectionHeader)
   if (!range) return Either.left({ _tag: "SectionNotFound", section: sectionHeader })
 
+  // New fields go after the section's last field, ahead of the blank and comment lines before the next header.
+  const bodyEnd = sectionBodyEnd(lines, range)
   const before = lines.slice(0, range.start + 1) // include header
-  const after = lines.slice(range.end)
-  const sectionBody = lines.slice(range.start + 1, range.end)
+  const after = lines.slice(bodyEnd)
+  const sectionBody = lines.slice(range.start + 1, bodyEnd)
 
   // Given an opening `"""` at `fromIdx`, return the index of the closing `"""`
   // or sectionBody.length if the multiline is unterminated (skip-to-end fallback).
@@ -158,20 +175,31 @@ export const updateSectionFields = (
     remaining: [],
     updatedKeys: Set.empty<string>(),
     skipUntil: -1,
+    keepUntil: -1,
   }
 
   const step = (state: UpdateState, line: string, i: number): UpdateState => {
     if (i <= state.skipUntil) return state
+    // Inside a multi-line value of a field we keep: copy it as is, even a line that looks like `key = …`.
+    if (i <= state.keepUntil) return { ...state, remaining: [...state.remaining, line] }
 
     const eqIdx = line.indexOf("=")
     const isFieldLine = eqIdx > 0 && !line.trimStart().startsWith("#") && !line.trimStart().startsWith("[")
-    const key = isFieldLine ? line.slice(0, eqIdx).trim() : ""
+    // `"key" = …` and `'key' = …` name the same key as `key = …`; an update keeps the key as written.
+    const keyText = isFieldLine ? line.slice(0, eqIdx).trim() : ""
+    const key = unquoteKey(keyText)
+    const indent = line.slice(0, line.length - line.trimStart().length)
+    const afterEquals = line.slice(eqIdx + 1).trim()
+    // Only a value that starts with `"""` and doesn't close on this line spans lines; a `"""` inside a
+    // literal string or a comment doesn't.
+    const opensMultiline =
+      isFieldLine &&
+      afterEquals.startsWith(MULTILINE_OPEN) &&
+      !afterEquals.slice(MULTILINE_OPEN.length).includes(MULTILINE_OPEN)
+    const valueEnd = opensMultiline ? findClosingMultiline(i) : -1
 
-    if (isFieldLine && key in updates) {
-      const afterEquals = line.slice(eqIdx + 1).trim()
-      const opensMultiline =
-        afterEquals.includes(MULTILINE_OPEN) && (afterEquals.match(new RegExp('"""', "g")) ?? []).length === 1
-      const skipUntil = opensMultiline ? findClosingMultiline(i) : state.skipUntil
+    if (isFieldLine && Object.hasOwn(updates, key)) {
+      const skipUntil = Math.max(valueEnd, state.skipUntil)
       const updatedKeys = state.updatedKeys.add(key)
       const value = updates[key]
 
@@ -179,13 +207,14 @@ export const updateSectionFields = (
         return { ...state, updatedKeys, skipUntil }
       }
       return {
-        remaining: [...state.remaining, `${key} = ${value}`],
+        ...state,
+        remaining: [...state.remaining, `${indent}${keyText} = ${value}`],
         updatedKeys,
         skipUntil,
       }
     }
 
-    return { ...state, remaining: [...state.remaining, line] }
+    return { ...state, remaining: [...state.remaining, line], keepUntil: Math.max(valueEnd, state.keepUntil) }
   }
 
   const final = List(sectionBody).zipWithIndex().foldLeft<UpdateState>(initial)((state, entry) =>

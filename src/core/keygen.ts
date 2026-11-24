@@ -1,10 +1,13 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { homedir } from "node:os"
 import { dirname, join } from "node:path"
+import { isDeepStrictEqual } from "node:util"
 
 import { type Either, Left, None, type Option, Right, Some, Try } from "functype"
+import { parse, stringify } from "smol-toml"
 
 import { generateAgeKeypair } from "./age.js"
+import { appendSection, updateSectionFields } from "./toml-edit.js"
 import type { KeygenError, KeygenResult } from "./types.js"
 
 /** Resolve the age identity file path: ENVPKT_AGE_KEY_FILE env var > ~/.envpkt/age-key.txt */
@@ -57,71 +60,80 @@ type UpdateIdentityOptions = {
   readonly name?: string
 }
 
-/** Update identity fields (recipient, key_file, name) in an envpkt.toml file, preserving structure */
-export const updateConfigIdentity = (configPath: string, options: UpdateIdentityOptions): Either<KeygenError, true> => {
-  const readResult = Try(() => readFileSync(configPath, "utf-8"))
+type IdentityFields = Readonly<Record<string, string>>
 
-  const fieldUpdaters: ReadonlyArray<{ readonly re: RegExp; readonly line: string }> = [
-    { re: /^recipient\s*=/, line: `recipient = "${options.recipient}"` },
-    ...(options.name ? [{ re: /^name\s*=/, line: `name = "${options.name}"` }] : []),
-    ...(options.keyFile ? [{ re: /^key_file\s*=/, line: `key_file = "${options.keyFile}"` }] : []),
-  ]
+/** The `[identity]` fields keygen sets, in the order it writes new ones. */
+const identityFields = (options: UpdateIdentityOptions): IdentityFields => ({
+  recipient: options.recipient,
+  ...(options.name ? { name: options.name } : {}),
+  ...(options.keyFile ? { key_file: options.keyFile } : {}),
+})
 
-  return readResult.fold<Either<KeygenError, true>>(
-    (err) => Left({ _tag: "ConfigUpdateError", message: `Failed to read config: ${err}` } as const),
-    (raw) => {
-      // A final newline leaves a trailing "" that new [identity] lines would land after; drop it and add it back on write.
-      const split = raw.split("\n")
-      const lines = split[split.length - 1] === "" ? split.slice(0, -1) : split
-      const updatedFields = new Set<string>()
+/** A TOML string literal for `value`, escaped by smol-toml. */
+const tomlString = (value: string): string => stringify({ v: value }).trimEnd().slice("v = ".length)
 
-      const acc = lines.reduce(
-        (state, line) => {
-          if (/^\[identity\]\s*$/.test(line)) {
-            return { ...state, output: [...state.output, line], inIdentitySection: true, hasIdentitySection: true }
-          }
+/** The `[identity]` table for these options, as escaped TOML: what keygen tells the user to add when it can't edit the file. */
+export const identityTomlBlock = (options: UpdateIdentityOptions): string =>
+  stringify({ identity: identityFields(options) })
 
-          if (/^\[/.test(line) && !/^\[identity\]\s*$/.test(line)) {
-            // Leaving [identity] — insert any fields not yet written
-            const missing = state.inIdentitySection
-              ? fieldUpdaters.filter((f) => !updatedFields.has(f.re.source)).map((f) => f.line)
-              : []
-            missing.forEach((l) => updatedFields.add(l))
-            return {
-              ...state,
-              output: [...state.output, ...missing, line],
-              inIdentitySection: false,
-            }
-          }
+const configUpdateError = (message: string): Either<KeygenError, never> =>
+  Left({ _tag: "ConfigUpdateError", message } as const)
 
-          if (state.inIdentitySection) {
-            const match = fieldUpdaters.find((f) => f.re.test(line))
-            if (match) {
-              updatedFields.add(match.re.source)
-              return { ...state, output: [...state.output, match.line] }
-            }
-          }
+const parseTomlDoc = (raw: string): Either<string, Readonly<Record<string, unknown>>> =>
+  Try(() => parse(raw)).fold<Either<string, Readonly<Record<string, unknown>>>>(
+    (err) => Left(err.message),
+    (doc) => Right(doc),
+  )
 
-          return { ...state, output: [...state.output, line] }
-        },
-        { output: [] as ReadonlyArray<string>, inIdentitySection: false, hasIdentitySection: false },
+const isTable = (value: unknown): value is Readonly<Record<string, unknown>> =>
+  typeof value === "object" && value !== null && !Array.isArray(value)
+
+/**
+ * Set identity fields in raw envpkt.toml text. Edits the `[identity]` table in place, or appends one.
+ * The result must parse to the original document with only those fields changed; anything else
+ * (a layout the text editor can't follow) is refused rather than written.
+ */
+const setIdentityFields = (raw: string, fields: IdentityFields): Either<KeygenError, string> => {
+  const eol = raw.includes("\r\n") ? "\r\n" : "\n"
+  const text = raw.replaceAll("\r\n", "\n")
+
+  return parseTomlDoc(raw).fold<Either<KeygenError, string>>(
+    (message) => configUpdateError(`envpkt.toml does not parse, so it was left unchanged: ${message}`),
+    (original) => {
+      const existing = original["identity"]
+      const expected = { ...original, identity: { ...(isTable(existing) ? existing : {}), ...fields } }
+      const quoted = Object.fromEntries(Object.entries(fields).map(([key, value]) => [key, tomlString(value)]))
+
+      const edited = updateSectionFields(text, "[identity]", quoted).fold(
+        () => appendSection(text, stringify({ identity: fields })),
+        (updated) => updated,
       )
+      const result = `${edited.trimEnd()}\n`.replaceAll("\n", eol)
 
-      // Still in [identity] at EOF — insert any missing fields
-      const missingAtEof = acc.inIdentitySection
-        ? fieldUpdaters.filter((f) => !updatedFields.has(f.re.source)).map((f) => f.line)
-        : []
-      const afterEof: ReadonlyArray<string> = [...acc.output, ...missingAtEof]
-
-      // No [identity] section at all — append one with all fields
-      const identityLines = fieldUpdaters.map((f) => f.line)
-      const output = !acc.hasIdentitySection ? [...afterEof, "", "[identity]", ...identityLines] : afterEof
-
-      const writeResult = Try(() => writeFileSync(configPath, `${output.join("\n")}\n`))
-      return writeResult.fold<Either<KeygenError, true>>(
-        (err) => Left({ _tag: "ConfigUpdateError", message: `Failed to write config: ${err}` } as const),
-        () => Right(true as const),
+      const matches = parseTomlDoc(result).fold(
+        () => false,
+        // smol-toml builds null-prototype tables and TomlDate values; cloning both sides compares data alone.
+        (doc) => isDeepStrictEqual(structuredClone(doc), structuredClone(expected)),
       )
+      return matches
+        ? Right(result)
+        : configUpdateError(
+            "envpkt.toml lays out [identity] in a way keygen can't edit safely, so it was left unchanged",
+          )
     },
   )
 }
+
+/** Update identity fields (recipient, key_file, name) in an envpkt.toml file, preserving structure */
+export const updateConfigIdentity = (configPath: string, options: UpdateIdentityOptions): Either<KeygenError, true> =>
+  Try(() => readFileSync(configPath, "utf-8"))
+    .fold<Either<KeygenError, string>>(
+      (err) => configUpdateError(`Failed to read config: ${err}`),
+      (raw) => setIdentityFields(raw, identityFields(options)),
+    )
+    .flatMap((updated) =>
+      Try(() => writeFileSync(configPath, updated)).fold<Either<KeygenError, true>>(
+        (err) => configUpdateError(`Failed to write config: ${err}`),
+        () => Right(true as const),
+      ),
+    )
