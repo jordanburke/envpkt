@@ -44,7 +44,7 @@ export const runDoctor = async (options: DoctorOptions): Promise<void> => {
   console.log(`${BOLD}envpkt doctor${RESET}\n`)
 
   // age is built in (age-encryption), so there is nothing to install; report which version.
-  ok("age   ", `built in (age-encryption ${ageEncryptionVersion().orElse("version unknown")})`)
+  ok("age   ", `built in (age-encryption ${ageEncryptionVersion().getOrElse(() => "version unknown")})`)
 
   const resolveOk = await resolveConfigPath(options.config).fold(
     () => {

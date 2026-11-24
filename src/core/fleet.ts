@@ -64,8 +64,8 @@ function* findEnvpktFiles(dir: string, maxDepth: number, currentDepth = 0): Gene
 export const scanFleet = (rootDir: string, options?: { maxDepth?: number }): FleetHealth => {
   const maxDepth = options?.maxDepth ?? 3
 
-  const agents: FleetAgent[] = Array.from(findEnvpktFiles(rootDir, maxDepth)).flatMap((configPath) =>
-    loadConfig(configPath).fold<FleetAgent[]>(
+  const agents: ReadonlyArray<FleetAgent> = Array.from(findEnvpktFiles(rootDir, maxDepth)).flatMap((configPath) =>
+    loadConfig(configPath).fold<ReadonlyArray<FleetAgent>>(
       () => [],
       (config) => {
         const audit = computeAudit(config)

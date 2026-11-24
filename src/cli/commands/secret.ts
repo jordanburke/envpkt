@@ -90,35 +90,40 @@ type AliasOptions = {
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
-const buildSecretBlock = (name: string, options: AddOptions): string => {
-  const lines: string[] = [`[secret.${name}]`]
-  const today = new Date().toISOString().split("T")[0]!
+const formatTagsLine = (tags: string): string => {
+  const pairs = tags.split(",").map((pair) => {
+    const [k, v] = pair.split("=").map((s) => s.trim())
+    return `${k} = "${v}"`
+  })
+  return `tags = { ${pairs.join(", ")} }`
+}
 
-  if (options.service) lines.push(`service = "${options.service}"`)
-  if (options.purpose) lines.push(`purpose = "${options.purpose}"`)
-  if (options.comment) lines.push(`comment = "${options.comment}"`)
-  lines.push(`created = "${today}"`)
-  if (options.expires) lines.push(`expires = "${options.expires}"`)
-  if (options.rotates) lines.push(`rotates = "${options.rotates}"`)
-  if (options.rateLimit) lines.push(`rate_limit = "${options.rateLimit}"`)
-  if (options.modelHint) lines.push(`model_hint = "${options.modelHint}"`)
-  if (options.source) lines.push(`source = "${options.source}"`)
-  if (options.rotationUrl) lines.push(`rotation_url = "${options.rotationUrl}"`)
-  if (options.required) lines.push(`required = true`)
-  if (options.capabilities) {
-    const caps = options.capabilities
-      .split(",")
-      .map((c) => `"${c.trim()}"`)
-      .join(", ")
-    lines.push(`capabilities = [${caps}]`)
-  }
-  if (options.tags) {
-    const pairs = options.tags.split(",").map((pair) => {
-      const [k, v] = pair.split("=").map((s) => s.trim())
-      return `${k} = "${v}"`
-    })
-    lines.push(`tags = { ${pairs.join(", ")} }`)
-  }
+const formatCapabilitiesLine = (capabilities: string): string => {
+  const caps = capabilities
+    .split(",")
+    .map((c) => `"${c.trim()}"`)
+    .join(", ")
+  return `capabilities = [${caps}]`
+}
+
+const buildSecretBlock = (name: string, options: AddOptions): string => {
+  const today = new Date().toISOString().split("T")[0]!
+  const lines: ReadonlyArray<string> = [
+    `[secret.${name}]`,
+    ...(options.service ? [`service = "${options.service}"`] : []),
+    ...(options.purpose ? [`purpose = "${options.purpose}"`] : []),
+    ...(options.comment ? [`comment = "${options.comment}"`] : []),
+    `created = "${today}"`,
+    ...(options.expires ? [`expires = "${options.expires}"`] : []),
+    ...(options.rotates ? [`rotates = "${options.rotates}"`] : []),
+    ...(options.rateLimit ? [`rate_limit = "${options.rateLimit}"`] : []),
+    ...(options.modelHint ? [`model_hint = "${options.modelHint}"`] : []),
+    ...(options.source ? [`source = "${options.source}"`] : []),
+    ...(options.rotationUrl ? [`rotation_url = "${options.rotationUrl}"`] : []),
+    ...(options.required ? [`required = true`] : []),
+    ...(options.capabilities ? [formatCapabilitiesLine(options.capabilities)] : []),
+    ...(options.tags ? [formatTagsLine(options.tags)] : []),
+  ]
 
   return `${lines.join("\n")}\n`
 }
@@ -330,16 +335,13 @@ const runSecretRename = (oldName: string, newName: string, options: RenameOption
 const ALIAS_REF_RE = /^(secret|env)\.(.+)$/
 
 const buildSecretAliasBlock = (name: string, options: AliasOptions): string => {
-  const lines: string[] = [`[secret.${name}]`, `from_key = "${options.from}"`]
-  if (options.purpose) lines.push(`purpose = "${options.purpose}"`)
-  if (options.comment) lines.push(`comment = "${options.comment}"`)
-  if (options.tags) {
-    const pairs = options.tags.split(",").map((pair) => {
-      const [k, v] = pair.split("=").map((s) => s.trim())
-      return `${k} = "${v}"`
-    })
-    lines.push(`tags = { ${pairs.join(", ")} }`)
-  }
+  const lines: ReadonlyArray<string> = [
+    `[secret.${name}]`,
+    `from_key = "${options.from}"`,
+    ...(options.purpose ? [`purpose = "${options.purpose}"`] : []),
+    ...(options.comment ? [`comment = "${options.comment}"`] : []),
+    ...(options.tags ? [formatTagsLine(options.tags)] : []),
+  ]
   return `${lines.join("\n")}\n`
 }
 
@@ -447,18 +449,10 @@ type RotateOptions = {
 const readNewValue = async (key: string): Promise<string> => {
   // Piped stdin: read the entire buffer (trim trailing newline only).
   if (!process.stdin.isTTY) {
-    const chunks: Buffer[] = []
-    return new Promise((resolveP, rejectP) => {
-      process.stdin.on("data", (c) => chunks.push(Buffer.from(c)))
-      process.stdin.on("end", () =>
-        resolveP(
-          Buffer.concat(chunks)
-            .toString("utf-8")
-            .replace(/\r?\n$/, ""),
-        ),
-      )
-      process.stdin.on("error", rejectP)
-    })
+    const chunks = await Array.fromAsync(process.stdin, (c: Buffer | string) => Buffer.from(c))
+    return Buffer.concat(chunks)
+      .toString("utf-8")
+      .replace(/\r?\n$/, "")
   }
   // TTY: prompt once. Empty input cancels.
   const rl = createInterface({ input: process.stdin, output: process.stderr })

@@ -34,8 +34,6 @@ const classifySecret = (
   requireService: boolean,
   today: Date,
 ): SecretHealth => {
-  const issues: string[] = []
-
   const created = Option(meta.created).flatMap(parseDate)
   const expires = Option(meta.expires).flatMap(parseDate)
   const lastRotated = Option(meta.last_rotated_at).flatMap(parseDate)
@@ -70,28 +68,34 @@ const classifySecret = (
 
   const isMissingMetadata = (requireExpiration && expires.isNone()) || (requireService && service.isNone())
 
-  if (isExpired) issues.push("Secret has expired")
-  if (isExpiringSoon) {
-    issues.push(
-      `Expires in ${daysRemaining.fold(
-        () => "?",
-        (d) => String(d),
-      )} days`,
-    )
-  }
-  if (isStale) {
-    const since = daysSinceRotation.fold(
-      () => "?",
-      (d) => String(d),
-    )
-    const label = staleFromRotation ? "last rotated" : "created"
-    issues.push(`Secret is stale (${label} ${since} days ago)`)
-  }
-  if (isMissing) issues.push("Key not found in fnox")
-  if (isMissingMetadata) {
-    if (requireExpiration && expires.isNone()) issues.push("Missing required expiration date")
-    if (requireService && service.isNone()) issues.push("Missing required service")
-  }
+  const issues: ReadonlyArray<string> = [
+    ...(isExpired ? ["Secret has expired"] : []),
+    ...(isExpiringSoon
+      ? [
+          `Expires in ${daysRemaining.fold(
+            () => "?",
+            (d) => String(d),
+          )} days`,
+        ]
+      : []),
+    ...(isStale
+      ? [
+          `Secret is stale (${staleFromRotation ? "last rotated" : "created"} ${daysSinceRotation.fold(
+            () => "?",
+            (d) => String(d),
+          )} days ago)`,
+        ]
+      : []),
+    ...(isMissing ? ["Key not found in fnox"] : []),
+    ...expires.fold<ReadonlyArray<string>>(
+      () => (requireExpiration ? ["Missing required expiration date"] : []),
+      () => [],
+    ),
+    ...service.fold<ReadonlyArray<string>>(
+      () => (requireService ? ["Missing required service"] : []),
+      () => [],
+    ),
+  ]
 
   const status: SecretStatus = Cond.of<SecretStatus>()
     .when(isExpired, "expired")
@@ -189,7 +193,7 @@ export const computeAudit = (
         () => targetKey.map((k) => `secret.${k}`),
         (v) => Option(v),
       )
-      .orElse("")
+      .getOrElse(() => "")
 
     return targetHealth.fold<SecretHealth>(
       () => ({
@@ -249,6 +253,18 @@ export const computeAudit = (
   }
 }
 
+/** EnvAuditResult as plain JSON data: `alias_of` is the reference string or null, not an Option */
+export const envAuditToJson = (result: EnvAuditResult): Record<string, unknown> => ({
+  ...result,
+  entries: result.entries.map((entry) => ({
+    ...entry,
+    alias_of: entry.alias_of.fold<string | null>(
+      () => null,
+      (ref) => ref,
+    ),
+  })),
+})
+
 export const computeEnvAudit = (
   config: EnvpktConfig,
   // eslint-disable-next-line functype/prefer-option -- process.env uses string | undefined natively
@@ -268,7 +284,7 @@ export const computeEnvAudit = (
       const targetEntry = yield* $(Option(envEntries[targetKey]))
       return yield* $(Option(targetEntry.value))
     }) as Option<string>
-    return viaAlias.orElse(entry.value ?? "")
+    return viaAlias.getOrElse(() => entry.value ?? "")
   }
 
   const entries = Object.entries(envEntries).map(([key, entry]) => {

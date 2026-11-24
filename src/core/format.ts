@@ -1,6 +1,6 @@
 import { Option } from "functype"
 
-import type { ResolveResult, SecretMeta } from "./types.js"
+import type { Identity, LifecycleConfig, ResolveResult, SecretMeta } from "./types.js"
 
 export type SecretDisplay = "encrypted" | "plaintext"
 
@@ -17,56 +17,77 @@ export const maskValue = (value: string): string => {
 }
 
 const formatSecretFields = (meta: SecretMeta, indent: string): string => {
-  const lines: string[] = []
+  const dateLine: ReadonlyArray<string> = [
+    ...(meta.created ? [`created: ${meta.created}`] : []),
+    ...(meta.expires ? [`expires: ${meta.expires}`] : []),
+  ]
+  const opsLine: ReadonlyArray<string> = [
+    ...(meta.rotates ? [`rotates: ${meta.rotates}`] : []),
+    ...(meta.rate_limit ? [`rate_limit: ${meta.rate_limit}`] : []),
+  ]
+  const tags = meta.tags
+    ? [
+        `${indent}tags: ${Object.entries(meta.tags)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(", ")}`,
+      ]
+    : []
 
-  if (meta.purpose) lines.push(`${indent}purpose: ${meta.purpose}`)
-  if (meta.capabilities) lines.push(`${indent}capabilities: ${meta.capabilities.join(", ")}`)
-
-  const dateLine: string[] = []
-  if (meta.created) dateLine.push(`created: ${meta.created}`)
-  if (meta.expires) dateLine.push(`expires: ${meta.expires}`)
-  if (dateLine.length > 0) lines.push(`${indent}${dateLine.join("  ")}`)
-
-  const opsLine: string[] = []
-  if (meta.rotates) opsLine.push(`rotates: ${meta.rotates}`)
-  if (meta.rate_limit) opsLine.push(`rate_limit: ${meta.rate_limit}`)
-  if (opsLine.length > 0) lines.push(`${indent}${opsLine.join("  ")}`)
-
-  if (meta.source) lines.push(`${indent}source: ${meta.source}`)
-  if (meta.model_hint) lines.push(`${indent}model_hint: ${meta.model_hint}`)
-  if (meta.rotation_url) lines.push(`${indent}rotation_url: ${meta.rotation_url}`)
-  if (meta.required !== undefined) lines.push(`${indent}required: ${meta.required}`)
-  if (meta.tags) {
-    const tagStr = Object.entries(meta.tags)
-      .map(([k, v]) => `${k}=${v}`)
-      .join(", ")
-    lines.push(`${indent}tags: ${tagStr}`)
-  }
+  const lines: ReadonlyArray<string> = [
+    ...(meta.purpose ? [`${indent}purpose: ${meta.purpose}`] : []),
+    ...(meta.capabilities ? [`${indent}capabilities: ${meta.capabilities.join(", ")}`] : []),
+    ...(dateLine.length > 0 ? [`${indent}${dateLine.join("  ")}`] : []),
+    ...(opsLine.length > 0 ? [`${indent}${opsLine.join("  ")}`] : []),
+    ...(meta.source ? [`${indent}source: ${meta.source}`] : []),
+    ...(meta.model_hint ? [`${indent}model_hint: ${meta.model_hint}`] : []),
+    ...(meta.rotation_url ? [`${indent}rotation_url: ${meta.rotation_url}`] : []),
+    ...(meta.required !== undefined ? [`${indent}required: ${meta.required}`] : []),
+    ...tags,
+  ]
 
   return lines.join("\n")
 }
 
+const formatHeader = (identity: Identity | undefined): string => {
+  if (!identity) return "envpkt packet"
+  const consumer = identity.consumer ? ` (${identity.consumer})` : ""
+  return `envpkt packet: ${identity.name}${consumer}`
+}
+
+const formatAgentBlock = (identity: Identity | undefined): ReadonlyArray<string> => {
+  if (!identity) return []
+  const agentLines: ReadonlyArray<string> = [
+    ...(identity.description ? [`  ${identity.description}`] : []),
+    ...(identity.capabilities ? [`  capabilities: ${identity.capabilities.join(", ")}`] : []),
+    ...(identity.services ? [`  services: ${identity.services.join(", ")}`] : []),
+    ...(identity.expires ? [`  expires: ${identity.expires}`] : []),
+  ]
+  return agentLines.length > 0 ? [agentLines.join("\n")] : []
+}
+
+const formatLifecycleBlock = (lifecycle: LifecycleConfig | undefined): ReadonlyArray<string> => {
+  if (!lifecycle) return []
+  const lcLines: ReadonlyArray<string> = [
+    ...(lifecycle.stale_warning_days !== undefined ? [`  stale_warning_days: ${lifecycle.stale_warning_days}`] : []),
+    ...(lifecycle.require_expiration !== undefined ? [`  require_expiration: ${lifecycle.require_expiration}`] : []),
+    ...(lifecycle.require_service !== undefined ? [`  require_service: ${lifecycle.require_service}`] : []),
+  ]
+  return lcLines.length > 0 ? [["lifecycle:", ...lcLines].join("\n")] : []
+}
+
+const formatCatalogBlock = (result: ResolveResult): ReadonlyArray<string> => {
+  if (!result.catalogPath) return []
+  const catLines: ReadonlyArray<string> = [
+    `catalog: ${result.catalogPath}`,
+    `  merged: ${result.merged.length} keys`,
+    result.overridden.length > 0 ? `  overridden: ${result.overridden.join(", ")}` : "  overridden: (none)",
+    ...result.warnings.map((w) => `  warning: ${w}`),
+  ]
+  return [catLines.join("\n")]
+}
+
 export const formatPacket = (result: ResolveResult, options?: FormatPacketOptions): string => {
   const { config } = result
-  const sections: string[] = []
-
-  // Header
-  if (config.identity) {
-    const consumer = config.identity.consumer ? ` (${config.identity.consumer})` : ""
-    sections.push(`envpkt packet: ${config.identity.name}${consumer}`)
-  } else {
-    sections.push("envpkt packet")
-  }
-
-  // Agent block
-  if (config.identity) {
-    const agentLines: string[] = []
-    if (config.identity.description) agentLines.push(`  ${config.identity.description}`)
-    if (config.identity.capabilities) agentLines.push(`  capabilities: ${config.identity.capabilities.join(", ")}`)
-    if (config.identity.services) agentLines.push(`  services: ${config.identity.services.join(", ")}`)
-    if (config.identity.expires) agentLines.push(`  expires: ${config.identity.expires}`)
-    if (agentLines.length > 0) sections.push(agentLines.join("\n"))
-  }
 
   // Secrets block
   const secretConfig = config.secret ?? {}
@@ -85,51 +106,36 @@ export const formatPacket = (result: ResolveResult, options?: FormatPacketOption
     const fields = formatSecretFields(meta, "    ")
     return fields ? `${header}\n${fields}` : header
   })
-  sections.push([secretHeader, ...secretLines].join("\n"))
 
   // Env block — show alias relationships
   const envConfig = config.env ?? {}
   const envEntriesArr = Object.entries(envConfig)
-  if (envEntriesArr.length > 0) {
-    const envHeader = `env: ${envEntriesArr.length}`
-    const envLines = envEntriesArr.map(([key, meta]) => {
-      const aliasTag = meta.from_key ? ` [alias → ${meta.from_key}]` : ""
-      const valuePart = Option(meta.value).fold(
-        () => "",
-        (v) => ` = ${v}`,
-      )
-      const purposePart = meta.purpose ? `\n    purpose: ${meta.purpose}` : ""
-      return `  ${key}${aliasTag}${valuePart}${purposePart}`
-    })
-    sections.push([envHeader, ...envLines].join("\n"))
-  }
+  const envBlock: ReadonlyArray<string> =
+    envEntriesArr.length > 0
+      ? [
+          [
+            `env: ${envEntriesArr.length}`,
+            ...envEntriesArr.map(([key, meta]) => {
+              const aliasTag = meta.from_key ? ` [alias → ${meta.from_key}]` : ""
+              const valuePart = Option(meta.value).fold(
+                () => "",
+                (v) => ` = ${v}`,
+              )
+              const purposePart = meta.purpose ? `\n    purpose: ${meta.purpose}` : ""
+              return `  ${key}${aliasTag}${valuePart}${purposePart}`
+            }),
+          ].join("\n"),
+        ]
+      : []
 
-  // Lifecycle block
-  if (config.lifecycle) {
-    const lcLines: string[] = ["lifecycle:"]
-    if (config.lifecycle.stale_warning_days !== undefined)
-      lcLines.push(`  stale_warning_days: ${config.lifecycle.stale_warning_days}`)
-    if (config.lifecycle.require_expiration !== undefined)
-      lcLines.push(`  require_expiration: ${config.lifecycle.require_expiration}`)
-    if (config.lifecycle.require_service !== undefined)
-      lcLines.push(`  require_service: ${config.lifecycle.require_service}`)
-    if (lcLines.length > 1) sections.push(lcLines.join("\n"))
-  }
-
-  // Catalog block
-  if (result.catalogPath) {
-    const catLines: string[] = [`catalog: ${result.catalogPath}`]
-    catLines.push(`  merged: ${result.merged.length} keys`)
-    if (result.overridden.length > 0) {
-      catLines.push(`  overridden: ${result.overridden.join(", ")}`)
-    } else {
-      catLines.push("  overridden: (none)")
-    }
-    if (result.warnings.length > 0) {
-      catLines.push(...result.warnings.map((w) => `  warning: ${w}`))
-    }
-    sections.push(catLines.join("\n"))
-  }
+  const sections: ReadonlyArray<string> = [
+    formatHeader(config.identity),
+    ...formatAgentBlock(config.identity),
+    [secretHeader, ...secretLines].join("\n"),
+    ...envBlock,
+    ...formatLifecycleBlock(config.lifecycle),
+    ...formatCatalogBlock(result),
+  ]
 
   return sections.join("\n\n")
 }

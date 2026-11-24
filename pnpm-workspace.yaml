@@ -5,7 +5,6 @@ minimumReleaseAgeExclude:
   - "*functype*"
   - ts-builds
   - somamcp
-  - "@types/node@24.13.1" # auto-added (no aged alternative for ^24.13.1)
 
 publicHoistPattern:
   - "*eslint*"

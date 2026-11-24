@@ -203,3 +203,19 @@ describe("callTool", () => {
     })
   })
 })
+
+describe("getEnvMeta", () => {
+  it("returns alias_of as a plain string", () => {
+    const configPath = writeConfig(
+      join(tmpDir, "env-alias"),
+      `version = 1\n\n[env.PORT]\nvalue = "3000"\n\n[env.APP_PORT]\nfrom_key = "env.PORT"\n`,
+    )
+
+    const result = callTool("getEnvMeta", { configPath })
+    const text = result.content[0]?.text ?? ""
+    expect(text).not.toContain("@functype")
+    const parsed = JSON.parse(text) as { entries: Array<{ key: string; alias_of: unknown }> }
+    expect(parsed.entries.find((e) => e.key === "APP_PORT")?.alias_of).toBe("env.PORT")
+    expect(parsed.entries.find((e) => e.key === "PORT")?.alias_of).toBeNull()
+  })
+})

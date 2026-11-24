@@ -253,20 +253,20 @@ export const resolveForEmit = (options: {
  * env defaults, then overridden env entries (value from config), then secrets (which
  * override). `secret` marks values that consumers must redact (e.g. GitHub masking).
  */
-const collectEmitEntries = (boot: BootResult): EmitEntry[] => {
+const collectEmitEntries = (boot: BootResult): ReadonlyArray<EmitEntry> => {
   const wireName = (key: string): string => boot.envNames[key] ?? key
 
-  const defaults: EmitEntry[] = Object.entries(boot.envDefaults).map(([key, value]) => ({
+  const defaults: ReadonlyArray<EmitEntry> = Object.entries(boot.envDefaults).map(([key, value]) => ({
     name: wireName(key),
     value,
     secret: false,
   }))
 
   // Env entries already set in the environment (boot skipped them); re-emit from config value.
-  const overridden: EmitEntry[] =
+  const overridden: ReadonlyArray<EmitEntry> =
     boot.overridden.length === 0
       ? []
-      : loadConfig(boot.configPath).fold<EmitEntry[]>(
+      : loadConfig(boot.configPath).fold<ReadonlyArray<EmitEntry>>(
           () => [],
           (config) => {
             const envEntries = config.env ?? {}
@@ -279,7 +279,7 @@ const collectEmitEntries = (boot: BootResult): EmitEntry[] => {
           },
         )
 
-  const secrets: EmitEntry[] = Object.entries(boot.secrets).map(([key, value]) => ({
+  const secrets: ReadonlyArray<EmitEntry> = Object.entries(boot.secrets).map(([key, value]) => ({
     name: wireName(key),
     value,
     secret: true,
@@ -419,18 +419,22 @@ const runEnvDotenv = async (options: DotenvOptions): Promise<void> => {
 
 // --- CRUD operations ---
 
-const buildEnvBlock = (name: string, value: string, options: AddEnvOptions): string => {
-  const lines: string[] = [`[env.${name}]`, `value = "${value}"`]
+const formatTagsLine = (tags: string): string => {
+  const pairs = tags.split(",").map((pair) => {
+    const [k, v] = pair.split("=").map((s) => s.trim())
+    return `${k} = "${v}"`
+  })
+  return `tags = { ${pairs.join(", ")} }`
+}
 
-  if (options.purpose) lines.push(`purpose = "${options.purpose}"`)
-  if (options.comment) lines.push(`comment = "${options.comment}"`)
-  if (options.tags) {
-    const pairs = options.tags.split(",").map((pair) => {
-      const [k, v] = pair.split("=").map((s) => s.trim())
-      return `${k} = "${v}"`
-    })
-    lines.push(`tags = { ${pairs.join(", ")} }`)
-  }
+const buildEnvBlock = (name: string, value: string, options: AddEnvOptions): string => {
+  const lines: ReadonlyArray<string> = [
+    `[env.${name}]`,
+    `value = "${value}"`,
+    ...(options.purpose ? [`purpose = "${options.purpose}"`] : []),
+    ...(options.comment ? [`comment = "${options.comment}"`] : []),
+    ...(options.tags ? [formatTagsLine(options.tags)] : []),
+  ]
 
   return `${lines.join("\n")}\n`
 }
@@ -579,16 +583,13 @@ const runEnvRm = (name: string, options: RmEnvOptions): void => {
 const ALIAS_REF_RE = /^(secret|env)\.(.+)$/
 
 const buildEnvAliasBlock = (name: string, options: AliasEnvOptions): string => {
-  const lines: string[] = [`[env.${name}]`, `from_key = "${options.from}"`]
-  if (options.purpose) lines.push(`purpose = "${options.purpose}"`)
-  if (options.comment) lines.push(`comment = "${options.comment}"`)
-  if (options.tags) {
-    const pairs = options.tags.split(",").map((pair) => {
-      const [k, v] = pair.split("=").map((s) => s.trim())
-      return `${k} = "${v}"`
-    })
-    lines.push(`tags = { ${pairs.join(", ")} }`)
-  }
+  const lines: ReadonlyArray<string> = [
+    `[env.${name}]`,
+    `from_key = "${options.from}"`,
+    ...(options.purpose ? [`purpose = "${options.purpose}"`] : []),
+    ...(options.comment ? [`comment = "${options.comment}"`] : []),
+    ...(options.tags ? [formatTagsLine(options.tags)] : []),
+  ]
   return `${lines.join("\n")}\n`
 }
 

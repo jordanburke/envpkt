@@ -17,7 +17,6 @@ export type ValidationError = ConfigError | AliasError | McpConfigError
  * and `envpkt validate` covers them as a separate explicit check.
  */
 export const validateRawConfig = (raw: string): Either<ValidationError, EnvpktConfig> =>
-  // eslint-disable-next-line functype/prefer-do-notation -- linear flatMap chain reads cleaner than Do here
   parseToml(raw)
     .flatMap(validateConfig)
     .flatMap((config) => validateAliases(config).map(() => config))

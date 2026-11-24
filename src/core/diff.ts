@@ -47,9 +47,9 @@ const metaDiff = (a: Meta, b: Meta): ReadonlyArray<FieldChange> => {
       ? []
       : [{ field: "sealed", a: ar["encrypted_value"] ? "yes" : "no", b: br["encrypted_value"] ? "yes" : "no" }]
 
-  const fieldKeys = [...Object.keys(ar), ...Object.keys(br)].filter(
-    (k, i, arr) => k !== "encrypted_value" && arr.indexOf(k) === i,
-  )
+  const fieldKeys = Object.keys(ar)
+    .concat(Object.keys(br))
+    .filter((k, i, arr) => k !== "encrypted_value" && arr.indexOf(k) === i)
 
   const fieldChanges = fieldKeys.flatMap((field) => {
     const av = serialize(ar[field])
@@ -57,7 +57,7 @@ const metaDiff = (a: Meta, b: Meta): ReadonlyArray<FieldChange> => {
     return av === bv ? [] : [{ field, a: av, b: bv }]
   })
 
-  return [...sealedChange, ...fieldChanges.sort((x, y) => x.field.localeCompare(y.field))]
+  return [...sealedChange, ...fieldChanges.toSorted((x, y) => x.field.localeCompare(y.field))]
 }
 
 const sectionDiff = (a: Readonly<Record<string, Meta>>, b: Readonly<Record<string, Meta>>): SectionDiff => {

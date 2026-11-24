@@ -82,7 +82,7 @@ export type { FormatPacketOptions, SecretDisplay } from "./core/format.js"
 export { formatPacket, maskValue } from "./core/format.js"
 
 // Audit engine
-export { computeAudit, computeEnvAudit } from "./core/audit.js"
+export { computeAudit, computeEnvAudit, envAuditToJson } from "./core/audit.js"
 
 // Pattern registry
 export type { ConfidenceLevel, CredentialPattern, MatchResult } from "./core/patterns.js"
@@ -98,8 +98,6 @@ export { boot, bootSafe, EnvpktBootError } from "./core/boot.js"
 // Diagnostic logger re-exports from functype-log. BootOptions.logger accepts
 // any DirectLogger; consumers can use createDirectConsoleLogger for quick
 // enabling, createDirectTestLogger for assertions, or bring their own.
-// Import from /direct to avoid eagerly loading loglayer — the /direct
-// subpath has zero loglayer dependency (just console output + no-op).
 export type { LogEntry, LogLevel, LogMetadata } from "functype-log"
 export {
   createDirectConsoleLogger,

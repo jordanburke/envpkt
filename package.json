@@ -43,16 +43,16 @@
     "@sinclair/typebox": "^0.34.52",
     "age-encryption": "^0.3.1",
     "commander": "^15.1.0",
-    "functype": "^1.27.0",
-    "functype-log": "^1.27.0",
-    "functype-os": "^1.27.0",
+    "functype": "^2.2.0",
+    "functype-log": "^2.2.0",
+    "functype-os": "^2.2.0",
     "smol-toml": "^1.9.1",
-    "somamcp": "^2.6.0"
+    "somamcp": "^2.11.0"
   },
   "devDependencies": {
     "@modelcontextprotocol/client": "~2.4.0",
     "@types/node": "^24.19.2",
-    "ts-builds": "^4.7.0",
+    "ts-builds": "^5.0.0",
     "tsdown": "^0.23.7",
     "tsx": "^4.23.15"
   },
@@ -77,5 +77,5 @@
     "schemas"
   ],
   "prettier": "ts-builds/prettier",
-  "packageManager": "pnpm@12.18.0+sha512.9d7882d5dc82147ecfc4e062aa34834e0ad0296710a1837a1115ae012127d36b7109e321ac1598a1dd0a65597681b1e99917e12ed0d749eae91187943363beb3"
+  "packageManager": "pnpm@12.23.0+sha512.02da94ffaf133f46074322afe552f90d40b5f71ae259aefbccdacc5085b1d617e98d65e0131f5748b9b67445978ee5055d7d59a473f1eef0d504854fefcd5975"
 }

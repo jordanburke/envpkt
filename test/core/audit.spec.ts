@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 
-import { computeAudit, computeEnvAudit } from "../../src/core/audit.js"
+import { computeAudit, computeEnvAudit, envAuditToJson } from "../../src/core/audit.js"
 import type { EnvpktConfig } from "../../src/core/types.js"
 
 const today = new Date("2025-06-15T00:00:00Z")
@@ -465,6 +465,25 @@ describe("computeAudit", () => {
         },
       )
     })
+  })
+})
+
+describe("envAuditToJson", () => {
+  it("writes alias_of as the reference string or null, not an Option envelope", () => {
+    const config: EnvpktConfig = {
+      version: 1,
+      env: {
+        PORT: { value: "3000" },
+        APP_PORT: { from_key: "env.PORT" },
+      },
+    }
+
+    const json = JSON.parse(JSON.stringify(envAuditToJson(computeEnvAudit(config, {}))))
+    expect(json.entries).toEqual([
+      expect.objectContaining({ key: "PORT", alias_of: null }),
+      expect.objectContaining({ key: "APP_PORT", alias_of: "env.PORT", defaultValue: "3000" }),
+    ])
+    expect(json.total).toBe(2)
   })
 })
 

@@ -71,7 +71,7 @@ describe("bootSafe logger", () => {
 
     const failures = entries().filter((e) => e.message === "alias.validate.failed")
     expect(failures.size).toBe(1)
-    failures.headOption.fold(
+    failures.headOption().fold(
       () => expect.unreachable("Expected a failure entry"),
       (entry) => {
         expect(entry.level).toBe("warn")

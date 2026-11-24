@@ -33,37 +33,41 @@ export const copyableSecretMeta = (
 
 /** Serialize a `[secret.<name>]` block from its metadata, round-trippable by the TOML parser. */
 export const serializeSecretBlock = (name: string, meta: SecretMeta): string => {
-  const lines: string[] = [`[secret.${name}]`]
-  if (meta.service !== undefined) lines.push(`service = ${tomlString(meta.service)}`)
-  if (meta.purpose !== undefined) lines.push(`purpose = ${tomlString(meta.purpose)}`)
-  if (meta.comment !== undefined) lines.push(`comment = ${tomlString(meta.comment)}`)
-  if (meta.created !== undefined) lines.push(`created = ${tomlString(meta.created)}`)
-  if (meta.expires !== undefined) lines.push(`expires = ${tomlString(meta.expires)}`)
-  if (meta.rotates !== undefined) lines.push(`rotates = ${tomlString(meta.rotates)}`)
-  if (meta.rate_limit !== undefined) lines.push(`rate_limit = ${tomlString(meta.rate_limit)}`)
-  if (meta.model_hint !== undefined) lines.push(`model_hint = ${tomlString(meta.model_hint)}`)
-  if (meta.source !== undefined) lines.push(`source = ${tomlString(meta.source)}`)
-  if (meta.rotation_url !== undefined) lines.push(`rotation_url = ${tomlString(meta.rotation_url)}`)
-  if (meta.last_rotated_at !== undefined) lines.push(`last_rotated_at = ${tomlString(meta.last_rotated_at)}`)
-  if (meta.required !== undefined) lines.push(`required = ${meta.required ? "true" : "false"}`)
-  if (meta.capabilities !== undefined) lines.push(`capabilities = ${tomlStringArray(meta.capabilities)}`)
-  if (meta.tags !== undefined) lines.push(`tags = ${tomlInlineTable(meta.tags)}`)
-  if (meta.namespace !== undefined) lines.push(`namespace = ${tomlString(meta.namespace)}`)
-  if (meta.from_key !== undefined) lines.push(`from_key = ${tomlString(meta.from_key)}`)
-  if (meta.encrypted_value !== undefined && meta.encrypted_value !== "") {
-    lines.push(`encrypted_value = """`, meta.encrypted_value, `"""`)
-  }
+  const lines: ReadonlyArray<string> = [
+    `[secret.${name}]`,
+    ...(meta.service !== undefined ? [`service = ${tomlString(meta.service)}`] : []),
+    ...(meta.purpose !== undefined ? [`purpose = ${tomlString(meta.purpose)}`] : []),
+    ...(meta.comment !== undefined ? [`comment = ${tomlString(meta.comment)}`] : []),
+    ...(meta.created !== undefined ? [`created = ${tomlString(meta.created)}`] : []),
+    ...(meta.expires !== undefined ? [`expires = ${tomlString(meta.expires)}`] : []),
+    ...(meta.rotates !== undefined ? [`rotates = ${tomlString(meta.rotates)}`] : []),
+    ...(meta.rate_limit !== undefined ? [`rate_limit = ${tomlString(meta.rate_limit)}`] : []),
+    ...(meta.model_hint !== undefined ? [`model_hint = ${tomlString(meta.model_hint)}`] : []),
+    ...(meta.source !== undefined ? [`source = ${tomlString(meta.source)}`] : []),
+    ...(meta.rotation_url !== undefined ? [`rotation_url = ${tomlString(meta.rotation_url)}`] : []),
+    ...(meta.last_rotated_at !== undefined ? [`last_rotated_at = ${tomlString(meta.last_rotated_at)}`] : []),
+    ...(meta.required !== undefined ? [`required = ${meta.required ? "true" : "false"}`] : []),
+    ...(meta.capabilities !== undefined ? [`capabilities = ${tomlStringArray(meta.capabilities)}`] : []),
+    ...(meta.tags !== undefined ? [`tags = ${tomlInlineTable(meta.tags)}`] : []),
+    ...(meta.namespace !== undefined ? [`namespace = ${tomlString(meta.namespace)}`] : []),
+    ...(meta.from_key !== undefined ? [`from_key = ${tomlString(meta.from_key)}`] : []),
+    ...(meta.encrypted_value !== undefined && meta.encrypted_value !== ""
+      ? [`encrypted_value = """`, meta.encrypted_value, `"""`]
+      : []),
+  ]
   return `${lines.join("\n")}\n`
 }
 
 /** Serialize an `[env.<name>]` block from its metadata. */
 export const serializeEnvBlock = (name: string, meta: EnvMeta): string => {
-  const lines: string[] = [`[env.${name}]`]
-  if (meta.value !== undefined) lines.push(`value = ${tomlString(meta.value)}`)
-  if (meta.from_key !== undefined) lines.push(`from_key = ${tomlString(meta.from_key)}`)
-  if (meta.purpose !== undefined) lines.push(`purpose = ${tomlString(meta.purpose)}`)
-  if (meta.comment !== undefined) lines.push(`comment = ${tomlString(meta.comment)}`)
-  if (meta.tags !== undefined) lines.push(`tags = ${tomlInlineTable(meta.tags)}`)
-  if (meta.namespace !== undefined) lines.push(`namespace = ${tomlString(meta.namespace)}`)
+  const lines: ReadonlyArray<string> = [
+    `[env.${name}]`,
+    ...(meta.value !== undefined ? [`value = ${tomlString(meta.value)}`] : []),
+    ...(meta.from_key !== undefined ? [`from_key = ${tomlString(meta.from_key)}`] : []),
+    ...(meta.purpose !== undefined ? [`purpose = ${tomlString(meta.purpose)}`] : []),
+    ...(meta.comment !== undefined ? [`comment = ${tomlString(meta.comment)}`] : []),
+    ...(meta.tags !== undefined ? [`tags = ${tomlInlineTable(meta.tags)}`] : []),
+    ...(meta.namespace !== undefined ? [`namespace = ${tomlString(meta.namespace)}`] : []),
+  ]
   return `${lines.join("\n")}\n`
 }
